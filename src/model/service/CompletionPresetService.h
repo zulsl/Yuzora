@@ -1,0 +1,73 @@
+#ifndef COMPLETIONPRESETSERVICE_H
+#define COMPLETIONPRESETSERVICE_H
+
+#include <QObject>
+#include <QList>
+#include "CompletionPresetDao.h"
+#include "CompletionPresetEntity.h"
+#include "PromptDao.h"
+#include "PromptEntity.h"
+
+class CompletionPresetService : public QObject
+{
+    Q_OBJECT
+public:
+    static CompletionPresetService& instance();
+    ~CompletionPresetService() override;
+
+    CompletionPresetService(const CompletionPresetService&) = delete;
+    CompletionPresetService& operator=(const CompletionPresetService&) = delete;
+    CompletionPresetService(CompletionPresetService&&) = delete;
+    CompletionPresetService& operator=(CompletionPresetService&&) = delete;
+
+    //----------预设----------
+    // 查询
+    QList<CompletionPresetEntity> getAllPresets();
+    CompletionPresetEntity getPresetById(const QString& id);
+    CompletionPresetEntity getActivePreset()const;
+    // 增删改
+    QString createPreset(const CompletionPresetEntity& preset);
+    bool updatePreset(const CompletionPresetEntity& preset);
+    bool deletePreset(const QString& id);
+    QString duplicatePreset(const QString& sourceId);
+    bool setActivePreset(const QString& id);
+    bool renamePreset(const QString& id, const QString& newName);
+
+    //----------提示词----------
+    QList<PromptEntity> getPromptsByPresetId(const QString& id);
+    PromptEntity getPromptById(const QString& id);
+    bool createPrompts(const QList<PromptEntity>& prompts);
+    bool createPrompt(const PromptEntity& prompt);
+    bool updatePrompt(const PromptEntity& prompt);
+
+
+
+    // 导入导出（兼容 SillyTavern 原生格式）
+    int importFromSillyTavern(const QString& filePath,const QString& fileName);
+    bool exportToSillyTavern(const QString& presetId, const QString& savePath);
+    bool exportAllToSillyTavern(const QString& savePath);
+
+signals:
+    // void presetListChanged();
+    void presetUpdated(const QString& presetId);
+    void presetDeleted(const QString& presetId);
+    void exportSuccess();
+    void operationError(const QString& errorMsg);
+
+private:
+    explicit CompletionPresetService(QObject* parent = nullptr);
+    void initBuiltinPresets();
+    QStringList parsePromptOrder(const QJsonObject& cpJson,QHash<QString, bool>& h_isActive);
+    void CreateDefaultPromptEntries(const QString& presetId,QStringList & promptOrderList);
+    bool validatePreset(const CompletionPresetEntity& preset, QString& outError);//验证预设(用处不大)
+
+    // SillyTavern 格式互转
+    CompletionPresetEntity parsePresetDataToEntity(const QJsonObject& stJson,const QString& fileName,QList<PromptEntity>& promptList);//json转结构体
+    QJsonObject toSillyTavernJson(const CompletionPresetEntity& preset);
+
+    CompletionPresetDao* m_completionPresetDao = nullptr;
+    PromptDao* m_promptDao = nullptr;
+    CompletionPresetEntity m_currentActivePreset;//当前激活的预设
+};
+
+#endif

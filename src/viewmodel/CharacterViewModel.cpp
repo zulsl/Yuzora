@@ -1,0 +1,240 @@
+#include "CharacterViewModel.h"
+#include "CharacterService.h"
+#include "CharacterItemViewModel.h"
+#include "CharacterListModel.h"
+#include "ChatService.h"
+#include "WorldInfoService.h"
+
+CharacterViewModel::CharacterViewModel(QObject* parent)
+    : QObject(parent)
+    , m_characterListModel(new CharacterListModel(this))
+{
+    CharacterService& service = CharacterService::instance();
+
+    // 绑定业务层信号，自动同步视图状态
+    connect(&service, &CharacterService::characterListChanged,
+            this, &CharacterViewModel::onCharacterListChanged);
+    connect(&service, &CharacterService::operationError,
+            this, &CharacterViewModel::operationError);
+    connect(&service, &CharacterService::importSuccess,
+            this, &CharacterViewModel::importSuccess);
+    connect(&service, &CharacterService::exportSuccess,
+            this, &CharacterViewModel::exportSuccess);
+
+    // 初始化加载角色列表
+    refreshList();
+}
+
+CharacterViewModel::~CharacterViewModel() = default;
+
+int CharacterViewModel::currentIndex() const
+{
+    return m_currentIndex;
+}
+
+void CharacterViewModel::setCurrentIndex(int index)
+{
+    if (m_currentIndex == index) return;
+    if (index < 0 || index >= m_characterListModel->rowCount()) return;
+
+    m_currentIndex = index;
+    emit currentIndexChanged();
+}
+
+// ==================== 属性读取 ====================
+CharacterListModel* CharacterViewModel::characterListModel() const
+{
+    return m_characterListModel;
+}
+
+CharacterEntity CharacterViewModel::currentCharacter() const
+{
+    return m_currentCharacter;
+}
+
+QString CharacterViewModel::searchKeyword() const
+{
+    return m_searchKeyword;
+}
+
+void CharacterViewModel::setSearchKeyword(const QString& keyword)
+{
+    if (m_searchKeyword != keyword) {
+        m_searchKeyword = keyword;
+        emit searchKeywordChanged();
+    }
+}
+
+bool CharacterViewModel::hasSelection() const
+{
+    return !m_currentCharacter.id.isEmpty();
+}
+
+// ==================== UI 可调用方法 ====================
+void CharacterViewModel::refreshList()
+{
+    QList<CharacterEntity> entities = CharacterService::instance().getAllCharacters();
+    updateListModel(entities);
+}
+
+void CharacterViewModel::searchCharacters()
+{
+    QList<CharacterEntity> entities = CharacterService::instance().searchByName(m_searchKeyword);
+    updateListModel(entities);
+}
+
+void CharacterViewModel::createNewCharacter()
+{
+    CharacterEntity newChar;
+    newChar.name = "新角色";
+    newChar.cardFormatVersion = 2;
+    newChar.characterVersion = "1.0.0";
+
+    CharacterService::instance().createCharacter(newChar);
+
+    refreshList();
+
+    m_currentCharacter = newChar;
+    refreshForm();
+}
+
+void CharacterViewModel::saveCurrentCharacter(const CharacterEntity& entity)
+{
+    CharacterEntity updated = entity;
+    CharacterService::instance().updateCharacter(updated);
+
+    m_currentCharacter = updated;
+    refreshForm();
+}
+
+void CharacterViewModel::deleteCurrentCharacter()
+{
+    if (!hasSelection()) return;
+    CharacterService::instance().deleteCharacter(m_currentCharacter.id);
+    clearSelection();
+}
+
+void CharacterViewModel::duplicateCurrentCharacter()
+{
+    if (!hasSelection()) return;
+
+    QString newId = CharacterService::instance().duplicateCharacter(m_currentCharacter.id);
+    if (!newId.isEmpty()) {
+        selectCharacter(newId);
+    }
+}
+
+void CharacterViewModel::importCharacter(const QUrl& fileUrl)
+{
+    qDebug()<<"文件url:"<<fileUrl;
+    QString filePath = fileUrl.toLocalFile();
+    QString newId = CharacterService::instance().importCharacterFromFile(filePath);
+
+    //切换表单
+    // if (!newId.isEmpty()) {
+    //     selectCharacter(newId);
+    // }
+}
+
+void CharacterViewModel::exportCurrentCharacter(const QString& savePath)
+{
+    if (!hasSelection()) return;
+    CharacterService::instance().exportCharacterToFile(m_currentCharacter.id, savePath);
+}
+
+void CharacterViewModel::toggleFavorite(const QString& charId)
+{
+    CharacterService::instance().toggleFavorite(charId);
+}
+
+void CharacterViewModel::selectCharacter(const QString& charId)
+{
+    qDebug()<<"调用一次";
+    CharacterEntity entity = CharacterService::instance().getCharacterById(charId);
+    if (entity.id.isEmpty()) return;
+
+    m_currentCharacter = entity;
+    refreshForm();
+}
+
+void CharacterViewModel::clearSelection()
+{
+    m_currentCharacter = CharacterEntity();
+    refreshForm();
+}
+
+void CharacterViewModel::openSelectedCharChat()
+{
+    if (!hasSelection())
+    {
+        emit operationTip("请先选择角色");
+        return;
+    }
+    QString charId = m_currentCharacter.id;
+    if (charId.isEmpty())
+    {
+        emit operationError("角色ID无效");
+        return;
+    }
+
+
+    // 调用ChatService业务方法
+    QString sessionId = ChatService::instance().openCharacterSession(charId);
+    if (sessionId.isEmpty())
+    {
+        emit operationError("打开角色会话失败");
+        return;
+    }
+    // 打开成功，通知QML切换页面到聊天页
+    emit navigateToChatPage();
+}
+
+// ==================== 槽函数 ====================
+void CharacterViewModel::onCharacterListChanged()
+{
+    refreshList();
+}
+
+void CharacterViewModel::onOperationError(const QString& errorMsg)
+{
+    emit operationError(errorMsg);
+}
+
+void CharacterViewModel::updateListModel(const QList<CharacterEntity>& entities)
+{
+    QList<CharacterItemViewModel*> items;
+    items.reserve(entities.size());
+
+    for (const CharacterEntity& entity : entities) {
+        items.append(createItemFromEntity(entity));
+    }
+
+    m_characterListModel->loadList(items);
+}
+
+CharacterItemViewModel* CharacterViewModel::createItemFromEntity(const CharacterEntity& entity)
+{
+    auto* item = new CharacterItemViewModel();
+    item->updateFromEntity(entity);
+    return item;
+}
+
+void CharacterViewModel::refreshForm()
+{
+
+    emit currentCharacterChanged();
+    emit characterBookNameChanged();
+}
+
+
+QString CharacterViewModel::getCharacterBookName() const
+{
+
+    if (m_currentCharacter.worldBookIds.isEmpty()) return "无";
+
+    QString bookId=m_currentCharacter.worldBookIds.first();
+    WorldInfoBookEntity entity = WorldInfoService::instance().getBookById(bookId);
+
+    return entity.name.isEmpty() ? "无" : entity.name;
+}
+
