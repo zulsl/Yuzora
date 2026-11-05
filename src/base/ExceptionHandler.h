@@ -3,9 +3,9 @@
 
 #include <QObject>
 #include <QtQml/qqmlregistration.h>
+#include <QQmlEngine>
 #include "AppException.h"
 
-class QQmlEngine;
 class QJSEngine;
 
 //异常处理类
@@ -18,7 +18,13 @@ class ExceptionHandler : public QObject
 
 public:
     // 私有构造单例，QML 侧通过 create() 复用同一实例（必须 public）
-    static ExceptionHandler* create(QQmlEngine*, QJSEngine*) { return &instance(); }
+    static ExceptionHandler* create(QQmlEngine*, QJSEngine*)
+    {
+        ExceptionHandler* inst = &instance();
+        // 生命周期归 C++，避免引擎析构时删除静态单例造成退出卡死
+        QQmlEngine::setObjectOwnership(inst, QQmlEngine::CppOwnership);
+        return inst;
+    }
 
 public:
     static ExceptionHandler& instance();

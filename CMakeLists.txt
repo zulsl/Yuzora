@@ -7,7 +7,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Quick Network Sql)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Quick QuickControls2 Network Sql)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
@@ -146,7 +146,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 )
 
 target_link_libraries(${PROJECT_NAME}
-    PRIVATE Qt6::Core Qt6::Gui Qt6::Quick
+    PRIVATE Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2
     Qt6::Network Qt6::Qml Qt6::Sql
 )
 

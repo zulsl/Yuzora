@@ -5,10 +5,10 @@
 #include <QVariantMap>
 #include <QStringList>
 #include <QtQml/qqmlregistration.h>
+#include <QQmlEngine>
 #include "CharacterListModel.h"
 #include "CharacterEntity.h"
 
-class QQmlEngine;
 class QJSEngine;
 
 /**
@@ -27,6 +27,8 @@ public:
     static CharacterViewModel* create(QQmlEngine*, QJSEngine*)
     {
         static CharacterViewModel instance;
+        // 生命周期归 C++：静态实例必须由我们销毁，否则退出时被销毁两次导致卡死
+        QQmlEngine::setObjectOwnership(&instance, QQmlEngine::CppOwnership);
         return &instance;
     }
     //列表model

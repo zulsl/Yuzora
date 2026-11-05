@@ -3,9 +3,9 @@
 
 #include <QObject>
 #include <QtQml/qqmlregistration.h>
+#include <QQmlEngine>
 #include "GlobalConstants.h"
 
-class QQmlEngine;
 class QJSEngine;
 
 /**
@@ -27,6 +27,9 @@ public:
     static SettingsViewModel* create(QQmlEngine*, QJSEngine*)
     {
         static SettingsViewModel instance;
+        // 生命周期归 C++：静态实例必须由我们销毁。否则引擎析构时会先 delete 一次，
+        // 进程退出时静态析构再销毁一次，表现为"关窗后卡死/崩溃"。
+        QQmlEngine::setObjectOwnership(&instance, QQmlEngine::CppOwnership);
         return &instance;
     }
 

@@ -17,8 +17,8 @@ QtObject {
     property real windowHeight: 720
 
     // ========== 断点 ==========
-    readonly property int bpCompact: 600
-    readonly property int bpExpanded: 1024
+    readonly property int bpCompact: 600    //手机
+    readonly property int bpExpanded: 1024  //电脑
 
     readonly property bool isCompact: windowWidth < bpCompact
     readonly property bool isExpanded: windowWidth >= bpExpanded
@@ -27,14 +27,20 @@ QtObject {
     // 兼容旧名：历史代码用 Theme.isMobile，语义改为"窗口窄于 600"
     readonly property bool isMobile: isCompact
     // 是否触屏优先设备（用于 hover 态、鼠标光标等降级）
-    readonly property bool isTouchPrimary: DeviceHelper.isTouchDevice
+    // 【重要】QML 单例不在内部绑定 C++ 单例：否则引擎析构阶段会卡死（关窗后进程不退出）。
+    // 这些值统一由 Main.qml 用 Connections 推入。
+    property bool isTouchPrimary: false
 
     // ========== 主题模式 ==========
     // 取值沿用 Material 语义：0 = Light, 1 = Dark, 2 = System
-    readonly property int themeMode: SettingsViewModel.themeMode
+    // 由 Main.qml 从 SettingsViewModel.themeMode 推入
+    property int themeMode: 0
+    // 系统当前是否深色，由 Main.qml 从 DeviceHelper.systemDarkMode 推入
+    property bool systemDarkMode: false
+
     readonly property int materialTheme: themeMode
     readonly property bool isDark: themeMode === 1
-                                 || (themeMode === 2 && DeviceHelper.systemDarkMode)
+                                 || (themeMode === 2 && systemDarkMode)
 
     // ========== 色板 ==========
     readonly property PaletteLight lightPalette: PaletteLight {}
@@ -80,8 +86,8 @@ QtObject {
     readonly property color overlayScrim: palette.overlayScrim
     readonly property color shadowColor: palette.shadowColor
 
-    // ========== 主色（唯一来源：SettingsViewModel.themeColor）==========
-    readonly property color primaryColor: SettingsViewModel.themeColor
+    // ========== 主色（唯一来源：SettingsViewModel.themeColor，由 Main 推入）==========
+    property color primaryColor: "#4169E1"
     readonly property color accentColor: primaryColor              // 兼容旧名
     readonly property color accentHover: Qt.lighter(primaryColor, 1.12)
     readonly property color accentPressed: Qt.darker(primaryColor, 1.12)
@@ -101,7 +107,8 @@ QtObject {
     readonly property string fontFamily: Qt.platform.os === "windows"
                                          ? "Microsoft YaHei"
                                          : ""
-    readonly property int baseFontSize: SettingsViewModel.baseFontSize
+    // 正文字号（由 Main.qml 从 SettingsViewModel.baseFontSize 推入）
+    property int baseFontSize: 14
 
     readonly property int fontDisplay: 24
     readonly property int fontTitle: 18

@@ -5,10 +5,10 @@
 #include <QString>
 #include <QStringList>
 #include <QtQml/qqmlregistration.h>
+#include <QQmlEngine>
 
 #include "ApiConfigEntity.h"
 
-class QQmlEngine;
 class QJSEngine;
 
 /**
@@ -29,7 +29,13 @@ class ApiConfigFormViewModel : public QObject
 public:
     static ApiConfigFormViewModel* instance();
     // 供 QML 使用：QML 单例工厂
-    static ApiConfigFormViewModel* create(QQmlEngine*, QJSEngine*) { return instance(); }
+    static ApiConfigFormViewModel* create(QQmlEngine*, QJSEngine*)
+    {
+        // 必须复用 instance() 的同一个对象，不能再定义一份静态实例
+        ApiConfigFormViewModel* inst = instance();
+        QQmlEngine::setObjectOwnership(inst, QQmlEngine::CppOwnership);
+        return inst;
+    }
 
     explicit ApiConfigFormViewModel(QObject* parent = nullptr);
     ~ApiConfigFormViewModel() override;

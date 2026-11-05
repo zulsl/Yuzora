@@ -4,11 +4,11 @@
 #include <QObject>
 #include <QString>
 #include <QtQml/qqmlregistration.h>
+#include <QQmlEngine>
 
 #include "ApiConfigListModel.h"
 #include "ApiConfigService.h"
 
-class QQmlEngine;
 class QJSEngine;
 
 /**
@@ -30,6 +30,8 @@ public:
     static ApiConfigViewModel* create(QQmlEngine*, QJSEngine*)
     {
         static ApiConfigViewModel instance;
+        // 生命周期归 C++：静态实例必须由我们销毁，否则退出时被销毁两次导致卡死
+        QQmlEngine::setObjectOwnership(&instance, QQmlEngine::CppOwnership);
         return &instance;
     }
 

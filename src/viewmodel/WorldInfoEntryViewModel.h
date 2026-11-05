@@ -5,11 +5,11 @@
 #include <QVariantMap>
 #include <QStringList>
 #include <QtQml/qqmlregistration.h>
+#include <QQmlEngine>
 
 #include "WorldInfoEntryListModel.h"
 #include "WorldInfoEntryEntity.h"
 
-class QQmlEngine;
 class QJSEngine;
 
 /**
@@ -35,7 +35,13 @@ public:
     // C++ 侧获取同一实例（QML 单例也用这个实例，避免出现两份状态）
     static WorldInfoEntryViewModel* instance();
     // 供 QML 使用：QML 单例工厂
-    static WorldInfoEntryViewModel* create(QQmlEngine*, QJSEngine*) { return instance(); }
+    static WorldInfoEntryViewModel* create(QQmlEngine*, QJSEngine*)
+    {
+        WorldInfoEntryViewModel* inst = instance();
+        // 生命周期归 C++，避免引擎析构时删除静态单例导致退出卡死
+        QQmlEngine::setObjectOwnership(inst, QQmlEngine::CppOwnership);
+        return inst;
+    }
 
     explicit WorldInfoEntryViewModel(QObject* parent = nullptr);
     ~WorldInfoEntryViewModel() override;

@@ -1,7 +1,6 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
-#include <QQmlContext>
-#include <QDebug>
+#include <QQuickStyle>
 #include <QIcon>
 #include <qqml.h>
 
@@ -14,34 +13,41 @@
 // ======================================
 // 视图层与业务层的边界
 // ======================================
-// 6 个 ViewModel 已改为 QML 单例（QML_ELEMENT + QML_SINGLETON），定义在 src/viewmodel/ 下，
-// 由 QML 引擎在首次被引用时构造并托管生命周期，因此这里不再手工 new，也不再注入上下文属性。
-// DeviceHelper / ExceptionHandler 是"私有构造 + instance()"的单例，无法交给 QML 自动构造，
-// 故改用 qmlRegisterSingletonInstance 注册成同名 QML 单例，QML 侧写法保持不变。
+// 6 个 ViewModel + DeviceHelper / ExceptionHandler 都以 QML 单例形式暴露：
+// 前者用 QML_ELEMENT + QML_SINGLETON（create() 里把静态实例标记为 CppOwnership），
+// 后者是"私有构造 + instance()"，同样在 create() 里返回该静态实例。
+// 关键：create() 返回的静态实例必须 setObjectOwnership(CppOwnership)，
+// 否则 QML 引擎会在析构时 delete 它们，退出阶段再被静态析构销毁一次，
+// 表现为"关窗后进程卡死"。
 
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
 
+// 必须显式选择非原生样式：
+//   1) 本项目大量自定义 background / contentItem，Windows 原生样式不支持定制；
+//   2) Material.theme / Material.primary / Material.accent 只在 Material 样式下生效。
+// 必须在加载 QML 之前调用。
+    QQuickStyle::setStyle(QStringLiteral("Material"));
+
 //设置应用基本信息
     app.setWindowIcon(QIcon(":/icons/res/app/favicon-48x48.png"));
-    app.setApplicationName(GlobalConstants::APP_NAME);//设置应用名称
-    app.setApplicationVersion(GlobalConstants::APP_VERSION.toString());//设置应用版本
-    //弃用app.setOrganizationName("zzds");//设置组织名(公司名)
-    app.setOrganizationDomain("com.qtyuzora");//域名(macOs偏好文件)
+    app.setApplicationName(GlobalConstants::APP_NAME);
+    app.setApplicationVersion(GlobalConstants::APP_VERSION.toString());
+    app.setOrganizationDomain("com.qtyuzora");
 
 //全局异常处理器和跨端适配层初始化
     ExceptionHandler& exceptionHandler = ExceptionHandler::instance();
     DeviceHelper& deviceHelper = DeviceHelper::instance();
+    Q_UNUSED(exceptionHandler)
+    Q_UNUSED(deviceHelper)
 
 //确保应用数据目录存在
     Utils::getAppDataPath();
     Utils::getAvatarDirPath();
 
 //初始化数据库（主线程建表、创建连接池基础配置）
-    bool dbInitOk = DatabaseManager::instance().initialize();
-    if (!dbInitOk) {
-        //致命错误
+    if (!DatabaseManager::instance().initialize()) {
         qFatal("数据库初始化失败，程序退出。");
         return -1;
     }
@@ -49,11 +55,9 @@ int main(int argc, char *argv[])
 // ========== QML引擎初始化 ==========
     QQmlApplicationEngine engine;
 
-//加载主 QML 界面
-    //==监听启动失败信号,失败退出程序==
     QObject::connect(
-        &engine,&QQmlApplicationEngine::objectCreationFailed,
-        &app,[]() { QCoreApplication::exit(-1); },
+        &engine, &QQmlApplicationEngine::objectCreationFailed,
+        &app, []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
 
     engine.loadFromModule("Yuzora", "Main");

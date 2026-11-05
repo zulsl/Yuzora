@@ -3,18 +3,17 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 
+import Yuzora 1.0
+
 // 导航宿主
-// 职责：按断点切换导航形态 —— 宽窗口常驻侧栏、窄窗口抽屉；
-//       并把页面内容宿主（content）交给调用方放 StackView。
+// 职责：按断点切换导航形态 —— 宽窗口常驻侧栏、窄窗口抽屉。
 // 移动端专项：抽屉在触屏设备上关闭拖拽（interactive: false），
 //       避免与系统边缘返回手势抢边缘，只能由按钮打开。
-// 可配置属性：items（[{title, icon}]）、currentIndex、content。
 Item {
     id: root
 
     property alias content: contentHost.data
-    // 供调用方把 StackView 锚定到内容区
-    readonly property Item contentArea: contentHost
+    property Item contentArea: contentHost
     property var items: []
     property int currentIndex: 0
 
@@ -98,7 +97,6 @@ Item {
                 anchors.fill: parent
                 spacing: 0
 
-                // 顶部用户区（头像 + 名称）
                 Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: Theme.avatarLg + Theme.spaceXl
@@ -110,6 +108,12 @@ Item {
                         source: SettingsViewModel.userAvatar
                         fallbackText: SettingsViewModel.userName.length > 0
                                       ? SettingsViewModel.userName.charAt(0) : "?"
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: avatarDialog.open()
+                        }
                     }
                 }
 
@@ -188,7 +192,6 @@ Item {
                         color: Theme.textPrimary
                         readOnly: true
                         selectByMouse: true
-                        // TextInput 不支持 elide：超出部分由它自身横向滚动处理
 
                         MouseArea {
                             anchors.fill: parent
@@ -231,7 +234,7 @@ Item {
         }
     }
 
-    // 头像选择（原先挂在 Main.qml 的抽屉里，随导航宿主一起迁移）
+    // 头像选择
     FileDialog {
         id: avatarDialog
         title: "选择头像图片"

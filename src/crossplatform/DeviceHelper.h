@@ -4,10 +4,10 @@
 #include <QObject>
 #include <QSize>
 #include <QtQml/qqmlregistration.h>
+#include <QQmlEngine>
 
 #include <QPermission>
 
-class QQmlEngine;
 class QJSEngine;
 
 //除了权限适配需优化,其他全面完成
@@ -27,7 +27,14 @@ class DeviceHelper : public QObject
 public:
     // 本类是"私有构造 + instance()"的单例，QML 侧通过 create() 拿到同一个实例。
     // 必须是 public：QML 只会查找 public 的 create()。
-    static DeviceHelper* create(QQmlEngine*, QJSEngine*) { return &instance(); }
+    static DeviceHelper* create(QQmlEngine*, QJSEngine*)
+    {
+        DeviceHelper* inst = &instance();
+        // 生命周期归 C++。若不给这个标记，QML 引擎会在析构时 delete 掉本静态单例，
+        // 进程退出时静态析构再销毁一次 → 关窗后进程卡死（本次修复的核心问题）。
+        QQmlEngine::setObjectOwnership(inst, QQmlEngine::CppOwnership);
+        return inst;
+    }
     Q_PROPERTY(bool isMobile READ isMobile CONSTANT)
     Q_PROPERTY(bool isPC READ isPC CONSTANT)
     Q_PROPERTY(bool isTablet READ isTablet CONSTANT)

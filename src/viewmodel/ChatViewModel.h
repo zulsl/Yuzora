@@ -3,11 +3,11 @@
 
 #include <QObject>
 #include <QtQml/qqmlregistration.h>
+#include <QQmlEngine>
 #include "ChatMessageEntity.h"
 #include "ChatMessageListModel.h"
 #include "ChatSessionListModel.h"
 
-class QQmlEngine;
 class QJSEngine;
 
 /**
@@ -26,6 +26,8 @@ public:
     static ChatViewModel* create(QQmlEngine*, QJSEngine*)
     {
         static ChatViewModel instance;
+        // 生命周期归 C++：静态实例必须由我们销毁，否则退出时被销毁两次导致卡死
+        QQmlEngine::setObjectOwnership(&instance, QQmlEngine::CppOwnership);
         return &instance;
     }
     //正在生成
