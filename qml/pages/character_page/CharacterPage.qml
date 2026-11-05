@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Dialogs
 
 import Yuzora 1.0
@@ -13,6 +14,36 @@ PageScaffold {
     title: "角色管理"
     contentPadding: Theme.spaceSm
     onLeftClicked: Ui.requestDrawer()
+
+    // ========== 首次构建详情表单时的加载态 ==========
+    // 为什么要它：从"未选中"切到"有选中"时，右侧要一次性创建整个表单
+    // （含多个长文本 TextArea），长角色卡的排版会阻塞一帧以上，表现为点完卡一下。
+    // 这里先画一帧"加载中"，下一帧再真正构建表单 —— 用户看到的是转圈，而不是卡死。
+    // 只在"无 → 有"时生效；两个角色之间切换不会销毁重建表单。
+    property bool pendingFirstBuild: false
+    property bool _hadSelection: CharacterViewModel.hasSelection
+
+    Connections {
+        target: CharacterViewModel
+
+        function onCurrentCharacterChanged() {
+            const selected = CharacterViewModel.hasSelection
+            if (selected && !root._hadSelection) {
+                root.pendingFirstBuild = true
+                buildDelay.restart()
+            } else if (!selected) {
+                root.pendingFirstBuild = false
+            }
+            root._hadSelection = selected
+        }
+    }
+
+    Timer {
+        id: buildDelay
+        interval: 16          // 一帧：让加载态先上屏
+        repeat: false
+        onTriggered: root.pendingFirstBuild = false
+    }
 
     // QML 的 url 没有 toLocalFile()，这里做一次统一的 file:// → 本地路径转换
     function localPath(url) {
@@ -30,6 +61,48 @@ PageScaffold {
     }
 
     // ========== 宽窗口：左右并排 ==========
+    // 右侧按"是否有选中"切换：没选中就显示空态，而不是一个空的详情表单。
+    Component {
+        id: characterDetailComp
+
+        CharacterDetailForm {
+            onExportRequested: exportDialog.open()
+        }
+    }
+
+    Component {
+        id: noCharacterComp
+
+        EmptyState {
+            text: "未选择角色"
+            detail: "在左侧列表中选择一个角色进行编辑"
+        }
+    }
+
+    // 首次构建表单时的加载态（一帧）
+    Component {
+        id: loadingComp
+
+        Item {
+            BusyIndicator {
+                anchors.centerIn: parent
+                running: true
+                width: Theme.controlLg
+                height: Theme.controlLg
+            }
+
+            Label {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.top: parent.verticalCenter
+                anchors.topMargin: Theme.controlLg * 0.8
+                text: "正在加载角色…"
+                font.pixelSize: Theme.fontBodySm
+                font.family: Theme.fontFamily
+                color: Theme.textSecondary
+            }
+        }
+    }
+
     Component {
         id: wideLayout
 
@@ -42,8 +115,10 @@ PageScaffold {
                 // 并排时详情一直在右侧，无需额外动作
             }
 
-            second: CharacterDetailForm {
-                onExportRequested: exportDialog.open()
+            second: Loader {
+                sourceComponent: !CharacterViewModel.hasSelection ? noCharacterComp
+                                 : root.pendingFirstBuild ? loadingComp
+                                 : characterDetailComp
             }
         }
     }
@@ -53,7 +128,6 @@ PageScaffold {
         id: compactLayout
 
         MasterDetailStack {
-            id: detailStack
             listComponent: compactList
             detailComponent: compactDetail
         }
@@ -64,18 +138,23 @@ PageScaffold {
 
         CharacterListPanel {
             onImportRequested: importDialog.open()
-            onDetailRequested: detailStack.showDetail()
+            // detailRequested 由 MasterDetailStack 自动连接到 showDetail()，
+            // 不再跨 Component 引用 detailStack 的 id（那样会 ReferenceError）
         }
     }
 
     Component {
         id: compactDetail
 
-        // 详情页以整页形式呈现：自带返回按钮
+        // 详情页以整页形式呈现：自带返回按钮。
+        // backRequested 由 MasterDetailStack 自动连接到 hideDetail()。
         PageScaffold {
+            id: compactDetailPage
+            signal backRequested()
+
             title: root.detailStackTitle()
             leftIconSource: "qrc:/icons/res/arrow-narrow-left.svg"
-            onLeftClicked: detailStack.hideDetail()
+            onLeftClicked: compactDetailPage.backRequested()
 
             CharacterDetailForm {
                 anchors.fill: parent

@@ -41,9 +41,28 @@ PageScaffold {
                 onExportAllRequested: exportAllDialog.open()
             }
 
-            second: PresetEditForm {
-                onExportRequested: exportSingleDialog.open()
+            // 没选中预设时显示空态，而不是一个空的编辑表单
+            second: Loader {
+                sourceComponent: CompletionPresetViewModel.hasSelection
+                                 ? presetEditComp : noPresetComp
             }
+        }
+    }
+
+    Component {
+        id: presetEditComp
+
+        PresetEditForm {
+            onExportRequested: exportSingleDialog.open()
+        }
+    }
+
+    Component {
+        id: noPresetComp
+
+        EmptyState {
+            text: "未选择预设"
+            detail: "在左侧列表中选择一个预设进行编辑"
         }
     }
 
@@ -52,7 +71,6 @@ PageScaffold {
         id: compactLayout
 
         MasterDetailStack {
-            id: presetStack
             listComponent: compactList
             detailComponent: compactDetail
         }
@@ -64,7 +82,7 @@ PageScaffold {
         PresetListPanel {
             onImportRequested: importDialog.open()
             onExportAllRequested: exportAllDialog.open()
-            onPresetActivated: presetStack.showDetail()
+            // detailRequested 由 MasterDetailStack 自动连接到 showDetail()
         }
     }
 
@@ -72,9 +90,12 @@ PageScaffold {
         id: compactDetail
 
         PageScaffold {
+            id: compactDetailPage
+            signal backRequested()
+
             title: "预设编辑"
             leftIconSource: "qrc:/icons/res/arrow-narrow-left.svg"
-            onLeftClicked: presetStack.hideDetail()
+            onLeftClicked: compactDetailPage.backRequested()
 
             PresetEditForm {
                 anchors.fill: parent

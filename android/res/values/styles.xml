@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      自定义窗口背景：
+      软键盘弹出（adjustResize）会改变窗口尺寸，Android 在 Surface 重分配的间隙
+      会先绘制 android:windowBackground。不设置时默认是黑色，表现为"闪一下黑屏"。
+      这里把它设成与应用画布一致的颜色，闪的帧就看不出来了。
+    -->
+    <style name="YuzoraTheme" parent="@android:style/Theme.NoTitleBar">
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:colorBackground">@color/app_background</item>
+    </style>
+</resources>

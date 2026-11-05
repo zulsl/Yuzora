@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 与 Theme.PaletteLight.bgCanvas 保持一致：
+         窗口 resize 期间系统先画这个颜色，避免出现黑帧 -->
+    <color name="app_background">#F4F5F7</color>
+</resources>

@@ -2,11 +2,11 @@ import QtQuick
 import QtQuick.Layouts
 
 // 页面骨架
-// 职责：统一"顶栏 + 内容区"，并集中处理三件移动端专项：
-//   1. 安全区上下左右内边距由 AppToolBar / 本组件吸收，页面不用各自计算；
-//   2. 软键盘弹出时把内容区整体上抬（bottomInset），聊天输入框、密钥输入框、预设文本框
-//      都因此不会被遮挡；
-//   3. 内容内边距走 Theme.pagePadding，窄窗口自动收窄一档。
+// 职责：统一"顶栏 + 内容区"，并处理安全区。
+// 键盘避让说明：Android 用 android:windowSoftInputMode="adjustResize" 让窗口自身收缩，
+//   因此这里默认不做任何键盘上抬（keyboardAware=false），否则会双重位移；
+//   底部安全区默认也不额外留白（respectBottomSafeArea=false），因为窗口已让开系统栏。
+//   需要手动控制时，页面可把这两个开关打开，或直接读取 keyboardInset 自行布局。
 // 可配置属性：title、leftIconSource、showLeftButton、showToolBar、contentPadding、
 //             keyboardAware、rightItems。
 // 页面用法：PageScaffold { title: "设置"; onLeftClicked: Ui.requestDrawer(); ... }
@@ -21,19 +21,25 @@ Item {
     property bool showLeftButton: true
     property bool showToolBar: true
     property int contentPadding: Theme.pagePadding
-    // 需要键盘避让的页面保持 true；纯展示页可关掉
-    property bool keyboardAware: true
+    // 是否由页面骨架统一吸收软键盘高度（整块内容上抬）。
+    // Android 已用 windowSoftInputMode=adjustResize 让窗口自身收缩，
+    // 这里默认关闭，否则会出现"窗口已变矮 + QML 再抬一次"的双重位移。
+    property bool keyboardAware: false
+    // 是否额外给底部留出系统安全区。
+    // 默认关闭：adjustResize 下窗口本身已经让开了导航栏/键盘，再加一份就是多余空白。
+    property bool respectBottomSafeArea: false
     property alias rightItems: toolbar.rightItems
 
     signal leftClicked()
 
-    // 软键盘高度：键盘收起时 keyboardRectangle 为空（高度 0），因此不需要额外判断可见性。
-    // 桌面上可用 DeviceHelper.testKeyboardInset 模拟键盘，便于验证遮挡。
-    readonly property int keyboardInset: keyboardAware
-        ? Math.max(Qt.inputMethod.keyboardRectangle.height, DeviceHelper.testKeyboardInset)
-        : DeviceHelper.testKeyboardInset
+    // 软键盘高度：键盘收起时 keyboardRectangle 为空（高度 0）。
+    // 注意 Android 上该值不一定可靠（窗口收缩后坐标系变化），因此只作参考，
+    // 默认不参与布局；桌面上可用 DeviceHelper.testKeyboardInset 模拟验证。
+    readonly property int keyboardInset: Math.max(Qt.inputMethod.keyboardRectangle.height,
+                                                  DeviceHelper.testKeyboardInset)
 
-    readonly property int bottomInset: Math.max(DeviceHelper.safeAreaBottom, keyboardInset)
+    readonly property int bottomInset: (respectBottomSafeArea ? DeviceHelper.safeAreaBottom : 0)
+                                       + (keyboardAware ? keyboardInset : 0)
 
     ColumnLayout {
         anchors.fill: parent
@@ -46,7 +52,8 @@ Item {
             title: root.title
             subtitle: root.subtitle
             leftIconSource: root.leftIconSource
-            showLeftButton: root.showLeftButton
+            // 宽窗口下左侧菜单常驻，不再需要汉堡按钮；窄窗口才显示
+            showLeftButton: root.showLeftButton && !Theme.isExpanded
             onLeftClicked: root.leftClicked()
         }
 

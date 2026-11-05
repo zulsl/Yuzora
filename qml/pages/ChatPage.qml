@@ -95,6 +95,8 @@ PageScaffold {
         }
 
         // ========== 输入区 ==========
+        // 键盘避让交给系统：adjustResize 会让窗口自身收缩，输入框自然贴在键盘上沿。
+        // 这里不再手动加键盘高度，否则会"窗口已变矮 + 再抬一次"，输入框被顶到顶部。
         Rectangle {
             Layout.fillWidth: true
             implicitHeight: inputRow.implicitHeight + Theme.spaceMd * 2

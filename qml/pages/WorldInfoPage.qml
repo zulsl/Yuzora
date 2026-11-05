@@ -53,7 +53,6 @@ PageScaffold {
         id: compactLayout
 
         MasterDetailStack {
-            id: worldStack
             listComponent: compactBooks
             detailComponent: compactEntries
         }
@@ -67,7 +66,7 @@ PageScaffold {
             onExportRequested: exportDialog.open()
             onDeleteRequested: deleteDialog.open()
             onRenameRequested: renameDialog.open()
-            onBookActivated: worldStack.showDetail()
+            // detailRequested 由 MasterDetailStack 自动连接到 showDetail()
         }
     }
 
@@ -75,10 +74,13 @@ PageScaffold {
         id: compactEntries
 
         PageScaffold {
+            id: compactEntriesPage
+            signal backRequested()
+
             title: WorldInfoViewModel.currentBookName.length > 0
                    ? WorldInfoViewModel.currentBookName : "条目列表"
             leftIconSource: "qrc:/icons/res/arrow-narrow-left.svg"
-            onLeftClicked: worldStack.hideDetail()
+            onLeftClicked: compactEntriesPage.backRequested()
 
             EntryListPanel {
                 anchors.fill: parent

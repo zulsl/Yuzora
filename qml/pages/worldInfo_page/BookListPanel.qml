@@ -17,8 +17,8 @@ Item {
     signal exportRequested()
     signal deleteRequested()
     signal renameRequested()
-    // 窄窗口下选中文集后，由页面推入条目页
-    signal bookActivated()
+    // 窄窗口下选中文集后要求推入条目页（由 MasterDetailStack 自动接线）
+    signal detailRequested()
 
     ColumnLayout {
         anchors.fill: parent
@@ -101,7 +101,7 @@ Item {
                 onClicked: {
                     bookListView.currentIndex = index
                     WorldInfoViewModel.selectBook(bookDelegate.modelData.id)
-                    root.bookActivated()
+                    root.detailRequested()
                 }
 
                 contentItem: RowLayout {

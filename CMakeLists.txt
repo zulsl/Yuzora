@@ -16,8 +16,14 @@ qt_add_executable(${PROJECT_NAME}
 )
 
 if(ANDROID)
+    # 安卓openssl需自己导入
     include("D:/Qt/Android/SDK/android_openssl/android_openssl.cmake")
     add_android_openssl_libraries(${PROJECT_NAME})
+
+    # 自定义清单：android:windowSoftInputMode="adjustResize"
+    # 软键盘弹出时收缩窗口（只让底部让位），而不是默认的 pan（整个界面被平移）。
+    set_property(TARGET ${PROJECT_NAME} PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
+                 "${CMAKE_CURRENT_SOURCE_DIR}/android")
 endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE

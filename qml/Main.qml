@@ -12,8 +12,6 @@ ApplicationWindow {
 
     width: 1280
     height: 720
-    minimumWidth: 360
-    minimumHeight: 480
     visible: true
 
     // 断点按"窗口宽度"判断。
@@ -76,6 +74,8 @@ ApplicationWindow {
         NavigationHost {
             id: navHost
             anchors.fill: parent
+            // 抽屉遮罩要盖在页面栈之上
+            z: 2
             currentIndex: mainWindow.currentPage
             items: [
                 { title: "聊天", icon: "qrc:/icons/res/main_page/message-circle.svg" },

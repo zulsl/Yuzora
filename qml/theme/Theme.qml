@@ -91,8 +91,9 @@ QtObject {
     readonly property color accentColor: primaryColor              // 兼容旧名
     readonly property color accentHover: Qt.lighter(primaryColor, 1.12)
     readonly property color accentPressed: Qt.darker(primaryColor, 1.12)
+    // 按下/选中用的主色淡层：0.12 在浅灰背景上几乎看不出，提到 0.18
     readonly property color accentSubtle: Qt.rgba(primaryColor.r, primaryColor.g,
-                                                  primaryColor.b, 0.12)
+                                                  primaryColor.b, 0.18)
 
     // 兼容旧名（历史上声明未赋值的几个语义色，现在指向真实值）
     readonly property color backgroundColor: bgCanvas

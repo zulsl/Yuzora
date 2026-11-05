@@ -36,6 +36,13 @@ Item {
         // 详情展开时保留列表实例，返回时滚动位置与输入状态都还在
         visible: !root.detailShown
         enabled: !root.detailShown
+
+        // 自动接线：列表组件只要声明 detailRequested 信号，点条目就会推入详情。
+        // 这样页面不必跨 Component 去引用栈的 id（QML 里兄弟 Component 之间互相看不到 id）。
+        onLoaded: {
+            if (item && item.detailRequested)
+                item.detailRequested.connect(root.showDetail)
+        }
     }
 
     Loader {
@@ -46,6 +53,12 @@ Item {
         opacity: root.detailShown ? 1 : 0
         visible: opacity > 0
         x: root.detailShown ? 0 : root.width * 0.12
+
+        // 自动接线：详情页只要声明 backRequested 信号，点返回就会收起详情。
+        onLoaded: {
+            if (item && item.backRequested)
+                item.backRequested.connect(root.hideDetail)
+        }
 
         Behavior on opacity {
             NumberAnimation {

@@ -200,87 +200,106 @@ Item {
                 onClicked: extraForm.expanded = !extraForm.expanded
             }
 
+            // 高级定义：折叠时**不创建**内部控件。
+            // 这 4 个 TextArea 如果常驻，每次切换角色都要把它们的整段文本重新排版，
+            // 是"选中角色卡一下"的主要来源（无文本的角色因此不会卡）。
             ColumnLayout {
                 id: extraForm
                 Layout.fillWidth: true
                 layoutDirection: Qt.LeftToRight
-                spacing: Theme.spaceMd
+                spacing: 0
                 clip: true
-                opacity: expanded ? 1 : 0
                 property bool expanded: false
 
-                Layout.preferredHeight: expanded ? implicitHeight : 0
+                Layout.preferredHeight: expanded ? advancedLoader.implicitHeight : 0
                 Behavior on Layout.preferredHeight {
                     NumberAnimation {
                         duration: Theme.durationBase
                         easing.type: Theme.easingOut
                     }
                 }
-                Behavior on opacity {
-                    NumberAnimation { duration: Theme.durationBase }
-                }
 
-                Repeater {
-                    model: [
-                        { field: "personality", label: "性格特征", height: Theme.controlLg * 2.5 },
-                        { field: "scenario", label: "对话场景设定", height: Theme.controlLg * 2.5 },
-                        { field: "exampleDialogue", label: "示例对话", height: Theme.controlLg * 4 },
-                        { field: "systemPrompt", label: "角色专属系统提示词", height: Theme.controlLg * 3 }
-                    ]
-
-                    ColumnLayout {
-                        required property var modelData
-                        Layout.fillWidth: true
-                        spacing: Theme.spaceXs
-
-                        Label {
-                            text: modelData.label
-                            font.pixelSize: Theme.fontBodySm
-                            font.family: Theme.fontFamily
-                            color: Theme.textSecondary
-                        }
-
-                        ScrollView {
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: modelData.height
-                            clip: true
-
-                            TextArea {
-                                wrapMode: Text.WordWrap
-                                textFormat: TextEdit.PlainText
-                                font.pixelSize: Theme.fontBody
-                                font.family: Theme.fontFamily
-                                color: Theme.textPrimary
-                                text: root.editingCharacter
-                                      ? (root.editingCharacter[modelData.field] || "") : ""
-                                onTextChanged: {
-                                    if (activeFocus)
-                                        root.commit(modelData.field, text)
-                                }
-                            }
-                        }
-                    }
-                }
-
-                LabeledField {
-                    label: "标签"
-                    TextField {
-                        Layout.fillWidth: true
-                        implicitHeight: Theme.controlMd
-                        placeholderText: "英文逗号分隔"
-                        text: root.editingCharacter
-                              ? (root.editingCharacter.tags || []).join(", ") : ""
-                        onTextChanged: {
-                            if (!activeFocus) return
-                            root.commit("tags",
-                                        text.split(",").map(t => t.trim())
-                                            .filter(t => t.length > 0))
-                        }
+                Loader {
+                    id: advancedLoader
+                    Layout.fillWidth: true
+                    active: extraForm.expanded
+                    sourceComponent: advancedFields
+                    opacity: extraForm.expanded ? 1 : 0
+                    Behavior on opacity {
+                        NumberAnimation { duration: Theme.durationBase }
                     }
                 }
             }
 
             Item { Layout.fillHeight: true }
+        }
+    }
+
+    // ========== 高级定义的内容（懒加载：折叠时完全不存在）==========
+    Component {
+        id: advancedFields
+
+        ColumnLayout {
+            spacing: Theme.spaceMd
+
+            Repeater {
+                model: [
+                    { field: "personality", label: "性格特征", height: Theme.controlLg * 2.5 },
+                    { field: "scenario", label: "对话场景设定", height: Theme.controlLg * 2.5 },
+                    { field: "exampleDialogue", label: "示例对话", height: Theme.controlLg * 4 },
+                    { field: "systemPrompt", label: "角色专属系统提示词", height: Theme.controlLg * 3 }
+                ]
+
+                ColumnLayout {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    spacing: Theme.spaceXs
+
+                    Label {
+                        text: modelData.label
+                        font.pixelSize: Theme.fontBodySm
+                        font.family: Theme.fontFamily
+                        color: Theme.textSecondary
+                    }
+
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: modelData.height
+                        clip: true
+
+                        TextArea {
+                            wrapMode: Text.WordWrap
+                            textFormat: TextEdit.PlainText
+                            font.pixelSize: Theme.fontBody
+                            font.family: Theme.fontFamily
+                            color: Theme.textPrimary
+                            text: root.editingCharacter
+                                  ? (root.editingCharacter[modelData.field] || "") : ""
+                            onTextChanged: {
+                                if (activeFocus)
+                                    root.commit(modelData.field, text)
+                            }
+                        }
+                    }
+                }
+            }
+
+            LabeledField {
+                label: "标签"
+                TextField {
+                    Layout.fillWidth: true
+                    implicitHeight: Theme.controlMd
+                    placeholderText: "英文逗号分隔"
+                    text: root.editingCharacter
+                          ? (root.editingCharacter.tags || []).join(", ") : ""
+                    onTextChanged: {
+                        if (!activeFocus) return
+                        root.commit("tags",
+                                    text.split(",").map(t => t.trim())
+                                        .filter(t => t.length > 0))
+                    }
+                }
+            }
         }
     }
 

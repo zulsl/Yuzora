@@ -34,8 +34,10 @@ QtObject {
     readonly property color bubbleAssistantBorder: "#363b43"
 
     // ---- 交互态 ----
-    readonly property color rowHover: "#242830"
-    readonly property color rowSelected: "#2a3444"
+    // 深色下 bgSurface 是 #1e2126，悬停必须明显亮一档才看得见；
+    // 选中再用偏蓝且更亮的一档。
+    readonly property color rowHover: "#333944"
+    readonly property color rowSelected: "#3d4d66"
 
     // ---- 覆盖与阴影 ----
     readonly property color overlayScrim: "#99000000"

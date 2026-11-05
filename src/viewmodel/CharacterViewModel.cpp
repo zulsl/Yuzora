@@ -149,7 +149,10 @@ void CharacterViewModel::toggleFavorite(const QString& charId)
 
 void CharacterViewModel::selectCharacter(const QString& charId)
 {
-    qDebug()<<"调用一次";
+    // 重复点击同一角色：不重复读库、不重复触发整份文本重排版
+    // （与 CompletionPresetViewModel::selectPreset 的行为保持一致）
+    if (m_currentCharacter.id == charId) return;
+
     CharacterEntity entity = CharacterService::instance().getCharacterById(charId);
     if (entity.id.isEmpty()) return;
 

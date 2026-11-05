@@ -15,7 +15,8 @@ Item {
 
     signal importRequested()
     signal exportAllRequested()
-    signal presetActivated()
+    // 窄窗口下选中预设后要求推入编辑页（由 MasterDetailStack 自动接线）
+    signal detailRequested()
 
     ColumnLayout {
         anchors.fill: parent
@@ -75,7 +76,7 @@ Item {
                 onClicked: {
                     presetListView.currentIndex = index
                     CompletionPresetViewModel.selectPreset(presetDelegate.modelData.id)
-                    root.presetActivated()
+                    root.detailRequested()
                 }
 
                 contentItem: RowLayout {
