@@ -1,187 +1,127 @@
-import QtQuick 6.8
-import QtQuick.Controls 6.8
-import QtQuick.Layouts 6.8
-import QtQuick.Dialogs 6.8
-import QtQuick.Controls.Material 6.8
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
 import Yuzora 1.0
 
-//---------提示词条目列表-----------
+// 预设的提示词条目列表
+// 职责：条目的名称/角色/位置/启用开关，展开后编辑正文。
+// 展开行复用 ExpandableRow（与世界书条目列表同一套实现）。
 ListView {
-    id: promptsListView
-    Layout.fillWidth: true
-    // Layout.fillHeight: true
-    Layout.preferredHeight: contentHeight
-    interactive: false
+    id: root
 
     clip: true
-    cacheBuffer: 400
-    spacing: 2
+    spacing: Theme.spaceXs
     model: CompletionPresetViewModel.presetPromptModel
-    currentIndex: -1
+    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-    //(已弃用)
-    // property string expandedId: ""// 当前展开的项，-1 表示全部收起//使用int导致莫名其妙的bug
-
-    // ---------- 详情表单：Loader 懒加载 ----------
+    // ---------- 展开后的详情 ----------
     Component {
-        id: detailComponent
-        Item {
+        id: promptDetail
 
-            id: detailPanel
-            width: parent.width
-            // color: "#fafafa"
-            clip: true                     // 收起时裁掉内容
-            visible: height > 0            // 减少无谓渲染
+        ColumnLayout {
+            property var bodyData
 
-            implicitHeight: form.implicitHeight + 24
+            spacing: Theme.spaceSm
 
-
-            Column {
-                id: form
-                width: parent.width - 32
-                spacing: 10
-
-                //提示词名称(可编辑)
-                Label{
-                    font.pixelSize: 16
-                    font.bold: true
-                    text: "名称:"
+            Timer {
+                id: debounceTimer
+                interval: 300
+                repeat: false
+                onTriggered: {
+                    if (promptDetail.bodyData)
+                        promptDetail.bodyData.content = contentArea.text
                 }
-                TextField {
-                    width: parent.width
-                    text: entry?.name ?? ""
-                    onTextEdited: if (entry) entry.name = text
-                }
+            }
 
-                //消息类型/角色
-                RowLayout{
-                    width: parent.width
-                    Label{
-                        font.pixelSize: 16
-                        font.bold: true
-                        text: "角色(此消息应归于谁):"
-                    }
-                    ComboBox{
-                        Layout.fillWidth: true
-                        model: ["系统", "用户", "AI助手"]
-                        currentIndex: entry?.role ?? 0
-                        onActivated: (index) => { if (entry) entry.role = index }
+            LabeledField {
+                label: "角色"
+                ComboBox {
+                    Layout.fillWidth: true
+                    implicitHeight: Theme.controlMd
+                    model: ["系统", "用户", "AI 助手"]
+                    currentIndex: promptDetail.bodyData ? promptDetail.bodyData.role : 0
+                    onActivated: (index) => {
+                        if (promptDetail.bodyData)
+                            promptDetail.bodyData.role = index
                     }
                 }
+            }
 
-                //位置
-                RowLayout{
-                    width: parent.width
-                    Label{
-                        font.pixelSize: 16
-                        font.bold: true
-                        text: "位置:"
-                    }
-                    ComboBox{
-                        Layout.fillWidth: true
-                        model: ["相对","聊天中"]
-                        currentIndex: entry?.position ?? 0
-                        onActivated: (index) => { if (entry) entry.position = index }
+            LabeledField {
+                label: "位置"
+                ComboBox {
+                    Layout.fillWidth: true
+                    implicitHeight: Theme.controlMd
+                    model: ["相对", "聊天中"]
+                    currentIndex: promptDetail.bodyData ? promptDetail.bodyData.position : 0
+                    onActivated: (index) => {
+                        if (promptDetail.bodyData)
+                            promptDetail.bodyData.position = index
                     }
                 }
+            }
 
-                Timer {
-                    id: debounceTimer
-                    interval: 300
-                    repeat: false
-                    onTriggered: if (entry) entry.content = innerText.text
-                }
+            Label {
+                text: "提示词内容"
+                font.pixelSize: Theme.fontBodySm
+                font.family: Theme.fontFamily
+                color: Theme.textSecondary
+            }
 
-                //正文内容
-                ScrollView {
-                    width: parent.width
-                    height: 400
-                    clip: true
-                    TextArea {
-                        id: innerText
-                        // width: parent.width
-                        // height: parent.width
-                        textFormat: TextEdit.PlainText  // 纯文本模式,关闭富文本
-                        font.pixelSize: 18
-                        wrapMode: TextArea.Wrap // 自动换行
-                        placeholderText: "提示词"
-                        text: entry?.content ?? ""
-                        onTextChanged: {
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Theme.controlLg * 5
+                clip: true
+
+                TextArea {
+                    id: contentArea
+                    textFormat: TextEdit.PlainText
+                    wrapMode: TextArea.Wrap
+                    placeholderText: "提示词"
+                    font.pixelSize: Theme.fontBody
+                    font.family: Theme.fontFamily
+                    color: Theme.textPrimary
+                    text: promptDetail.bodyData ? (promptDetail.bodyData.content || "") : ""
+                    onTextChanged: {
+                        if (activeFocus)
                             debounceTimer.restart()
-                        }
                     }
                 }
-
             }
         }
     }
 
+    // ---------- 条目行 ----------
+    delegate: ExpandableRow {
+        width: ListView.view.width
+        headerHeight: Theme.touchTarget
+        expanded: model.expandedState
+        bodyComponent: promptDetail
+        bodyData: model
 
-    delegate: Item {
-        id: delegateRoot
-        width: promptsListView.width
-        height: mainColumn.implicitHeight   //高度随内容变化
+        IconButton {
+            compact: true
+            tip: model.expandedState ? "收起" : "展开"
+            icon.source: model.expandedState
+                         ? "qrc:/icons/res/circle-chevron-up.svg"
+                         : "qrc:/icons/res/circle-chevron-down.svg"
+            onClicked: model.expandedState = !model.expandedState
+        }
 
-        Column {
-            id: mainColumn
-            width: parent.width
+        TextField {
+            Layout.fillWidth: true
+            implicitHeight: Theme.controlSm
+            text: model.name || ""
+            placeholderText: "提示词名称"
+            font.pixelSize: Theme.fontBody
+            font.family: Theme.fontFamily
+            onTextEdited: model.name = text
+        }
 
-            // ---------- 标题行 ----------
-            RowLayout{
-                width: parent.width
-                height: 56
-                Item {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    RowLayout{
-                        anchors.fill: parent
-                        Text {
-                            text: "▼"
-                            rotation: model.expandedState ? 180 : 0
-                            Behavior on rotation { NumberAnimation { duration: 200 } }//旋转动画
-                        }
-                        //名称
-                        Text {
-                            Layout.fillWidth: true
-                            text: model.name
-                            font.pixelSize: 16
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        onClicked: {
-                            //再次点击则收起
-                            model.expandedState = !model.expandedState
-                        }
-                    }
-
-                }
-
-                Switch {
-                    checked: model.isActive
-                    onToggled: model.isActive = checked
-                }
-            }
-
-
-            Loader {
-                id: detailLoader
-                width: parent.width
-                sourceComponent: detailComponent
-                active: model !== null && model !== undefined && model.expandedState // 收起时不创建，不绑定
-                asynchronous: false                  // 异步加载,展开时可以打开异步避免卡一帧
-
-                property var entry: model
-
-                // 展开 = 内容高度，收起 = 0
-                height: model.expandedState ? implicitHeight : 0
-                Behavior on height {//动画
-                    NumberAnimation { duration: 220; easing.type: Easing.InOutQuad }
-                }
-                clip: true
-            }
+        Switch {
+            checked: model.isActive
+            onToggled: model.isActive = checked
         }
     }
 }

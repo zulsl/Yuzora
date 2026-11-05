@@ -2,12 +2,32 @@
 #define CHATVIEWMODEL_H
 
 #include <QObject>
+#include <QtQml/qqmlregistration.h>
 #include "ChatMessageEntity.h"
 #include "ChatMessageListModel.h"
 #include "ChatSessionListModel.h"
 
+class QQmlEngine;
+class QJSEngine;
+
+/**
+ * @brief 聊天视图模型
+ * 职责：持有当前会话/角色的展示状态、消息与会话两个列表模型，把 UI 操作转发给 ChatService。
+ * 本类以 QML 单例形式暴露给 QML（类型名 ChatViewModel）。
+ */
 class ChatViewModel : public QObject {
     Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+
+public:
+    // QML 单例工厂（供 QML 使用）：没有 create() 时 qmltyperegistrar 会把单例标记为
+    // isCreatable=false，QML 侧解析不到该名字。
+    static ChatViewModel* create(QQmlEngine*, QJSEngine*)
+    {
+        static ChatViewModel instance;
+        return &instance;
+    }
     //正在生成
     Q_PROPERTY(bool isGenerating READ isGenerating NOTIFY isGeneratingChanged)
     //当前角色名称

@@ -2,52 +2,61 @@
 #define WORLDINFOVIEWMODEL_H
 
 #include <QObject>
-#include <QVariantMap>
-#include "WorldInfoBookListModel.h"
-#include "WorldInfoEntryListModel.h"
-#include "WorldInfoEntryEntity.h"
+#include <QString>
+#include <QUrl>
+#include <QtQml/qqmlregistration.h>
 
+#include "WorldInfoBookListModel.h"
+
+class QQmlEngine;
+class QJSEngine;
+
+/**
+ * @brief 世界书文集视图模型（文集域）
+ *
+ * 职责：文集列表数据源、当前选中文集、文集级增删改/开关/重命名/导入导出。
+ * 条目域（条目列表、条目增删改、当前条目快照）已拆分到 WorldInfoEntryViewModel，
+ * 本类在 selectBook() 时把当前文集 id 交给它。
+ *
+ * 对外暴露为 QML 单例，类型名 WorldInfoViewModel。
+ */
 class WorldInfoViewModel : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(WorldInfoBookListModel* bookModel READ bookModel CONSTANT)
-    Q_PROPERTY(WorldInfoEntryListModel* entryModel READ entryModel CONSTANT)
-    Q_PROPERTY(QVariantMap currentEntry READ currentEntry NOTIFY currentEntryChanged)
-    Q_PROPERTY(QString currentBookId READ currentBookId NOTIFY currentBookIdChanged)
-    Q_PROPERTY(QString currentBookName READ getCurrentBookName WRITE setCurrentBookName NOTIFY currentBookNameChanged FINAL)
-
+    QML_ELEMENT
+    QML_SINGLETON
 
 public:
+    // 供 QML 使用：QML 单例工厂
+    static WorldInfoViewModel* create(QQmlEngine*, QJSEngine*)
+    {
+        static WorldInfoViewModel instance;
+        return &instance;
+    }
+
     explicit WorldInfoViewModel(QObject* parent = nullptr);
     ~WorldInfoViewModel() override;
 
+    // 文集列表数据源（供 QML 使用）
+    Q_PROPERTY(WorldInfoBookListModel* bookModel READ bookModel CONSTANT)
+    // 当前选中文集 id（供 QML 使用）
+    Q_PROPERTY(QString currentBookId READ currentBookId NOTIFY currentBookIdChanged)
+    // 当前选中文集名称，可写（供 QML 使用）
+    Q_PROPERTY(QString currentBookName READ getCurrentBookName
+               WRITE setCurrentBookName NOTIFY currentBookNameChanged FINAL)
+
     WorldInfoBookListModel* bookModel() const;
-    WorldInfoEntryListModel* entryModel() const;
-    QVariantMap currentEntry() const;
     QString currentBookId() const;
 
-    // 文集操作
+    // ---- 供 QML 使用 ----
     Q_INVOKABLE void refreshBookList();
     Q_INVOKABLE void selectBook(const QString& bookId);
     Q_INVOKABLE void createBook();
     Q_INVOKABLE void deleteBook();
-    Q_INVOKABLE void duplicateBook(const QString& bookId);//复制
-    Q_INVOKABLE void toggleBookEnabled(const QString& bookId);//启用
-    Q_INVOKABLE void toggleBookGlobal(const QString& bookId);//全局
-    Q_INVOKABLE void renameBook(const QString& bookId, const QString& newName);//重命名
-
-    // 条目操作
-    Q_INVOKABLE void refreshEntryList();//刷新
-    Q_INVOKABLE void selectEntry(const QString& entryId);//选择
-    Q_INVOKABLE void createEntry();//新建
-    Q_INVOKABLE void saveEntry(const QVariantMap& entryData);//保存
-    Q_INVOKABLE void deleteEntry(const QString& entryId);//删除
-    Q_INVOKABLE void toggleEntryEnabled(const QString& entryId);//变更开关
-    Q_INVOKABLE void moveEntry(const QString& entryId, const QString& targetBookId);//移动
-    Q_INVOKABLE void batchDelete(const QStringList& entryIds);//批量删除
-    Q_INVOKABLE void batchSetEnabled(const QStringList& entryIds, bool enabled);//批量开关
-
-    // 导入导出
+    Q_INVOKABLE void duplicateBook(const QString& bookId);
+    Q_INVOKABLE void toggleBookEnabled(const QString& bookId);
+    Q_INVOKABLE void toggleBookGlobal(const QString& bookId);
+    Q_INVOKABLE void renameBook(const QString& bookId, const QString& newName);
     Q_INVOKABLE void importBook(const QUrl& fileUrl);
     Q_INVOKABLE void exportCurrentBook(const QString& savePath);
     Q_INVOKABLE void exportAllBooks(const QString& savePath);
@@ -56,22 +65,16 @@ public:
     void setCurrentBookName(const QString &newCurrentBookName);
 
 signals:
+    // 以下信号供 QML 使用
     void currentBookIdChanged();
-    void currentEntryChanged();
     void importSuccess(int count);
     void exportSuccess();
     void operationError(const QString& errorMsg);
-
     void currentBookNameChanged();
 
 private:
     WorldInfoBookListModel* m_bookModel = nullptr;
-    WorldInfoEntryListModel* m_entryModel = nullptr;
     QString m_currentBookId;
-    WorldInfoEntryEntity m_currentEntry;//()
-
-    QVariantMap entryToMap(const WorldInfoEntryEntity& entry) const;
-    WorldInfoEntryEntity mapToEntry(const QVariantMap& map) const;
 };
 
-#endif
+#endif // WORLDINFOVIEWMODEL_H

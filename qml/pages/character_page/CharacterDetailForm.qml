@@ -1,284 +1,356 @@
-import QtQuick 6.8
-import QtQuick.Dialogs 6.8
-import QtQuick.Controls 6.8
-import QtQuick.Layouts 6.8
-import QtQuick.Controls.Material 6.8
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
 import Yuzora 1.0
 
-/**
- * 角色详情表单 - 可复用
- * 包含：所有角色信息编辑字段 + 操作按钮
- */
-ScrollView{
-    id:charaterScrollView
-    anchors.fill: parent
-    contentWidth: availableWidth
-    clip: true
+// 角色详情表单
+// 职责：编辑当前角色的各个字段，并把结果整体交回 ViewModel。
+// 关键修复：改造前所有输入框都是单向绑定（text: editingCharacter.x），
+//          没有任何回写，点"保存"提交的是未改动的副本 —— 角色编辑实际不生效。
+//          现在用 onTextChanged + activeFocus 守卫回写到编辑副本。
+// 根节点用 Item 包一层，便于被 AdaptiveSplit 用 LayoutItemProxy 搬运。
+Item {
+    id: root
 
-    padding:Theme.page_padding
+    implicitWidth: 480
+    implicitHeight: 600
 
-    rightPadding:30
+    // Q_GADGET 值类型只能用 var 承接（QML 不接受 QML_VALUE_TYPE 注册名做类型注解）
+    property var editingCharacter: CharacterViewModel.currentCharacter
 
-    property characterEntity editingCharacter : CharacterViewModel.currentCharacter
+    signal exportRequested()
+    signal bookRequested()
 
-    ColumnLayout {
-        id: root
-        width: parent.width
-        spacing:Theme.layout_spacing
-
-        // CharacterViewModel.hasSelection ?
-
-        Text {
-            text: "角色详情"
-            font.pixelSize: Theme.baseFontSize+2
-            font.weight: Font.Bold
-            Layout.bottomMargin: 4
-        }
-
-        // 操作栏
-        RowLayout {
-            Layout.alignment: Qt.AlignRight
-            Layout.topMargin: 10
-            spacing: 8
-
-            MyToolButton{
-                ToolTip.text:"角色世界书"
-                icon.source: "qrc:/icons/res/main_page/book-2.svg"
-                onClicked:characterBookDialog.open()
-            }
-            MyToolButton {
-                ToolTip.text: "删除"
-                icon.source: "qrc:/icons/res/trash.svg"
-                enabled: CharacterViewModel.hasSelection
-                onClicked: characterDeleteDialog.open()
-            }
-            MyToolButton {
-                ToolTip.text: "保存"
-                icon.source: "qrc:/icons/res/save.svg"
-                onClicked: CharacterViewModel.saveCurrentCharacter(editingCharacter)
-            }
-            MyToolButton {
-                ToolTip.text: "导出"
-                icon.source: "qrc:/icons/res/file-export.svg"
-                onClicked: exportDialog.open()
-            }
-        }
-
-
-
-        TextField {
-            id: nameField
-            Layout.fillWidth: true
-            placeholderText: "角色名称 *"
-            text: editingCharacter.name || ""
-        }
-
-
-        ScrollView {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 300
-            TextArea {
-                id: descField
-                placeholderText: "角色描述(系统提示词)"
-                text: editingCharacter.description || ""
-                wrapMode: Text.WordWrap
-                textFormat: Qt.PlainText
-            }
-        }
-
-        ScrollView {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 300
-            clip: true
-            TextArea {
-                id: firstMsgField
-                placeholderText: "初始开场白"
-                text:editingCharacter.firstMessage || ""
-                wrapMode: Text.WordWrap
-                textFormat: Qt.PlainText
-            }
-        }
-
-        ScrollView {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 300
-            TextArea {
-                id: altGreetField
-                placeholderText: "备选开场白（每行一个）"
-                text: (editingCharacter.alternateGreetings || []).join("\n")
-                wrapMode: Text.WordWrap
-                textFormat: Qt.PlainText
-            }
-        }
-
-        //作者
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
-            TextField {
-                id: creatorField
-                Layout.fillWidth: true
-                placeholderText: "作者"
-                text: editingCharacter.creator || ""
-            }
-            TextField {
-                id: versionField
-                Layout.preferredWidth: 120
-                placeholderText: "版本号"
-                text: editingCharacter.characterVersion || "1.0.0"
-            }
-        }
-        ScrollView {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 100
-            TextArea {
-                id: creatorNotesField
-                Layout.fillWidth: true
-                Layout.preferredHeight: 60
-                placeholderText: "作者备注"
-                text: editingCharacter.creatorNotes || ""
-                wrapMode: Text.WordWrap
-            }
-        }
-
-
-        // 触发按钮
-        Button {
-            id: dropdownBtn
-            Layout.fillWidth: true
-            flat: true
-            text: extraForm.expanded ? "收起 ▲" : "更多高级定义 ▼"
-            onClicked: extraForm.expanded = !extraForm.expanded
-        }
-        // 下拉表单
-        ColumnLayout {
-            id: extraForm
-            Layout.fillWidth: true
-            Layout.preferredHeight: expanded ? implicitHeight : 0  // 0 → 内容高
-            Layout.bottomMargin: expanded ? 0 : -8                 // 收起时去掉多余间距
-            spacing: 8
-            clip: true                                             // 动画中途防止溢出
-            opacity: expanded ? 1 : 0
-
-            property bool expanded: false
-
-            // 平滑动画
-            Behavior on Layout.preferredHeight {
-                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-            }
-            Behavior on opacity {
-                NumberAnimation { duration: 180 }
-            }
-
-            TextArea {
-                id: personalityField
-                Layout.fillWidth: true
-                Layout.preferredHeight: 60
-                placeholderText: "性格特征"
-                text: editingCharacter.personality || ""
-                wrapMode: Text.WordWrap
-            }
-            TextArea {
-                id: scenarioField
-                Layout.fillWidth: true
-                Layout.preferredHeight: 60
-                placeholderText: "对话场景设定"
-                text: editingCharacter.scenario || ""
-                wrapMode: Text.WordWrap
-            }
-            TextArea {
-                id: exampleField
-                Layout.fillWidth: true
-                Layout.preferredHeight: 100
-                placeholderText: "示例对话"
-                text: editingCharacter.exampleDialogue || ""
-                wrapMode: Text.WordWrap
-            }
-            TextArea {
-                id: systemPromptField
-                Layout.fillWidth: true
-                Layout.preferredHeight: 80
-                placeholderText: "角色专属系统提示词"
-                text: editingCharacter.systemPrompt || ""
-                wrapMode: Text.WordWrap
-            }
-            TextField {
-                id: tagsField
-                Layout.fillWidth: true
-                placeholderText: "标签（英文逗号分隔）"
-                text: (editingCharacter.tags || []).join(", ")
-            }
-        }
-
+    // 统一回写：只在用户正在编辑该字段时写回，避免模型刷新把编辑内容冲掉
+    function commit(field, value) {
+        if (!editingCharacter) return
+        if (editingCharacter[field] === value) return
+        editingCharacter[field] = value
     }
 
+    ScrollView {
+        anchors.fill: parent
+        contentWidth: availableWidth
+        clip: true
 
-    MessageDialog {
+        ColumnLayout {
+            width: parent.width
+            spacing: Theme.spaceMd
+
+            // ========== 操作栏 ==========
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spaceSm
+
+                Label {
+                    Layout.fillWidth: true
+                    text: "角色详情"
+                    font.pixelSize: Theme.fontTitle
+                    font.bold: true
+                    font.family: Theme.fontFamily
+                    color: Theme.textPrimary
+                }
+
+                IconButton {
+                    tip: "角色世界书"
+                    icon.source: "qrc:/icons/res/main_page/book-2.svg"
+                    onClicked: characterBookDialog.open()
+                }
+                IconButton {
+                    tip: "删除角色"
+                    danger: true
+                    icon.source: "qrc:/icons/res/trash.svg"
+                    enabled: CharacterViewModel.hasSelection
+                    onClicked: characterDeleteDialog.open()
+                }
+                IconButton {
+                    tip: "导出角色卡"
+                    icon.source: "qrc:/icons/res/file-export.svg"
+                    enabled: CharacterViewModel.hasSelection
+                    onClicked: root.exportRequested()
+                }
+                IconButton {
+                    tip: "保存"
+                    icon.source: "qrc:/icons/res/save.svg"
+                    enabled: CharacterViewModel.hasSelection
+                    onClicked: {
+                        CharacterViewModel.saveCurrentCharacter(root.editingCharacter)
+                        Ui.toast("角色已保存", false)
+                    }
+                }
+            }
+
+            // ========== 基础字段 ==========
+            LabeledField {
+                label: "角色名称"
+                TextField {
+                    Layout.fillWidth: true
+                    implicitHeight: Theme.controlMd
+                    placeholderText: "角色名称 *"
+                    text: root.editingCharacter ? (root.editingCharacter.name || "") : ""
+                    onTextChanged: if (activeFocus) root.commit("name", text)
+                }
+            }
+
+            LabeledField {
+                label: "作者"
+                RowLayout {
+                    Layout.fillWidth: true
+                    TextField {
+                        Layout.fillWidth: true
+                        implicitHeight: Theme.controlMd
+                        placeholderText: "作者"
+                        text: root.editingCharacter ? (root.editingCharacter.creator || "") : ""
+                        onTextChanged: if (activeFocus) root.commit("creator", text)
+                    }
+                    TextField {
+                        Layout.preferredWidth: Theme.controlMd * 3
+                        implicitHeight: Theme.controlMd
+                        placeholderText: "版本号"
+                        text: root.editingCharacter ? (root.editingCharacter.characterVersion || "") : ""
+                        onTextChanged: if (activeFocus) root.commit("characterVersion", text)
+                    }
+                }
+            }
+
+            // 长文本区（描述 / 开场白 / 备选开场白 / 作者备注）
+            Repeater {
+                model: [
+                    { field: "description", label: "角色描述（系统提示词）", hint: "", height: Theme.controlLg * 7 },
+                    { field: "firstMessage", label: "初始开场白", hint: "", height: Theme.controlLg * 7 },
+                    { field: "creatorNotes", label: "作者备注", hint: "", height: Theme.controlLg * 3 }
+                ]
+
+                ColumnLayout {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    spacing: Theme.spaceXs
+
+                    Label {
+                        text: modelData.label
+                        font.pixelSize: Theme.fontBodySm
+                        font.family: Theme.fontFamily
+                        color: Theme.textSecondary
+                    }
+
+                    ScrollView {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: modelData.height
+                        clip: true
+
+                        TextArea {
+                            placeholderText: modelData.hint
+                            wrapMode: Text.WordWrap
+                            textFormat: TextEdit.PlainText
+                            font.pixelSize: Theme.fontBody
+                            font.family: Theme.fontFamily
+                            color: Theme.textPrimary
+                            text: root.editingCharacter
+                                  ? (root.editingCharacter[modelData.field] || "") : ""
+                            onTextChanged: {
+                                if (activeFocus)
+                                    root.commit(modelData.field, text)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 备选开场白：多行文本 ↔ 字符串数组
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spaceXs
+
+                Label {
+                    text: "备选开场白（每行一个）"
+                    font.pixelSize: Theme.fontBodySm
+                    font.family: Theme.fontFamily
+                    color: Theme.textSecondary
+                }
+
+                ScrollView {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Theme.controlLg * 5
+                    clip: true
+
+                    TextArea {
+                        placeholderText: "每行一个备选开场白"
+                        wrapMode: Text.WordWrap
+                        textFormat: TextEdit.PlainText
+                        font.pixelSize: Theme.fontBody
+                        font.family: Theme.fontFamily
+                        color: Theme.textPrimary
+                        text: root.editingCharacter
+                              ? (root.editingCharacter.alternateGreetings || []).join("\n") : ""
+                        onTextChanged: {
+                            if (!activeFocus) return
+                            root.commit("alternateGreetings",
+                                        text.split("\n").filter(line => line.trim().length > 0))
+                        }
+                    }
+                }
+            }
+
+            // ========== 高级定义 ==========
+            AppButton {
+                Layout.fillWidth: true
+                variant: "ghost"
+                text: extraForm.expanded ? "收起高级定义 ▲" : "更多高级定义 ▼"
+                onClicked: extraForm.expanded = !extraForm.expanded
+            }
+
+            ColumnLayout {
+                id: extraForm
+                Layout.fillWidth: true
+                layoutDirection: Qt.LeftToRight
+                spacing: Theme.spaceMd
+                clip: true
+                opacity: expanded ? 1 : 0
+                property bool expanded: false
+
+                Layout.preferredHeight: expanded ? implicitHeight : 0
+                Behavior on Layout.preferredHeight {
+                    NumberAnimation {
+                        duration: Theme.durationBase
+                        easing.type: Theme.easingOut
+                    }
+                }
+                Behavior on opacity {
+                    NumberAnimation { duration: Theme.durationBase }
+                }
+
+                Repeater {
+                    model: [
+                        { field: "personality", label: "性格特征", height: Theme.controlLg * 2.5 },
+                        { field: "scenario", label: "对话场景设定", height: Theme.controlLg * 2.5 },
+                        { field: "exampleDialogue", label: "示例对话", height: Theme.controlLg * 4 },
+                        { field: "systemPrompt", label: "角色专属系统提示词", height: Theme.controlLg * 3 }
+                    ]
+
+                    ColumnLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        spacing: Theme.spaceXs
+
+                        Label {
+                            text: modelData.label
+                            font.pixelSize: Theme.fontBodySm
+                            font.family: Theme.fontFamily
+                            color: Theme.textSecondary
+                        }
+
+                        ScrollView {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: modelData.height
+                            clip: true
+
+                            TextArea {
+                                wrapMode: Text.WordWrap
+                                textFormat: TextEdit.PlainText
+                                font.pixelSize: Theme.fontBody
+                                font.family: Theme.fontFamily
+                                color: Theme.textPrimary
+                                text: root.editingCharacter
+                                      ? (root.editingCharacter[modelData.field] || "") : ""
+                                onTextChanged: {
+                                    if (activeFocus)
+                                        root.commit(modelData.field, text)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                LabeledField {
+                    label: "标签"
+                    TextField {
+                        Layout.fillWidth: true
+                        implicitHeight: Theme.controlMd
+                        placeholderText: "英文逗号分隔"
+                        text: root.editingCharacter
+                              ? (root.editingCharacter.tags || []).join(", ") : ""
+                        onTextChanged: {
+                            if (!activeFocus) return
+                            root.commit("tags",
+                                        text.split(",").map(t => t.trim())
+                                            .filter(t => t.length > 0))
+                        }
+                    }
+                }
+            }
+
+            Item { Layout.fillHeight: true }
+        }
+    }
+
+    // ========== 对话框 ==========
+    ConfirmDialog {
         id: characterDeleteDialog
         title: "确认删除"
-        text: "确定要删除该角色吗？"
-        buttons: MessageDialog.Ok | MessageDialog.Cancel
-        onAccepted: CharacterViewModel.deleteCurrentCharacter()
+        text: "确定要删除该角色吗？关联的会话数据不会被删除。"
+        acceptText: "删除"
+        danger: true
+        onConfirmed: CharacterViewModel.deleteCurrentCharacter()
     }
 
     Dialog {
         id: characterBookDialog
         title: "角色世界书"
         modal: true
-        anchors.centerIn: Overlay.overlay   // 全局窗口居中
+        anchors.centerIn: Overlay.overlay
+        width: Math.min(parent ? parent.width - Theme.spaceXl * 2 : 360, 420)
+        padding: Theme.spaceLg
 
-        //按钮居中
-        footer: DialogButtonBox {
-            standardButtons: Dialog.Ok | Dialog.Cancel
-            alignment: Qt.AlignHCenter  //居中
+        background: Rectangle {
+            color: Theme.bgElevated
+            radius: Theme.radiusMd
+            border.width: 1
+            border.color: Theme.borderDefault
         }
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 16
-            spacing: 16
+        contentItem: ColumnLayout {
+            spacing: Theme.spaceSm
 
             Label {
-                text: "角色链接的世界书"
-                font.pixelSize: 18
-                font.bold: true
                 Layout.fillWidth: true
+                text: "使用该角色聊天时会自动启用以下世界书"
+                wrapMode: Text.WordWrap
+                font.pixelSize: Theme.fontBody
+                font.family: Theme.fontFamily
+                color: Theme.textPrimary
             }
 
-            Label {
-                text: "使用该角色聊天时会自动启用该世界书"
-                wrapMode: Label.WordWrap
+            Rectangle {
                 Layout.fillWidth: true
-            }
+                implicitHeight: Theme.controlLg
+                radius: Theme.radiusSm
+                color: Theme.bgSurfaceVariant
+                border.width: 1
+                border.color: Theme.borderDefault
 
-            Item {
-                Layout.fillWidth: true
-                implicitHeight: 48
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 6
-                    color: palette.base
-                    border.color: palette.mid
-                    border.width: 1
-
-                    Label {
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.leftMargin: 12
-                        text: CharacterViewModel.characterBookName
-                        font.pixelSize: 15
-                        color: palette.text
-                    }
+                Label {
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.spaceMd
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: CharacterViewModel.characterBookName
+                    font.pixelSize: Theme.fontBody
+                    font.family: Theme.fontFamily
+                    color: Theme.textPrimary
+                    elide: Text.ElideRight
                 }
             }
+        }
 
-            // 底部占位撑开一点，防止内容贴按钮
-            Item {
-                Layout.fillHeight: true
+        footer: Item {
+            implicitHeight: Theme.touchTarget + Theme.spaceSm
+            AppButton {
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.spaceLg
+                anchors.verticalCenter: parent.verticalCenter
+                text: "关闭"
+                onClicked: characterBookDialog.close()
             }
         }
     }
-
-
 }

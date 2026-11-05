@@ -1,23 +1,83 @@
-// SliderFloatInput.qml
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
+// 浮点数滑块输入
+// 职责：滑块 + 数字框联动的取值控件；用户交互时才发出 edited，
+//       外部值变化（命令式同步）不会反向触发 edited，避免绑定回环。
+// 本次改造只把写死的尺寸/字号换成 Theme token，行为不变。
 Item {
     id: root
-    property string labelText: "温度"
-    property real value: 1.00
+
+    property string labelText: ""
+    property real value: 1.0
     property real from: 0.0
     property real to: 2.0
     property int decimals: 2
 
-    // 只在用户交互（拖滑块 / 改输入框）时发出
-    signal edited
+    signal edited()
 
-    width: 600
-    height: 80
+    implicitWidth: 420
+    implicitHeight: Theme.controlLg + Theme.spaceXl + Theme.spaceSm
 
-    // 外部（模型）→ 内部：命令式同步，不用绑定
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: Theme.spaceXs
+
+        Label {
+            Layout.fillWidth: true
+            text: root.labelText
+            font.pixelSize: Theme.fontBodySm
+            font.family: Theme.fontFamily
+            color: Theme.textSecondary
+            elide: Text.ElideRight
+        }
+
+        RowLayout {
+            spacing: Theme.spaceSm
+
+            Slider {
+                id: slider
+                Layout.fillWidth: true
+                Layout.minimumWidth: Theme.controlLg * 4
+                from: root.from
+                to: root.to
+                stepSize: 0.01
+
+                onMoved: {
+                    const v = Number(value.toFixed(root.decimals))
+                    if (Math.abs(root.value - v) > 1e-9) {
+                        root.value = v
+                        root.edited()
+                    }
+                }
+            }
+
+            TextField {
+                id: inputField
+                Layout.preferredWidth: Theme.controlLg * 2
+                implicitHeight: Theme.controlSm
+                horizontalAlignment: Text.AlignHCenter
+                font.pixelSize: Theme.fontBody
+                font.family: Theme.fontFamily
+
+                onEditingFinished: {
+                    let num = parseFloat(text)
+                    if (isNaN(num)) num = root.value
+                    num = Math.max(root.from, Math.min(root.to, num))
+                    const v = Number(num.toFixed(root.decimals))
+                    if (Math.abs(root.value - v) > 1e-9) {
+                        root.value = v
+                        root.edited()
+                    } else {
+                        text = v.toFixed(root.decimals)
+                    }
+                }
+            }
+        }
+    }
+
+    // 外部（模型）→ 控件：命令式同步，不用绑定
     onValueChanged: {
         if (Math.abs(slider.value - value) > 1e-9)
             slider.value = value
@@ -28,56 +88,5 @@ Item {
     Component.onCompleted: {
         slider.value = value
         inputField.text = value.toFixed(decimals)
-    }
-
-    ColumnLayout {
-        anchors.fill: parent
-        Text {
-            text: labelText
-            font.pixelSize: 16
-            Layout.alignment: Qt.AlignHCenter
-            Layout.fillWidth: true
-        }
-        RowLayout {
-            spacing: 12
-
-            Slider {
-                id: slider
-                Layout.fillWidth: true
-                Layout.minimumWidth: 300
-                from: root.from
-                to: root.to
-                stepSize: 0.01
-
-                // 用户拖动 / 点击 —— 唯一触发 edited 的地方
-                onMoved: {
-                    var v = Number(value.toFixed(root.decimals))
-                    if (Math.abs(root.value - v) > 1e-9) {
-                        root.value = v
-                        root.edited()
-                    }
-                }
-            }
-
-            TextField {
-                id: inputField
-                Layout.preferredWidth: 160
-                font.pixelSize: 32
-                horizontalAlignment: Text.AlignHCenter
-
-                onEditingFinished: {
-                    var num = parseFloat(text)
-                    if (isNaN(num)) num = root.value
-                    num = Math.max(root.from, Math.min(root.to, num))
-                    var v = Number(num.toFixed(root.decimals))
-                    if (Math.abs(root.value - v) > 1e-9) {
-                        root.value = v
-                        root.edited()
-                    } else {
-                        text = v.toFixed(root.decimals)
-                    }
-                }
-            }
-        }
     }
 }

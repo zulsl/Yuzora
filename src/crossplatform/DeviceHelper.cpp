@@ -11,6 +11,7 @@
 #include <QFuture>
 #include <QSslSocket>
 #include <QSettings>
+#include <QStyleHints>
 
 
 #ifdef Q_OS_ANDROID
@@ -38,7 +39,14 @@ DeviceHelper::DeviceHelper(QObject *parent)
     // 检测
     detectDeviceType();
     detectScreenInfo();
+    detectSafeArea();
     initAppPath();
+
+    // 系统深浅色变化 → 通知 QML 重新选择色板（"跟随系统"模式）
+    if (QGuiApplication::styleHints()) {
+        connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged,
+                this, &DeviceHelper::systemColorSchemeChanged);
+    }
 }
 
 void DeviceHelper::detectDeviceType()
@@ -426,6 +434,82 @@ qreal DeviceHelper::pxToDp(qreal px) const
 int DeviceHelper::getScaledFontSize(int baseSize) const
 {
     return qRound(baseSize * m_screenDensity);
+}
+
+// ======================================
+// 响应式布局 / 主题系统辅助（供 QML 使用）
+// ======================================
+void DeviceHelper::detectSafeArea()
+{
+    int top = 0, bottom = 0, left = 0, right = 0;
+
+    // 桌面平台没有系统栏遮挡，恒为 0；否则会把任务栏误算成"安全区"，
+    // 导致桌面端无端留白。
+    if (isMobile()) {
+        if (QScreen* screen = QGuiApplication::primaryScreen()) {
+            const QRect full = screen->geometry();
+            const QRect avail = screen->availableGeometry();
+            top    = qMax(0, avail.top()    - full.top());
+            bottom = qMax(0, full.bottom()  - avail.bottom());
+            left   = qMax(0, avail.left()   - full.left());
+            right  = qMax(0, full.right()   - avail.right());
+
+            // 旋转 / 分屏 / 系统栏显隐时重算
+            connect(screen, &QScreen::availableGeometryChanged,
+                    this, &DeviceHelper::detectSafeArea, Qt::UniqueConnection);
+        }
+    }
+
+    // 环境变量覆盖：让桌面端可以模拟刘海屏 / 状态栏，从而验证移动端内边距
+    bool ok = false;
+    int v = qEnvironmentVariableIntValue("YUZORA_SAFE_AREA_TOP", &ok);
+    if (ok) top = v;
+    v = qEnvironmentVariableIntValue("YUZORA_SAFE_AREA_BOTTOM", &ok);
+    if (ok) bottom = v;
+    v = qEnvironmentVariableIntValue("YUZORA_SAFE_AREA_LEFT", &ok);
+    if (ok) left = v;
+    v = qEnvironmentVariableIntValue("YUZORA_SAFE_AREA_RIGHT", &ok);
+    if (ok) right = v;
+
+    if (top == m_safeAreaTop && bottom == m_safeAreaBottom
+        && left == m_safeAreaLeft && right == m_safeAreaRight) {
+        return;
+    }
+
+    m_safeAreaTop = top;
+    m_safeAreaBottom = bottom;
+    m_safeAreaLeft = left;
+    m_safeAreaRight = right;
+    emit safeAreaChanged();
+}
+
+bool DeviceHelper::isTouchDevice() const
+{
+    // 移动端必然是触屏；桌面端可用 YUZORA_TOUCH=1 模拟，便于验证 hover 降级
+    static const bool envTouch = []() {
+        bool ok = false;
+        return qEnvironmentVariableIntValue("YUZORA_TOUCH", &ok) != 0 && ok;
+    }();
+    return isMobile() || envTouch;
+}
+
+bool DeviceHelper::systemDarkMode() const
+{
+    if (!QGuiApplication::styleHints()) return false;
+    return QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark;
+}
+
+void DeviceHelper::setTestKeyboardInset(int inset)
+{
+    const int clamped = qMax(0, inset);
+    if (m_testKeyboardInset == clamped) return;
+    m_testKeyboardInset = clamped;
+    emit testKeyboardInsetChanged();
+}
+
+qreal DeviceHelper::dp(qreal value) const
+{
+    return dpToPx(value);
 }
 
 

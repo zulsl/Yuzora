@@ -1,0 +1,175 @@
+pragma Singleton
+import QtQuick
+
+// 主题单例（唯一对外入口）
+// 职责：
+//   1. 把 PaletteLight / PaletteDark / Metrics / Motion 聚合成一个稳定的 `Theme.*` API；
+//   2. 暴露断点与窗口类别（由 Main.qml 通过 Binding 注入 windowWidth/windowHeight，
+//      不再使用 Screen.width，以符合"按窗口宽度断点 600/1024"的基线）；
+//   3. 持有动画总开关 animationsEnabled，实现"所有动画可一键移除"。
+// 约束：本文件与 theme/ 下其它文件是唯一允许出现裸色值与裸数字的地方。
+QtObject {
+    id: theme
+
+    // ========== 窗口尺寸（供 QML 使用）==========
+    // 由 Main.qml 以 Binding 注入真实窗口尺寸，默认值仅用于无窗口场景兜底。
+    property real windowWidth: 1280
+    property real windowHeight: 720
+
+    // ========== 断点 ==========
+    readonly property int bpCompact: 600
+    readonly property int bpExpanded: 1024
+
+    readonly property bool isCompact: windowWidth < bpCompact
+    readonly property bool isExpanded: windowWidth >= bpExpanded
+    readonly property bool isMedium: !isCompact && !isExpanded
+
+    // 兼容旧名：历史代码用 Theme.isMobile，语义改为"窗口窄于 600"
+    readonly property bool isMobile: isCompact
+    // 是否触屏优先设备（用于 hover 态、鼠标光标等降级）
+    readonly property bool isTouchPrimary: DeviceHelper.isTouchDevice
+
+    // ========== 主题模式 ==========
+    // 取值沿用 Material 语义：0 = Light, 1 = Dark, 2 = System
+    readonly property int themeMode: SettingsViewModel.themeMode
+    readonly property int materialTheme: themeMode
+    readonly property bool isDark: themeMode === 1
+                                 || (themeMode === 2 && DeviceHelper.systemDarkMode)
+
+    // ========== 色板 ==========
+    readonly property PaletteLight lightPalette: PaletteLight {}
+    readonly property PaletteDark darkPalette: PaletteDark {}
+    // 用 var 承接：PaletteLight / PaletteDark 是两个不同的 QMLObject 类型，
+    // 声明成 QtObject 会让静态检查认为所有色板成员都不存在。
+    readonly property var palette: isDark ? darkPalette : lightPalette
+
+    // 背景
+    readonly property color bgCanvas: palette.bgCanvas
+    readonly property color bgSurface: palette.bgSurface
+    readonly property color bgSurfaceVariant: palette.bgSurfaceVariant
+    readonly property color bgElevated: palette.bgElevated
+
+    // 文字
+    readonly property color textPrimary: palette.textPrimary
+    readonly property color textSecondary: palette.textSecondary
+    readonly property color textDisabled: palette.textDisabled
+    readonly property color textOnAccent: palette.textOnAccent
+
+    // 描边
+    readonly property color borderDefault: palette.borderDefault
+    readonly property color borderStrong: palette.borderStrong
+
+    // 状态
+    readonly property color success: palette.success
+    readonly property color successSubtle: palette.successSubtle
+    readonly property color warning: palette.warning
+    readonly property color danger: palette.danger
+    readonly property color dangerSubtle: palette.dangerSubtle
+
+    // 聊天气泡
+    readonly property color bubbleUser: palette.bubbleUser
+    readonly property color bubbleUserText: palette.bubbleUserText
+    readonly property color bubbleAssistant: palette.bubbleAssistant
+    readonly property color bubbleAssistantBorder: palette.bubbleAssistantBorder
+
+    // 交互态
+    readonly property color rowHover: palette.rowHover
+    readonly property color rowSelected: palette.rowSelected
+
+    // 覆盖与阴影
+    readonly property color overlayScrim: palette.overlayScrim
+    readonly property color shadowColor: palette.shadowColor
+
+    // ========== 主色（唯一来源：SettingsViewModel.themeColor）==========
+    readonly property color primaryColor: SettingsViewModel.themeColor
+    readonly property color accentColor: primaryColor              // 兼容旧名
+    readonly property color accentHover: Qt.lighter(primaryColor, 1.12)
+    readonly property color accentPressed: Qt.darker(primaryColor, 1.12)
+    readonly property color accentSubtle: Qt.rgba(primaryColor.r, primaryColor.g,
+                                                  primaryColor.b, 0.12)
+
+    // 兼容旧名（历史上声明未赋值的几个语义色，现在指向真实值）
+    readonly property color backgroundColor: bgCanvas
+    readonly property color foregroundColor: textPrimary
+    readonly property color textColor: textPrimary
+    readonly property color secondaryTextColor: textSecondary
+    readonly property color borderColor: borderDefault
+
+    // ========== 字体 ==========
+    // Windows 用雅黑；其它平台留空，让 Qt 使用系统默认字体。
+    // 不用 Qt.application.font：它不是稳定的跨平台属性，取不到时反而会抛异常。
+    readonly property string fontFamily: Qt.platform.os === "windows"
+                                         ? "Microsoft YaHei"
+                                         : ""
+    readonly property int baseFontSize: SettingsViewModel.baseFontSize
+
+    readonly property int fontDisplay: 24
+    readonly property int fontTitle: 18
+    readonly property int fontBody: baseFontSize
+    readonly property int fontBodySm: Math.max(11, baseFontSize - 1)
+    readonly property int fontCaption: Math.max(10, baseFontSize - 3)
+
+    readonly property font applicationFont: Qt.font({
+        family: fontFamily,
+        pixelSize: baseFontSize
+    })
+
+    // ========== 尺寸（转发 Metrics）==========
+    readonly property Metrics metrics: Metrics {}
+    readonly property Motion motion: Motion {}
+
+    readonly property int spaceXs: metrics.spaceXs
+    readonly property int spaceSm: metrics.spaceSm
+    readonly property int spaceMd: metrics.spaceMd
+    readonly property int spaceLg: metrics.spaceLg
+    readonly property int spaceXl: metrics.spaceXl
+    readonly property int space2xl: metrics.space2xl
+
+    readonly property int radiusSm: metrics.radiusSm
+    readonly property int radiusMd: metrics.radiusMd
+    readonly property int radiusLg: metrics.radiusLg
+    readonly property int radiusPill: metrics.radiusPill
+
+    readonly property int iconSm: metrics.iconSm
+    readonly property int iconMd: metrics.iconMd
+    readonly property int iconLg: metrics.iconLg
+
+    readonly property int controlSm: metrics.controlSm
+    readonly property int controlMd: metrics.controlMd
+    readonly property int controlLg: metrics.controlLg
+    readonly property int touchTarget: metrics.touchTarget
+
+    readonly property int avatarSm: metrics.avatarSm
+    readonly property int avatarMd: metrics.avatarMd
+    readonly property int avatarLg: metrics.avatarLg
+
+    // 页面内边距：窄窗口用紧一档
+    readonly property int pagePadding: isCompact ? metrics.pagePaddingCompact
+                                                 : metrics.pagePaddingExpanded
+    readonly property int gutter: metrics.gutter
+    readonly property int sectionGap: metrics.sectionGap
+
+    // 兼容旧名
+    readonly property int widget_spacing: metrics.spaceSm
+    readonly property int layout_spacing: metrics.spaceLg
+    readonly property int page_padding: pagePadding
+
+    // ========== 动效 ==========
+    // 一键移除动画：置 false 后所有用 Theme.duration* 的 Behavior 变为 0ms
+    property bool animationsEnabled: true
+
+    readonly property int durationFast: animationsEnabled ? motion.durationFast : 0
+    readonly property int durationBase: animationsEnabled ? motion.durationBase : 0
+    readonly property int durationSlow: animationsEnabled ? motion.durationSlow : 0
+    readonly property int durationEnter: animationsEnabled ? motion.enterDuration : 0
+    readonly property int durationExit: animationsEnabled ? motion.exitDuration : 0
+    readonly property int durationState: animationsEnabled ? motion.stateDuration : 0
+
+    readonly property int easingIn: motion.easingIn
+    readonly property int easingOut: motion.easingOut
+    readonly property int easingInOut: motion.easingInOut
+
+    readonly property real springDamping: motion.springDamping
+    readonly property real springMass: motion.springMass
+    readonly property real springStiffness: motion.springStiffness
+}

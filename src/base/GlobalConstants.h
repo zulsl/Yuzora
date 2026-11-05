@@ -4,10 +4,15 @@
 #include <QObject>
 #include <QString>
 #include <QVersionNumber>
+#include <QtQml/qqmlregistration.h>
 
 namespace GlobalConstants
 {
 Q_NAMESPACE
+// 供 QML 使用：把本命名空间的枚举注册进 Yuzora 模块，
+// QML 侧可直接写 GlobalConstants.User / GlobalConstants.Assistant，
+// 不再用裸数字 0/1/2 判断消息角色。
+QML_ELEMENT
 
 // ======================================
 // 通用业务常量

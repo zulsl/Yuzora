@@ -4,16 +4,31 @@
 #include <QObject>
 #include <QVariantMap>
 #include <QStringList>
+#include <QtQml/qqmlregistration.h>
 #include "CharacterListModel.h"
 #include "CharacterEntity.h"
+
+class QQmlEngine;
+class QJSEngine;
 
 /**
  * @brief 角色管理视图模型
  * 职责：视图状态持有、列表模型维护、实体与QVariantMap互转、UI事件转发
+ * 本类以 QML 单例形式暴露给 QML（类型名 CharacterViewModel）。
  */
 class CharacterViewModel : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+
+public:
+    // QML 单例工厂（供 QML 使用）：没有 create() 时单例会被标记为 isCreatable=false。
+    static CharacterViewModel* create(QQmlEngine*, QJSEngine*)
+    {
+        static CharacterViewModel instance;
+        return &instance;
+    }
     //列表model
     Q_PROPERTY(CharacterListModel* characterListModel READ characterListModel CONSTANT)
     //当前选中项索引

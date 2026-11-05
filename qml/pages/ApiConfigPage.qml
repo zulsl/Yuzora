@@ -1,332 +1,314 @@
-import QtQuick 6.8
-import QtQuick.Dialogs 6.8
-import QtQuick.Controls 6.8
-import QtQuick.Layouts 6.8
-import QtQuick.Controls.Material 6.8
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
 
+import Yuzora 1.0
 
-//api配置界面
-
-Page {
+// 模型 API 配置页
+// 职责：选择配置、编辑表单字段、拉取模型列表。
+// 说明：改造前"测试连接"按钮整段被注释（保留功能），本次同样不启用。
+PageScaffold {
     id: root
-    padding: Theme.page_padding
-    header: ToolBar {
-        // padding: 0
-        height: 50
-        RowLayout {
-            anchors.fill: parent
-            spacing: 8
 
-            ToolButton {
-                id:menuBtn
-                icon.source: "qrc:/icons/res/menu.svg"
-                onClicked: sideDrawer.open()
-            }
+    title: "模型 API 配置"
+    contentPadding: Theme.pagePadding
+    onLeftClicked: Ui.requestDrawer()
 
-            Label {
-                Layout.fillWidth: true
-                text: "模型API配置"
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-                verticalAlignment: Text.AlignVCenter
-            }
-
-            //占位弹簧
-            Item {Layout.preferredWidth: menuBtn.width}
-        }
-    }
-
-
-    ScrollView{
-        id:scrollView
+    ScrollView {
         anchors.fill: parent
         contentWidth: availableWidth
-        Layout.maximumWidth: Screen.width
         clip: true
+
         ColumnLayout {
-            anchors.fill: parent
+            width: parent.width
+            spacing: Theme.sectionGap
 
-            // ========== 顶部：下拉选择 + 添加按钮 ==========
-            ColumnLayout {
+            // ========== 连接配置 ==========
+            SectionCard {
+                title: "连接配置"
                 Layout.fillWidth: true
-                spacing: 5
 
-                Label {
-                    text: "API 连接配置:"
-                    font.bold: true
-                }
-                ComboBox {
-                    id: configCombo
-                    Layout.fillWidth: true
-                    model: ApiConfigViewModel.configListModel
-                    textRole: "name"
-                    valueRole: "id"//用id作为"值"
+                LabeledField {
+                    label: "当前配置"
 
-                    //qt6.8不支持直接写currentValue
-                    // currentValue: ApiConfigViewModel.currentConfigId
+                    ComboBox {
+                        id: configCombo
+                        Layout.fillWidth: true
+                        implicitHeight: Theme.controlMd
+                        model: ApiConfigViewModel.configListModel
+                        textRole: "name"
+                        valueRole: "id"
+                        font.pixelSize: Theme.fontBody
+                        font.family: Theme.fontFamily
 
-                    Binding on currentIndex {
-                        value: configCombo.indexOfValue(ApiConfigViewModel.currentConfigId)
-                        when: configCombo.indexOfValue(ApiConfigViewModel.currentConfigId) !== -1 // 找到有效值才更新
-                    }
-
-                    // 自定义收起后的显示框
-                    contentItem: Row {
-                        spacing: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        leftPadding: 12
-                        Rectangle {
-                            width: 8
-                            height: 8
-                            radius: 4
-                            color: ApiConfigViewModel.currentIsActive ? "#27ae60" : "transparent"
-                            anchors.verticalCenter: parent.verticalCenter
+                        // qt6.8 不支持直接写 currentValue，用 Binding 同步选中项
+                        Binding on currentIndex {
+                            value: configCombo.indexOfValue(ApiConfigViewModel.currentConfigId)
+                            when: configCombo.indexOfValue(ApiConfigViewModel.currentConfigId) !== -1
                         }
 
-                        Text {
-                            text: configCombo.displayText
-                            font: configCombo.font
-                            color: configCombo.palette.text
-                            anchors.verticalCenter: parent.verticalCenter
-                            elide: Text.ElideRight
-                        }
-                    }
-
-                    // 下拉列表项自定义委托：左侧带激活状态绿点
-                    delegate: ItemDelegate {
-                        width: configCombo.width
-                        highlighted: configCombo.highlightedIndex === index
+                        onActivated: ApiConfigViewModel.selectConfig(currentValue)
 
                         contentItem: Row {
-                            spacing: 10
+                            spacing: Theme.spaceSm
                             anchors.verticalCenter: parent.verticalCenter
+                            leftPadding: Theme.spaceMd
 
-                            // 激活状态绿点
                             Rectangle {
-                                width: 8
-                                height: 8
-                                radius: 4
-                                color: model.isActive ? "#27ae60" : "transparent"
+                                width: Theme.spaceSm
+                                height: Theme.spaceSm
+                                radius: width / 2
                                 anchors.verticalCenter: parent.verticalCenter
+                                color: ApiConfigViewModel.currentIsActive ? Theme.success
+                                                                          : "transparent"
+                                border.width: ApiConfigViewModel.currentIsActive ? 0 : 1
+                                border.color: Theme.borderStrong
                             }
 
                             Text {
-                                text: model.name
+                                text: configCombo.displayText
                                 font: configCombo.font
-                                color: parent.highlighted ? configCombo.palette.highlightedText : configCombo.palette.text
+                                color: Theme.textPrimary
                                 anchors.verticalCenter: parent.verticalCenter
-                                elide: Text.ElideRight//超出宽度显示省略号
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        delegate: ItemDelegate {
+                            width: configCombo.width
+                            highlighted: configCombo.highlightedIndex === index
+
+                            contentItem: Row {
+                                spacing: Theme.spaceSm
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                Rectangle {
+                                    width: Theme.spaceSm
+                                    height: Theme.spaceSm
+                                    radius: width / 2
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    color: model.isActive ? Theme.success : "transparent"
+                                    border.width: model.isActive ? 0 : 1
+                                    border.color: Theme.borderStrong
+                                }
+
+                                Text {
+                                    text: model.name
+                                    font.pixelSize: Theme.fontBody
+                                    font.family: Theme.fontFamily
+                                    color: Theme.textPrimary
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    elide: Text.ElideRight
+                                }
                             }
                         }
                     }
-
-                    //仅用户主动点选/键盘确认
-                    onActivated: ApiConfigViewModel.selectConfig(currentValue)
                 }
 
-                // 操作按钮区
-                GridLayout{
-                    columns: 2
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spaceSm
 
-                    Button {
+                    AppButton {
                         text: "设为当前使用"
-                        icon.name: "emblem-default"
+                        variant: "secondary"
                         enabled: !ApiConfigViewModel.currentIsActive
                         onClicked: ApiConfigViewModel.applyCurrentConfig()
                     }
 
-                    Button {
+                    AppButton {
                         text: "删除"
-                        visible: !ApiConfigViewModel.isCurrentBuiltin
-                        icon.name: "edit-delete"
-                        onClicked: ApiConfigViewModel.deleteCurrentConfig()
+                        variant: "danger"
+                        visible: !ApiConfigFormViewModel.isCurrentBuiltin
+                        onClicked: deleteDialog.open()
                     }
 
-                    Button {
-                        text: "添加自定义模型来源"
-                        icon.name: "list-add"
+                    Item { Layout.fillWidth: true }
+
+                    AppButton {
+                        text: "添加来源"
+                        variant: "secondary"
+                        iconSource: "qrc:/icons/res/file-plus.svg"
                         onClicked: addModelDialog.open()
                     }
-
-
                 }
             }
 
-            // ========== 下方表单区域 ==========
-            ColumnLayout {
+            // ========== 参数表单 ==========
+            SectionCard {
+                title: "参数"
                 Layout.fillWidth: true
-                spacing: 8
                 enabled: configCombo.count > 0
 
-                // 配置名称（仅自定义显示）
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: !ApiConfigViewModel.isCurrentBuiltin
-                    Label { text: "配置名称:" }
+                LabeledField {
+                    label: "配置名称"
+                    visible: !ApiConfigFormViewModel.isCurrentBuiltin
                     TextField {
                         Layout.fillWidth: true
-                        text: ApiConfigViewModel.configName
-                        onTextEdited: ApiConfigViewModel.setConfigName(text)
-                        placeholderText: "给这个API配置起个名字"
+                        implicitHeight: Theme.controlMd
+                        text: ApiConfigFormViewModel.configName
+                        placeholderText: "给这个 API 配置起个名字"
+                        font.pixelSize: Theme.fontBody
+                        font.family: Theme.fontFamily
+                        onTextEdited: ApiConfigFormViewModel.setConfigName(text)
                     }
                 }
 
-                // API 密钥
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Label { text: "API 密钥:" }
+                LabeledField {
+                    label: "API 密钥"
+
                     TextField {
+                        id: keyField
                         Layout.fillWidth: true
-                        text: ApiConfigViewModel.apiKey
+                        implicitHeight: Theme.controlMd
+                        text: ApiConfigFormViewModel.apiKey
                         echoMode: TextInput.Password
-                        onTextEdited: ApiConfigViewModel.setApiKey(text)
                         placeholderText: "sk-*************"
+                        font.pixelSize: Theme.fontBody
+                        font.family: Theme.fontFamily
+                        rightPadding: Theme.touchTarget
+                        onTextEdited: ApiConfigFormViewModel.setApiKey(text)
 
-                        rightPadding: 32// 预留按钮空间，防止文字盖住眼睛
-
-                        // 显示/隐藏密码按钮
-                        ToolButton {
+                        IconButton {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            icon.source: {
-                                var src = parent.echoMode === TextInput.Password
-                                    ? "qrc:/icons/res/eye-off.svg" : "qrc:/icons/res/eye.svg";
-                                return src;
-                            }
-                            icon.color: "black"
-                            onClicked: parent.echoMode = parent.echoMode === TextInput.Password ? TextInput.Normal : TextInput.Password
+                            compact: true
+                            tip: keyField.echoMode === TextInput.Password ? "显示" : "隐藏"
+                            icon.source: keyField.echoMode === TextInput.Password
+                                         ? "qrc:/icons/res/eye-off.svg"
+                                         : "qrc:/icons/res/eye.svg"
+                            onClicked: keyField.echoMode = keyField.echoMode === TextInput.Password
+                                                         ? TextInput.Normal : TextInput.Password
                         }
                     }
                 }
 
-                // API 域名（仅自定义显示）
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: ApiConfigViewModel.showDomainInput
-                    Label { text: "API 地址:"}
+                LabeledField {
+                    label: "API 地址"
+                    visible: ApiConfigFormViewModel.showDomainInput
                     TextField {
                         Layout.fillWidth: true
-                        text: ApiConfigViewModel.baseDomain
-                        onTextEdited: ApiConfigViewModel.setBaseDomain(text)
+                        implicitHeight: Theme.controlMd
+                        text: ApiConfigFormViewModel.baseDomain
                         placeholderText: "https://api.openai.com"
+                        font.pixelSize: Theme.fontBody
+                        font.family: Theme.fontFamily
+                        onTextEdited: ApiConfigFormViewModel.setBaseDomain(text)
                     }
                 }
 
-                // 接口路径（仅自定义显示）
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    visible: ApiConfigViewModel.showDomainInput
-                    Label { text: "接口路径:" }
+                LabeledField {
+                    label: "接口路径"
+                    visible: ApiConfigFormViewModel.showDomainInput
                     TextField {
                         Layout.fillWidth: true
-                        text: ApiConfigViewModel.apiPath
-                        onTextEdited: ApiConfigViewModel.setApiPath(text)
+                        implicitHeight: Theme.controlMd
+                        text: ApiConfigFormViewModel.apiPath
                         placeholderText: "/chat/completions"
+                        font.pixelSize: Theme.fontBody
+                        font.family: Theme.fontFamily
+                        onTextEdited: ApiConfigFormViewModel.setApiPath(text)
                     }
                 }
 
-                // 子模型选择
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Label { text: "可用模型:"}
+                LabeledField {
+                    label: "可用模型"
                     ComboBox {
                         Layout.fillWidth: true
-                        model: ApiConfigViewModel.modelList
-                        currentIndex:ApiConfigViewModel.currentModelsIndex
-                        onCurrentIndexChanged: {
-                            ApiConfigViewModel.setCurrentModelsIndex(currentIndex)
-                        }
+                        implicitHeight: Theme.controlMd
+                        model: ApiConfigFormViewModel.modelList
+                        currentIndex: ApiConfigFormViewModel.currentModelsIndex
+                        font.pixelSize: Theme.fontBody
+                        font.family: Theme.fontFamily
+                        onActivated: (index) => ApiConfigFormViewModel.setCurrentModelsIndex(index)
                     }
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spaceSm
 
-                Button {
-                    text: "获取可用模型"
-                    enabled: !ApiConfigViewModel.fetchModelListState
-                    onClicked: ApiConfigViewModel.fetchModelList()
+                    AppButton {
+                        text: "获取可用模型"
+                        variant: "secondary"
+                        enabled: !ApiConfigViewModel.fetchModelListState
+                        onClicked: ApiConfigViewModel.fetchModelList()
+                    }
+
                     BusyIndicator {
-                        anchors.centerIn: parent
                         running: ApiConfigViewModel.fetchModelListState
                         visible: running
+                        implicitWidth: Theme.iconLg
+                        implicitHeight: Theme.iconLg
                     }
+
+                    Item { Layout.fillWidth: true }
                 }
-
-                //保留功能
-                // Button {
-                //     text: "测试连接"
-                //     enabled: !ApiConfigViewModel.testingConnection
-                //     onClicked: ApiConfigViewModel.testCurrentConnection()
-                //     BusyIndicator {
-                //         anchors.centerIn: parent
-                //         running: ApiConfigViewModel.testingConnection
-                //         visible: running
-                //     }
-                // }
-
             }
+
+            Item { Layout.fillHeight: true }
         }
     }
 
-
-    // 添加模型对话框
+    // ========== 添加自定义来源 ==========
     Dialog {
         id: addModelDialog
-        //自定义标题
-        // header: Rectangle {
-        //     height: titleLabel.implicitHeight + 10
-        //     Label {text: "弹窗居中标题";anchors.centerIn: parent}
-        // }
         title: "添加自定义模型来源"
         modal: true
-
-        //按钮居中
-        footer: DialogButtonBox {
-            standardButtons: Dialog.Ok | Dialog.Cancel
-            alignment: Qt.AlignHCenter //居中
-        }
-
-        // 全局窗口居中
         anchors.centerIn: Overlay.overlay
+        width: Math.min(parent ? parent.width - Theme.spaceXl * 2 : 360, 420)
+        padding: Theme.spaceLg
+        standardButtons: Dialog.Ok | Dialog.Cancel
+
+        background: Rectangle {
+            color: Theme.bgElevated
+            radius: Theme.radiusMd
+            border.width: 1
+            border.color: Theme.borderDefault
+        }
 
         onAccepted: {
             ApiConfigViewModel.addCustomConfig(nameInput.text)
             nameInput.text = ""
         }
-        onRejected: {
-            nameInput.text = ""
-        }
 
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 12
+        contentItem: ColumnLayout {
+            spacing: Theme.spaceSm
 
             Label {
+                Layout.fillWidth: true
                 text: "请输入配置名称"
-                font.pointSize: 10
-                Layout.alignment: Qt.AlignHCenter
+                font.pixelSize: Theme.fontBodySm
+                font.family: Theme.fontFamily
+                color: Theme.textSecondary
             }
 
             TextField {
                 id: nameInput
                 Layout.fillWidth: true
+                implicitHeight: Theme.controlMd
                 placeholderText: "配置名称"
                 focus: true
+                font.pixelSize: Theme.fontBody
+                font.family: Theme.fontFamily
             }
         }
     }
 
-    //提示信息
+    ConfirmDialog {
+        id: deleteDialog
+        title: "确认删除"
+        text: "确定删除当前 API 配置吗？"
+        acceptText: "删除"
+        danger: true
+        onConfirmed: ApiConfigViewModel.deleteCurrentConfig()
+    }
+
     Connections {
         target: ApiConfigViewModel
-
-        function onOperationError(errorMsg) {
-            errorToast.show(errorMsg)
-            console.warn("API配置错误:", errorMsg)
-        }
-
-        function onOperationTip(tipMsg) {
-            tipToast.show(tipMsg)
-            console.log(tipMsg)
-        }
+        function onOperationError(message) { Ui.toast(message, true) }
+        function onOperationTip(message) { Ui.toast(message, false) }
+        function onDeleteSuccess() { Ui.toast("配置已删除", false) }
+        function onTestSuccess() { Ui.toast("连接正常", false) }
     }
 }

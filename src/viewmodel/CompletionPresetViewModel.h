@@ -2,14 +2,34 @@
 #define COMPLETIONPRESETVIEWMODEL_H
 
 #include <QObject>
+#include <QtQml/qqmlregistration.h>
 #include "PresetListModel.h"
 #include "PresetPromptListModel.h"
 #include "CompletionPresetEntity.h"
 #include "PromptEntity.h"
 #include "CompletionPresetService.h"
 
+class QQmlEngine;
+class QJSEngine;
+
+/**
+ * @brief 对话补全预设视图模型
+ * 职责：预设列表 / 提示词条目列表两个数据源，当前编辑中的预设快照，以及导入导出。
+ * 本类以 QML 单例形式暴露给 QML（类型名 CompletionPresetViewModel）。
+ * 注意：对外暴露的是 currentEditingPreset；历史 QML 里误写的 currentPreset 并不存在。
+ */
 class CompletionPresetViewModel : public QObject {
     Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+
+public:
+    // QML 单例工厂（供 QML 使用）：没有 create() 时单例会被标记为 isCreatable=false。
+    static CompletionPresetViewModel* create(QQmlEngine*, QJSEngine*)
+    {
+        static CompletionPresetViewModel instance;
+        return &instance;
+    }
     //列表模型
     Q_PROPERTY(PresetListModel* presetModel READ presetModel CONSTANT)
     Q_PROPERTY(PresetPromptListModel* presetPromptModel READ presetPromptModel CONSTANT)

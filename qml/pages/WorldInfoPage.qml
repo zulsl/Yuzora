@@ -1,138 +1,90 @@
-import QtQuick 6.8
-import QtQuick.Controls 6.8
-import QtQuick.Layouts 6.8
-import QtQuick.Dialogs 6.8
-import QtQuick.Controls.Material 6.8
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Dialogs
+
 import Yuzora 1.0
 
-Page {
+// 世界书页
+// 响应式策略：差异大 → Loader
+//   宽窗口：AdaptiveSplit 1:3（文集 | 条目）
+//   窄窗口：MasterDetailStack（文集 → 条目）
+PageScaffold {
     id: root
-    padding: 12
-    header: MyToolBar{
-        title:"世界书/知识书"
-        onLeftClicked: sideDrawer.open()
+
+    title: "世界书 / 知识书"
+    contentPadding: Theme.spaceSm
+    onLeftClicked: Ui.requestDrawer()
+
+    function localPath(url) {
+        const s = String(url)
+        if (s.indexOf("file:///") === 0)
+            return decodeURIComponent(s.substring(8))
+        if (s.indexOf("file://") === 0)
+            return decodeURIComponent(s.substring(7))
+        return s
     }
 
-    RowLayout {
+    Loader {
         anchors.fill: parent
-        spacing: 12
-
-        // ========== 左栏：文集列表 ==========
-        Pane {
-            Layout.fillHeight: true
-            Layout.fillWidth: true
-            Layout.preferredWidth: 1
-            padding: 0
-
-            ColumnLayout {
-                anchors.fill: parent
-                spacing: 8
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    Label { text: "世界书文集"; font.bold: true }
-                    Item { Layout.fillWidth: true }
-                    MyToolButton {
-                        ToolTip.text:"新建"
-                        icon.source: "qrc:/icons/res/file-plus.svg"
-                        onClicked: WorldInfoViewModel.createBook()
-                    }
-                }
-                RowLayout {
-                    Layout.fillWidth: true
-                    MyToolButton {
-                        ToolTip.text:"导入"
-                        icon.source: "qrc:/icons/res/file-import.svg"
-                        onClicked: importDialog.open()
-                    }
-                    MyToolButton {
-                        ToolTip.text: "导出"
-                        icon.source: "qrc:/icons/res/file-export.svg"
-                        onClicked: exportBookDialog.open()
-                        enabled: WorldInfoViewModel.currentBookId
-                    }
-                    MyToolButton {
-                        ToolTip.text:"删除"
-                        icon.source: "qrc:/icons/res/trash.svg"
-                        onClicked: bookDeleteDialog.open()
-                        enabled: WorldInfoViewModel.currentBookId
-                    }
-                    MyToolButton {
-                        ToolTip.text:"重命名"
-                        icon.source: "qrc:/icons/res/edit.svg"
-                        onClicked: renameDialog.open()
-                        enabled: WorldInfoViewModel.currentBookId
-                    }
-                }
-
-                ListView {
-                    id: bookListView
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    clip: true
-                    model: WorldInfoViewModel ? WorldInfoViewModel.bookModel : null
-                    currentIndex: -1
-
-                    delegate: ItemDelegate {
-                        width: bookListView.width
-                        highlighted: WorldInfoViewModel.currentBookId === model.id
-
-                        onClicked: {
-                            bookListView.currentIndex = index
-                            WorldInfoViewModel.selectBook(model.id)
-                        }
-
-                        contentItem: RowLayout {
-                            spacing: 2
-                            CheckBox{
-                                checked: model.isEnabled
-                                onToggled: WorldInfoViewModel.toggleBookEnabled(model.id)
-                            }
-
-
-                            Label {
-                                text: model.name
-                                font.bold: true
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                                color: model.isEnabled ? palette.text : palette.mid
-                            }
-
-                        }
-                    }
-                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AlwaysOn }
-                }
-            }
-        }
-
-        // ========== 右栏：条目列表 ==========
-        Pane {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.preferredWidth: 3
-            padding: 0
-
-            ColumnLayout {
-                anchors.fill: parent
-                spacing: 8
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    Label { text: "条目列表"; font.bold: true }
-                    Item { Layout.fillWidth: true }
-                    MyToolButton {
-                        ToolTip.text:"新建条目"
-                        icon.source: "qrc:/icons/res/file-plus.svg"
-                        onClicked: WorldInfoViewModel.createEntry()
-                    }
-                }
-
-                BookEntryListView{}
-            }
-        }
-
+        sourceComponent: Theme.isCompact ? compactLayout : wideLayout
     }
 
+    // ========== 宽窗口 ==========
+    Component {
+        id: wideLayout
+
+        AdaptiveSplit {
+            firstRatio: 1
+            secondRatio: 3
+
+            first: BookListPanel {
+                onImportRequested: importDialog.open()
+                onExportRequested: exportDialog.open()
+                onDeleteRequested: deleteDialog.open()
+                onRenameRequested: renameDialog.open()
+            }
+
+            second: EntryListPanel {}
+        }
+    }
+
+    // ========== 窄窗口 ==========
+    Component {
+        id: compactLayout
+
+        MasterDetailStack {
+            id: worldStack
+            listComponent: compactBooks
+            detailComponent: compactEntries
+        }
+    }
+
+    Component {
+        id: compactBooks
+
+        BookListPanel {
+            onImportRequested: importDialog.open()
+            onExportRequested: exportDialog.open()
+            onDeleteRequested: deleteDialog.open()
+            onRenameRequested: renameDialog.open()
+            onBookActivated: worldStack.showDetail()
+        }
+    }
+
+    Component {
+        id: compactEntries
+
+        PageScaffold {
+            title: WorldInfoViewModel.currentBookName.length > 0
+                   ? WorldInfoViewModel.currentBookName : "条目列表"
+            leftIconSource: "qrc:/icons/res/arrow-narrow-left.svg"
+            onLeftClicked: worldStack.hideDetail()
+
+            EntryListPanel {
+                anchors.fill: parent
+            }
+        }
+    }
 
     // ========== 对话框 ==========
     FileDialog {
@@ -142,60 +94,56 @@ Page {
         fileMode: FileDialog.OpenFile
         onAccepted: WorldInfoViewModel.importBook(selectedFile)
     }
+
     FileDialog {
-        id: exportBookDialog
+        id: exportDialog
         title: "导出世界书"
         nameFilters: ["JSON 文件 (*.json)"]
         fileMode: FileDialog.SaveFile
-        onAccepted: WorldInfoViewModel.exportCurrentBook(fileUrl.toLocalFile())
+        onAccepted: WorldInfoViewModel.exportCurrentBook(root.localPath(selectedFile))
     }
-    MessageDialog {
-        id: bookDeleteDialog
+
+    ConfirmDialog {
+        id: deleteDialog
         title: "确认删除"
-        text: "确定删除该世界书吗？"
-        buttons: MessageDialog.Ok | MessageDialog.Cancel
-        onAccepted: WorldInfoViewModel.deleteBook()
+        text: "确定删除该世界书吗？其中的条目会一并删除。"
+        acceptText: "删除"
+        danger: true
+        onConfirmed: WorldInfoViewModel.deleteBook()
     }
+
     Dialog {
         id: renameDialog
-        title: "重命名"
+        title: "重命名文集"
         modal: true
-
-        //按钮居中
-        footer: DialogButtonBox {
-            standardButtons: Dialog.Ok | Dialog.Cancel
-            alignment: Qt.AlignHCenter //居中
-        }
-        // 全局窗口居中
         anchors.centerIn: Overlay.overlay
+        width: Math.min(parent ? parent.width - Theme.spaceXl * 2 : 360, 420)
+        padding: Theme.spaceLg
+        standardButtons: Dialog.Ok | Dialog.Cancel
 
-        onAccepted: {
-            WorldInfoViewModel.currentBookName=nameInput.text
+        background: Rectangle {
+            color: Theme.bgElevated
+            radius: Theme.radiusMd
+            border.width: 1
+            border.color: Theme.borderDefault
         }
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 12
-            spacing: 8
-            TextField {
-                id: nameInput
-                text: WorldInfoViewModel.currentBookName
-                Layout.fillWidth: true
-                placeholderText: "名称"
-                focus: true
-                Layout.preferredWidth: 300
-            }
+        onAccepted: WorldInfoViewModel.currentBookName = nameInput.text
+
+        contentItem: TextField {
+            id: nameInput
+            text: WorldInfoViewModel.currentBookName
+            placeholderText: "文集名称"
+            focus: true
+            font.pixelSize: Theme.fontBody
+            font.family: Theme.fontFamily
         }
     }
 
-
-    MessageDialog {
-        id: confirmDeleteEntry
-        // icon: MessageDialog.Warning
-        title: "确认删除"
-        text: "确定删除该条目吗？"
-        buttons: MessageDialog.Ok | MessageDialog.Cancel
-        // onAccepted: WorldInfoViewModel.deleteEntry(WorldInfoViewModel.currentEntry.id)
+    Connections {
+        target: WorldInfoViewModel
+        function onOperationError(message) { Ui.toast(message, true) }
+        function onImportSuccess(count) { Ui.toast("已导入 " + count + " 个条目", false) }
+        function onExportSuccess() { Ui.toast("导出成功", false) }
     }
-
 }

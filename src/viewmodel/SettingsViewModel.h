@@ -2,10 +2,33 @@
 #define SETTINGSVIEWMODEL_H
 
 #include <QObject>
+#include <QtQml/qqmlregistration.h>
 #include "GlobalConstants.h"
 
+class QQmlEngine;
+class QJSEngine;
+
+/**
+ * @brief 系统设置视图模型
+ * 职责：外观 / 通用 / 网络 / 存储四组设置的读写转发与变更通知。
+ * 本类以 QML 单例形式暴露给 QML（类型名 SettingsViewModel）。
+ * 注意：themeMode 的取值沿用 Material 语义（0=Light 1=Dark 2=System），
+ * 与 GlobalConstants::ThemeType 的枚举序号并不一致，不要混用。
+ */
 class SettingsViewModel : public QObject {
     Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+
+public:
+    // QML 单例工厂（供 QML 使用）：qmltyperegistrar 只有检测到 create() 才会把本类注册成
+    // "可实例化的单例"；只依赖默认构造会被标记 isCreatable=false，QML 侧会报
+    // ReferenceError: SettingsViewModel is not defined。
+    static SettingsViewModel* create(QQmlEngine*, QJSEngine*)
+    {
+        static SettingsViewModel instance;
+        return &instance;
+    }
 
 //---主界面设置---
     Q_PROPERTY(QString userAvatar READ getUserAvatar WRITE setUserAvatar NOTIFY userAvatarChanged FINAL)

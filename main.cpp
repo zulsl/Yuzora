@@ -1,25 +1,27 @@
-#include <QApplication>
+#include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QDebug>
 #include <QIcon>
+#include <qqml.h>
 
 #include "ExceptionHandler.h"
 #include "GlobalConstants.h"
 #include "Utils.h"
 #include "DatabaseManager.h"
-#include "ChatViewModel.h"
 #include "DeviceHelper.h"
-#include "ApiConfigViewModel.h"
-#include "CharacterViewModel.h"
-#include "SettingsViewModel.h"
-#include "CompletionPresetViewModel.h"
-#include "WorldInfoViewModel.h"
 
+// ======================================
+// 视图层与业务层的边界
+// ======================================
+// 6 个 ViewModel 已改为 QML 单例（QML_ELEMENT + QML_SINGLETON），定义在 src/viewmodel/ 下，
+// 由 QML 引擎在首次被引用时构造并托管生命周期，因此这里不再手工 new，也不再注入上下文属性。
+// DeviceHelper / ExceptionHandler 是"私有构造 + instance()"的单例，无法交给 QML 自动构造，
+// 故改用 qmlRegisterSingletonInstance 注册成同名 QML 单例，QML 侧写法保持不变。
 
 int main(int argc, char *argv[])
 {
-    QApplication app(argc, argv);
+    QGuiApplication app(argc, argv);
 
 //设置应用基本信息
     app.setWindowIcon(QIcon(":/icons/res/app/favicon-48x48.png"));
@@ -44,28 +46,8 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-// ========== 创建ViewModel实例（UI专属，生命周期跟随QML引擎） ==========
-    auto* chatViewModel = new ChatViewModel();
-    auto* characterViewModel = new CharacterViewModel();
-    auto* completionPresetViewModel = new CompletionPresetViewModel();
-    auto* apiConfigViewModel = new ApiConfigViewModel();
-    auto* worldInfoViewModel = new WorldInfoViewModel();
-    auto* settingsViewModel = new SettingsViewModel();
-
-
-// ========== QML引擎初始化与全局注册 ==========
+// ========== QML引擎初始化 ==========
     QQmlApplicationEngine engine;
-
-    // // 注册全局上下文属性（View层仅通过这些对象与业务层交互）
-    engine.rootContext()->setContextProperty("DeviceHelper", &deviceHelper);
-    engine.rootContext()->setContextProperty("ExceptionHandler", &exceptionHandler);
-
-    engine.rootContext()->setContextProperty("ApiConfigViewModel", apiConfigViewModel);
-    engine.rootContext()->setContextProperty("ChatViewModel", chatViewModel);
-    engine.rootContext()->setContextProperty("CharacterViewModel", characterViewModel);
-    engine.rootContext()->setContextProperty("CompletionPresetViewModel", completionPresetViewModel);
-    engine.rootContext()->setContextProperty("WorldInfoViewModel", worldInfoViewModel);
-    engine.rootContext()->setContextProperty("SettingsViewModel", settingsViewModel);
 
 //加载主 QML 界面
     //==监听启动失败信号,失败退出程序==
@@ -75,16 +57,6 @@ int main(int argc, char *argv[])
         Qt::QueuedConnection);
 
     engine.loadFromModule("Yuzora", "Main");
-
-    // 绑定ViewModel与QML引擎生命周期，自动释放内存
-    chatViewModel->setParent(&engine);
-    characterViewModel->setParent(&engine);
-    completionPresetViewModel->setParent(&engine);
-    apiConfigViewModel->setParent(&engine);
-    worldInfoViewModel->setParent(&engine);
-    settingsViewModel->setParent(&engine);
-
-
 
     return app.exec();
 }

@@ -1,218 +1,181 @@
-import QtQuick 6.8
-import QtQuick.Controls 6.8
-import QtQuick.Layouts 6.8
-import QtQuick.Dialogs 6.8
-import QtQuick.Controls.Material 6.8
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
 import Yuzora 1.0
 
-//
+// 世界书条目列表
+// 职责：条目行的开关/名称/触发策略/插入位置/排序，以及展开后的详情编辑。
+// 展开行与详情懒加载统一用 ExpandableRow（原先这套"标题行 + Loader 详情"在
+// BookEntryListView 与 PromptsListView 里各复制了一遍）。
+// 注意：原先用 Layout.preferredHeight: contentHeight + interactive: false 嵌在外层滚动里，
+//      两层滚动互相打架；这里改为自身 fillHeight 独立滚动。
 ListView {
-    id: bookEntryListView
-    Layout.fillWidth: true
-    // Layout.fillHeight: true
-    Layout.preferredHeight: contentHeight
-    interactive: false
+    id: root
 
     clip: true
-    cacheBuffer: 400
-    spacing: 2
-    model: WorldInfoViewModel.entryModel
-    currentIndex: -1
+    spacing: Theme.spaceXs
+    model: WorldInfoEntryViewModel.entryModel
+    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-    // ---------- 详情表单：Loader 懒加载 ----------
+    // ---------- 展开后的详情 ----------
     Component {
-        id: detailComponent
-        Item {
+        id: entryDetail
 
-            id: detailPanel
-            width: parent.width
-            // color: "#fafafa"
-            clip: true                     // 收起时裁掉内容
-            visible: height > 0            // 减少无谓渲染
+        ColumnLayout {
+            // ExpandableRow 会把这个属性设为当前 delegate 的 model
+            property var bodyData
 
-            implicitHeight: form.implicitHeight + 24
+            spacing: Theme.spaceSm
 
-
-            Column {
-                id: form
-                width: parent.width - 32
-                spacing: 10
-
-                //主要关键字
-                TextField {
-                    width: parent.width
-                    text: entry?.name.join(",") ?? ""
-                    onTextEdited: if (entry) entry.name = text
+            // 正文内容：防抖 300ms 后再写回，避免每次按键都落库
+            Timer {
+                id: debounceTimer
+                interval: 300
+                repeat: false
+                onTriggered: {
+                    if (entryDetail.bodyData)
+                        entryDetail.bodyData.content = contentArea.text
                 }
+            }
 
-                //逻辑(未完成)
-                ComboBox{
-                    model: ["与任意", "与所有","非所有","非任何"]
-                }
+            Label {
+                text: "内容"
+                font.pixelSize: Theme.fontBodySm
+                font.family: Theme.fontFamily
+                color: Theme.textSecondary
+            }
 
-                //次要关键字(未完成)
-                TextField{}
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.preferredHeight: Theme.controlLg * 5
+                clip: true
 
-                //扫描深度
-                SpinBox{
-                    from:0
-                    to:1000
-                    stepSize:1
-                }
-
-                //内容
-                Timer {
-                    id: debounceTimer
-                    interval: 300
-                    repeat: false
-                    onTriggered: if (entry) entry.content = innerText.text
-                }
-
-                //正文内容
-                ScrollView {
-                    width: parent.width
-                    height: 400
-                    clip: true
-                    TextArea {
-                        id: innerText
-                        textFormat: TextEdit.PlainText
-                        font.pixelSize: 18
-                        wrapMode: TextArea.Wrap
-                        placeholderText: "内容"
-                        text: entry?.content ?? ""
-                        onTextChanged: {
+                TextArea {
+                    id: contentArea
+                    textFormat: TextEdit.PlainText
+                    wrapMode: TextArea.Wrap
+                    placeholderText: "条目内容"
+                    font.pixelSize: Theme.fontBody
+                    font.family: Theme.fontFamily
+                    color: Theme.textPrimary
+                    text: entryDetail.bodyData ? (entryDetail.bodyData.content || "") : ""
+                    onTextChanged: {
+                        if (activeFocus)
                             debounceTimer.restart()
-                        }
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Theme.spaceSm
+
+                Label {
+                    text: "扫描深度"
+                    font.pixelSize: Theme.fontBodySm
+                    font.family: Theme.fontFamily
+                    color: Theme.textSecondary
+                }
+
+                SpinBox {
+                    from: -1
+                    to: 1000
+                    stepSize: 1
+                    editable: true
+                    value: entryDetail.bodyData ? entryDetail.bodyData.scanDepth : -1
+                    onValueModified: {
+                        if (entryDetail.bodyData)
+                            entryDetail.bodyData.scanDepth = value
                     }
                 }
 
+                Item { Layout.fillWidth: true }
             }
         }
     }
 
+    // ---------- 条目行 ----------
+    delegate: ExpandableRow {
+        id: entryRow
+        width: ListView.view.width
+        headerHeight: Theme.touchTarget
+        expanded: model.expandedState
+        bodyComponent: entryDetail
+        bodyData: model
 
-    delegate: Item {
-        id: delegateRoot
-        width: bookEntryListView.width
-        height: mainColumn.implicitHeight   //高度随内容变化
+        IconButton {
+            compact: true
+            tip: model.expandedState ? "收起" : "展开"
+            icon.source: model.expandedState
+                         ? "qrc:/icons/res/circle-chevron-up.svg"
+                         : "qrc:/icons/res/circle-chevron-down.svg"
+            onClicked: model.expandedState = !model.expandedState
+        }
 
-        readonly property var entry: model
+        Switch {
+            checked: model.isEnabled
+            onToggled: model.isEnabled = checked
+        }
 
-        Column {
-            id: mainColumn
-            width: parent.width
+        TextField {
+            Layout.fillWidth: true
+            implicitHeight: Theme.controlSm
+            text: model.name || ""
+            placeholderText: "关键字（逗号分隔）"
+            font.pixelSize: Theme.fontBody
+            font.family: Theme.fontFamily
+            onTextEdited: model.name = text
+        }
 
-            // ---------- 标题行 ----------
-            RowLayout{
-                width: parent.width
-                height: 56
+        ComboBox {
+            Layout.preferredWidth: Theme.controlLg * 2
+            implicitHeight: Theme.controlSm
+            model: ["始终", "关键词", "向量化"]
+            currentIndex: model.triggerControl
+            onActivated: (index) => { model.triggerControl = index }
+        }
 
-                //下拉按钮
-                RoundButton{
-                    id: rotateBtn
-                    width: 64
-                    height: 64
-                    flat: true
-                    icon.source: model.expandedState
-                        ?"qrc:/icons/res/circle-chevron-up.svg"
-                        :"qrc:/icons/res/circle-chevron-down.svg"
-                    onClicked: {
-                        model.expandedState = !model.expandedState
-                    }
-                }
+        // 窄窗口下这两个下拉/数字太长，隐藏后仍可在详情里查看
+        ComboBox {
+            visible: !Theme.isCompact
+            Layout.preferredWidth: Theme.controlLg * 3.5
+            implicitHeight: Theme.controlSm
+            model: [
+                "角色定义之前", "角色定义之后", "示例消息之前", "示例消息之后",
+                "作者注释之前", "作者注释之后", "@D[系统]在深度", "@D[用户]在深度", "@D[AI]在深度"
+            ]
+            currentIndex: model.insertPosition
+            onActivated: (index) => { model.insertPosition = index }
+        }
 
-                //开关
-                Switch {
-                    checked: model.isEnabled
-                    onToggled: model.isEnabled = checked
-                }
+        SpinBox {
+            visible: !Theme.isCompact && entryRow.expanded === false
+                    && model.insertPosition === 4
+            implicitHeight: Theme.controlSm
+            from: 0
+            to: 1000000
+            editable: true
+            value: model.insertDepth
+            onValueModified: model.insertDepth = value
+        }
 
-                //名称
-                TextField {
-                    Layout.fillWidth: true
-                    text: model.name
-                    onTextEdited:model.name=text
-                }
+        SpinBox {
+            visible: !Theme.isCompact
+            implicitHeight: Theme.controlSm
+            from: 0
+            to: 1000000
+            editable: true
+            value: model.sortOrder
+            onValueModified: model.sortOrder = value
+        }
 
-                //触发策略
-                ComboBox{
-                    model: ["始终", "关键词","向量化"]
-                    currentIndex: entry.triggerControl
-                    onCurrentIndexChanged: {
-                        if (entry.triggerControl===currentIndex) return
-                        entry.triggerControl = currentIndex
-                    }
-                }
-
-                //插入位置
-                ComboBox{
-                    id:insertPositionComboBox
-                    implicitContentWidthPolicy: ComboBox.WidestTextWhenCompleted
-                    model: [
-                        "角色定义之前",
-                        "角色定义之后",
-                        "示例消息之前",
-                        "示例消息之后",
-                        "作者注释之前",
-                        "作者注释之后",
-                        "@D[系统]在深度",
-                        "@D[用户]在深度",
-                        "@D[AI]在深度"
-                    ]
-                    currentIndex: entry.insertPosition
-                    onCurrentIndexChanged: {
-                        if (entry.insertPosition===currentIndex) return
-                        entry.insertPosition=currentIndex
-                    }
-                }
-
-
-                //深度
-                SpinBox{
-                    visible: entry.insertPosition === 4
-                    from:0
-                    to:1000000
-                    stepSize:1
-                    value: entry.insertDepth
-                    onValueModified:entry.insertDepth=value
-                }
-
-                //顺序
-                SpinBox{
-                    from:0
-                    to:1000000
-                    stepSize:1
-                    value: entry.sortOrder
-                    onValueModified:entry.sortOrder=value
-                }
-
-                // //触发概率
-                // SpinBox{}
-
-                //删除
-                MyToolButton {
-                    ToolTip.text:"删除"
-                    icon.source: "qrc:/icons/res/trash.svg"
-                }
-            }
-
-
-            Loader {
-                id: detailLoader
-                width: parent.width
-                sourceComponent: detailComponent
-                active: model !== null && model !== undefined && model.expandedState
-                asynchronous: false
-
-                property var entry: model
-
-                // 展开 = 内容高度，收起 = 0
-                height: model.expandedState ? implicitHeight : 0
-                Behavior on height {//动画
-                    NumberAnimation { duration: 220; easing.type: Easing.InOutQuad }
-                }
-                clip: true
-            }
+        IconButton {
+            compact: true
+            danger: true
+            tip: "删除条目"
+            icon.source: "qrc:/icons/res/trash.svg"
+            onClicked: WorldInfoEntryViewModel.deleteEntry(model.id)
         }
     }
 }

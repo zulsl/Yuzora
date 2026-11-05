@@ -1,288 +1,146 @@
-import QtQuick 6.8
-import QtQuick.Controls 6.8
-import QtQuick.Layouts 6.8
-import QtQuick.Dialogs 6.8
-import QtQuick.Controls.Material 6.8
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import QtQuick.Dialogs
+
 import Yuzora 1.0
 
-Page {
+// 系统设置页
+// 职责：只做组合与绑定 —— 不写样式、不写业务分支。
+// 原实现的"通用设置""网络设置"两组控件在改动前就是整段注释掉的（未启用），
+// 本次重构不擅自启用，保持与改造前一致的功能边界。
+PageScaffold {
     id: root
-    padding: Theme.page_padding
-    header: MyToolBar{
-        title:"设置"
-        onLeftClicked: sideDrawer.open()
-    }
+
+    title: "设置"
+    onLeftClicked: Ui.requestDrawer()
 
     ScrollView {
         anchors.fill: parent
         contentWidth: availableWidth
         clip: true
+
         ColumnLayout {
             width: parent.width
-            spacing: Theme.layout_spacing
+            spacing: Theme.sectionGap
 
             // ========== 外观设置 ==========
-            GroupBox {
+            SectionCard {
                 title: "外观设置"
                 Layout.fillWidth: true
-                ColumnLayout {
-                    width: parent.width
-                    spacing: Theme.widget_spacing
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Theme.widget_spacing
-                        Label { text: "主题模式"; width: 100 }
-                        ComboBox {
-                            Layout.fillWidth: true
-                            model: ["浅色模式", "深色模式", "跟随系统"]
-                            currentIndex: Theme.materialTheme
-                            onCurrentIndexChanged: {
-                                if (SettingsViewModel)
-                                    SettingsViewModel.themeMode = currentIndex
-                            }
-                        }
-                    }
+                LabeledField {
+                    label: "主题模式"
 
-                    RowLayout {
+                    ComboBox {
+                        id: themeCombo
                         Layout.fillWidth: true
-                        spacing: Theme.widget_spacing
-                        Label { text: "字体大小"; width: 100 }
-                        SpinBox {
-                            from: 12; to: 24; stepSize: 1
-                            value: Theme.baseFontSize
-                            onValueChanged: SettingsViewModel.baseFontSize = value
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Theme.widget_spacing
-                        Label { text: "主题颜色"; width: 100 }
-                        Button{
-                            Layout.fillWidth: true
-                            text: "调色盘"
-                            onClicked: colorDialog.open()
-                        }
+                        implicitHeight: Theme.controlMd
+                        model: ["浅色模式", "深色模式", "跟随系统"]
+                        currentIndex: SettingsViewModel.themeMode
+                        onActivated: (index) => SettingsViewModel.themeMode = index
                     }
                 }
-            }
 
-            // ========== 通用设置 ==========
-            GroupBox {
-                title: "通用设置"
-                Layout.fillWidth: true
-                // ColumnLayout {
-                //     width: parent.width
-                //     spacing: 12
+                LabeledField {
+                    label: "字体大小"
 
-                //     RowLayout {
-                //         Layout.fillWidth: true
-                //         Label { text: "回车发送消息"; Layout.fillWidth: true }
-                //         Switch {
-                //             checked: SettingsViewModel ? SettingsViewModel.sendWithEnter : true
-                //             onCheckedChanged: {
-                //                 if (SettingsViewModel)
-                //                     SettingsViewModel.sendWithEnter = checked
-                //             }
-                //         }
-                //     }
+                    SpinBox {
+                        Layout.fillWidth: true
+                        implicitHeight: Theme.controlMd
+                        from: 12
+                        to: 24
+                        stepSize: 1
+                        value: SettingsViewModel.baseFontSize
+                        onValueModified: SettingsViewModel.baseFontSize = value
+                    }
+                }
 
-                //     RowLayout {
-                //         Layout.fillWidth: true
-                //         Label { text: "显示消息时间"; Layout.fillWidth: true }
-                //         Switch {
-                //             checked: SettingsViewModel ? SettingsViewModel.showTimeStamp : true
-                //             onCheckedChanged: {
-                //                 if (SettingsViewModel)
-                //                     SettingsViewModel.showTimeStamp = checked
-                //             }
-                //         }
-                //     }
+                LabeledField {
+                    label: "主题颜色"
 
-                //     RowLayout {
-                //         Layout.fillWidth: true
-                //         Label { text: "新消息自动滚动"; Layout.fillWidth: true }
-                //         Switch {
-                //             checked: SettingsViewModel ? SettingsViewModel.autoScroll : true
-                //             onCheckedChanged: {
-                //                 if (SettingsViewModel)
-                //                     SettingsViewModel.autoScroll = checked
-                //             }
-                //         }
-                //     }
-
-                //     RowLayout {
-                //         Layout.fillWidth: true
-                //         Label { text: "自动保存间隔(秒)"; width: 140 }
-                //         SpinBox {
-                //             from: 5; to: 300; stepSize: 5
-                //             value: SettingsViewModel ? SettingsViewModel.autoSaveInterval : 30
-                //             onValueChanged: {
-                //                 if (SettingsViewModel)
-                //                     SettingsViewModel.autoSaveInterval = value
-                //             }
-                //         }
-                //     }
-                // }
-            }
-
-            // ========== 网络设置 ==========
-            GroupBox {
-                title: "网络设置"
-                Layout.fillWidth: true
-                // ColumnLayout {
-                //     width: parent.width
-                //     spacing: 12
-
-                //     RowLayout {
-                //         Layout.fillWidth: true
-                //         Label { text: "启用代理"; Layout.fillWidth: true }
-                //         Switch {
-                //             id: proxySwitch
-                //             checked: SettingsViewModel ? SettingsViewModel.enableProxy : false
-                //             onCheckedChanged: {
-                //                 if (SettingsViewModel)
-                //                     SettingsViewModel.enableProxy = checked
-                //             }
-                //         }
-                //     }
-
-                //     RowLayout {
-                //         Layout.fillWidth: true
-                //         enabled: proxySwitch.checked
-                //         Label { text: "代理类型"; width: 100 }
-                //         ComboBox {
-                //             Layout.fillWidth: true
-                //             model: ["HTTP", "SOCKS5"]
-                //             currentIndex: SettingsViewModel?.proxyType === "socks5" ? 1 : 0
-                //             onCurrentIndexChanged: {
-                //                 if (!SettingsViewModel) return
-                //                 SettingsViewModel.proxyType =
-                //                     currentIndex === 0 ? "http" : "socks5"
-                //             }
-                //         }
-                //     }
-
-                //     RowLayout {
-                //         Layout.fillWidth: true
-                //         enabled: proxySwitch.checked
-                //         Label { text: "代理地址"; width: 100 }
-                //         TextField {
-                //             Layout.fillWidth: true
-                //             text: SettingsViewModel ? SettingsViewModel.proxyHost : ""
-                //             placeholderText: "127.0.0.1"
-                //             onEditingFinished: {
-                //                 if (SettingsViewModel)
-                //                     SettingsViewModel.proxyHost = text
-                //             }
-                //         }
-                //     }
-
-                //     RowLayout {
-                //         Layout.fillWidth: true
-                //         enabled: proxySwitch.checked
-                //         Label { text: "代理端口"; width: 100 }
-                //         SpinBox {
-                //             from: 1; to: 65535
-                //             value: SettingsViewModel ? SettingsViewModel.proxyPort : 7890
-                //             onValueChanged: {
-                //                 if (SettingsViewModel)
-                //                     SettingsViewModel.proxyPort = value
-                //             }
-                //         }
-                //     }
-
-                //     RowLayout {
-                //         Layout.fillWidth: true
-                //         Label { text: "请求超时(秒)"; width: 100 }
-                //         SpinBox {
-                //             from: 5; to: 300; stepSize: 5
-                //             value: SettingsViewModel ? SettingsViewModel.requestTimeout : 30
-                //             onValueChanged: {
-                //                 if (SettingsViewModel)
-                //                     SettingsViewModel.requestTimeout = value
-                //             }
-                //         }
-                //     }
-                // }
+                    AppButton {
+                        Layout.fillWidth: true
+                        text: "调整主色"
+                        variant: "secondary"
+                        onClicked: colorDialog.open()
+                    }
+                }
             }
 
             // ========== 存储设置 ==========
-            GroupBox {
+            SectionCard {
                 title: "存储设置"
                 Layout.fillWidth: true
-                ColumnLayout {
-                    width: parent.width
-                    spacing: 12
+
+                LabeledField {
+                    label: "数据目录"
 
                     RowLayout {
-                        spacing: 8
                         Layout.fillWidth: true
-                        Label { text: "数据存储路径"; width: 100 }
+
                         Label {
                             Layout.fillWidth: true
-                            text: SettingsViewModel ? SettingsViewModel.dataPath : "默认路径"
+                            text: SettingsViewModel.dataPath
                             elide: Text.ElideMiddle
-                            color: palette.mid
+                            font.pixelSize: Theme.fontBodySm
+                            font.family: Theme.fontFamily
+                            color: Theme.textSecondary
                         }
-                        Button {
+                        AppButton {
                             text: "更改"
+                            variant: "secondary"
                             onClicked: folderDialog.open()
                         }
                     }
-                    Button {
+                }
+
+                LabeledField {
+                    label: "清除数据"
+
+                    AppButton {
                         Layout.fillWidth: true
-                        text: "清除所有数据"
-                        onClicked: clearMsgDlg.open()
+                        text: "清除所有应用数据"
+                        variant: "danger"
+                        onClicked: clearDialog.open()
                     }
                 }
             }
 
-
-            Button {
+            AppButton {
                 Layout.fillWidth: true
                 text: "恢复默认设置"
-                onClicked: SettingsViewModel.resetAllSettings()
+                variant: "secondary"
+                onClicked: {
+                    SettingsViewModel.resetAllSettings()
+                    Ui.toast("已恢复默认设置", false)
+                }
             }
+
+            Item { Layout.fillHeight: true }
         }
     }
 
-    //目录选择对话框
+    ConfirmDialog {
+        id: clearDialog
+        title: "确认清除"
+        text: "该操作将重置所有应用数据，确定要继续吗？"
+        detail: "应用会随后重启。"
+        acceptText: "清除并重启"
+        danger: true
+        onConfirmed: SettingsViewModel.clearAllData()
+    }
+
     FolderDialog {
         id: folderDialog
         title: "选择数据存储目录"
-        acceptLabel: "确定"
-        rejectLabel: "取消"
-
-        // 用户点击确定
-        onAccepted: {
-            SettingsViewModel.customAppPath(selectedFolder);
-        }
-        // 用户取消
-        onRejected: {
-            console.log("用户取消选择")
-        }
+        onAccepted: SettingsViewModel.customAppPath(selectedFolder)
     }
 
-    MessageDialog {
-        id: clearMsgDlg
-        title: "提示"
-        text: "该操作将重置所有应用数据,确定要清除吗？"
-        informativeText: "该操作将重启应用"
-        buttons: MessageDialog.Yes | MessageDialog.No | MessageDialog.Cancel
-
-        onAccepted: SettingsViewModel.clearAllData()
-    }
-
-    //颜色对话框
     ColorDialog {
         id: colorDialog
         title: "选择主题主色"
-        selectedColor: Theme.primaryColor // 设置初始颜色
-        onAccepted: {
-            SettingsViewModel.themeColor = selectedColor
-            // 用户点击“确定”后，selectedColor 即为新颜色
-        }
+        selectedColor: Theme.primaryColor
+        onAccepted: SettingsViewModel.themeColor = selectedColor
     }
 }

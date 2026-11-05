@@ -2,13 +2,23 @@
 #define EXCEPTIONHANDLER_H
 
 #include <QObject>
+#include <QtQml/qqmlregistration.h>
 #include "AppException.h"
+
+class QQmlEngine;
+class QJSEngine;
 
 //异常处理类
 
 class ExceptionHandler : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
+
+public:
+    // 私有构造单例，QML 侧通过 create() 复用同一实例（必须 public）
+    static ExceptionHandler* create(QQmlEngine*, QJSEngine*) { return &instance(); }
 
 public:
     static ExceptionHandler& instance();
