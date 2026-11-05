@@ -36,7 +36,6 @@ public:
         return &instance;
     }
 
-    explicit WorldInfoViewModel(QObject* parent = nullptr);
     ~WorldInfoViewModel() override;
 
     // 文集列表数据源（供 QML 使用）
@@ -77,6 +76,11 @@ signals:
 private:
     WorldInfoBookListModel* m_bookModel = nullptr;
     QString m_currentBookId;
+
+    // 构造函数必须 private：QML 单例只有在"无法默认构造"时才会调用 create()。
+    // 若保持 public，引擎会自己 new 一个实例，C++ 侧的静态实例就与 QML 拿到的
+    // 不是同一个对象（会出现"数据写进 A、界面读的是 B"这类极难定位的问题）。
+    explicit WorldInfoViewModel(QObject* parent = nullptr);
 };
 
 #endif // WORLDINFOVIEWMODEL_H

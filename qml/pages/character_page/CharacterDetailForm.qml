@@ -122,74 +122,33 @@ Item {
                     { field: "creatorNotes", label: "作者备注", hint: "", height: Theme.controlLg * 3 }
                 ]
 
-                ColumnLayout {
+                // 超过阈值的文本会退化为"只读预览 + 点开编辑"，
+                // 避免几万字在每次切换角色时被整段排版（实测 37k 字 ≈ 330 ms）
+                LongTextField {
                     required property var modelData
                     Layout.fillWidth: true
-                    spacing: Theme.spaceXs
-
-                    Label {
-                        text: modelData.label
-                        font.pixelSize: Theme.fontBodySm
-                        font.family: Theme.fontFamily
-                        color: Theme.textSecondary
-                    }
-
-                    ScrollView {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: modelData.height
-                        clip: true
-
-                        TextArea {
-                            placeholderText: modelData.hint
-                            wrapMode: Text.WordWrap
-                            textFormat: TextEdit.PlainText
-                            font.pixelSize: Theme.fontBody
-                            font.family: Theme.fontFamily
-                            color: Theme.textPrimary
-                            text: root.editingCharacter
-                                  ? (root.editingCharacter[modelData.field] || "") : ""
-                            onTextChanged: {
-                                if (activeFocus)
-                                    root.commit(modelData.field, text)
-                            }
-                        }
-                    }
+                    recordId: root.editingCharacter ? root.editingCharacter.id : ""
+                    label: modelData.label
+                    placeholder: modelData.hint
+                    fieldHeight: modelData.height
+                    content: root.editingCharacter
+                             ? (root.editingCharacter[modelData.field] || "") : ""
+                    onEdited: (value) => root.commit(modelData.field, value)
                 }
             }
 
             // 备选开场白：多行文本 ↔ 字符串数组
-            ColumnLayout {
+            LongTextField {
                 Layout.fillWidth: true
-                spacing: Theme.spaceXs
-
-                Label {
-                    text: "备选开场白（每行一个）"
-                    font.pixelSize: Theme.fontBodySm
-                    font.family: Theme.fontFamily
-                    color: Theme.textSecondary
-                }
-
-                ScrollView {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Theme.controlLg * 5
-                    clip: true
-
-                    TextArea {
-                        placeholderText: "每行一个备选开场白"
-                        wrapMode: Text.WordWrap
-                        textFormat: TextEdit.PlainText
-                        font.pixelSize: Theme.fontBody
-                        font.family: Theme.fontFamily
-                        color: Theme.textPrimary
-                        text: root.editingCharacter
-                              ? (root.editingCharacter.alternateGreetings || []).join("\n") : ""
-                        onTextChanged: {
-                            if (!activeFocus) return
-                            root.commit("alternateGreetings",
-                                        text.split("\n").filter(line => line.trim().length > 0))
-                        }
-                    }
-                }
+                recordId: root.editingCharacter ? root.editingCharacter.id : ""
+                label: "备选开场白（每行一个）"
+                placeholder: "每行一个备选开场白"
+                fieldHeight: Theme.controlLg * 5
+                content: root.editingCharacter
+                         ? (root.editingCharacter.alternateGreetings || []).join("\n") : ""
+                onEdited: (value) => root.commit(
+                              "alternateGreetings",
+                              value.split("\n").filter(line => line.trim().length > 0))
             }
 
             // ========== 高级定义 ==========

@@ -224,7 +224,6 @@ CharacterItemViewModel* CharacterViewModel::createItemFromEntity(const Character
 
 void CharacterViewModel::refreshForm()
 {
-
     emit currentCharacterChanged();
     emit characterBookNameChanged();
 }

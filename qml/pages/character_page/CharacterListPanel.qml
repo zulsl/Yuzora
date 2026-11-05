@@ -71,8 +71,11 @@ Item {
 
                 // 单击只做选中（详情在右侧或推入新页），进入对话用右侧省略号菜单里的显式动作
                 onClicked: {
+                    // 性能探针：测"点击 → 读库 + 信号派发"这一段（不含后续构建）
+                    Perf.begin("选中角色（读库+信号）")
                     CharacterViewModel.setCurrentIndex(index)
                     CharacterViewModel.selectCharacter(rowDelegate.modelData.id)
+                    Perf.end("选中角色（读库+信号）")
                 }
 
                 contentItem: RowLayout {

@@ -102,10 +102,19 @@ ApplicationWindow {
         chatPage, apiConfigPage, presetPage, characterPage, worldInfoPage, settingsPage
     ]
 
+    // 页面名（性能探针输出用，与 pageComponents 顺序一致）
+    property var pageNames: [
+        "聊天", "API 配置", "补全预设", "角色管理", "世界书", "设置"
+    ]
+
     function switchPage(index) {
         if (index < 0 || index >= pageComponents.length) return
         mainWindow.currentPage = index
+
+        // 性能探针：记录"同步构建"与"首帧"两段耗时（未开启时零开销）
+        Perf.startPage(pageNames[index])
         mainStack.replace(pageComponents[index])
+        Perf.buildDone()
     }
 
     // ========== 系统返回（Android 返回键 / 手势）==========
@@ -120,6 +129,9 @@ ApplicationWindow {
         }
         mainWindow.close()
     }
+
+    // 退出前打印性能汇总（仅在性能探针开启时输出）
+    onClosing: Perf.report()
 
     // ========== 全局提示 ==========
     AppToast {

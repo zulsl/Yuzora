@@ -190,12 +190,18 @@ void CompletionPresetViewModel::refreshPromptList()
 // ======================================
 void CompletionPresetViewModel::importFromFile(const QUrl& fileUrl)
 {
-    qDebug()<<"导入文件url:["<<fileUrl<<"]";
     QString filePath = fileUrl.toLocalFile();
-    QFileInfo fi(fileUrl.toLocalFile());
+    QFileInfo fi(filePath);
     QString fileName = fi.completeBaseName();
-    qDebug()<<"文件名:["<<fileName<<"]";
-    CompletionPresetService::instance().importFromSillyTavern(filePath,fileName);
+
+    const int count = CompletionPresetService::instance().importFromSillyTavern(filePath, fileName);
+
+    // 导入后必须刷新列表并通知界面：原先只调用了 Service，模型没有重载，
+    // 新导入的预设不会出现在列表里，用户看到的就是"导入没反应"。
+    if (count > 0) {
+        refreshList();
+        emit importSuccess(count);
+    }
 }
 
 void CompletionPresetViewModel::exportCurrent(const QString& presetId, const QString& savePath)

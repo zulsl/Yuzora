@@ -137,12 +137,10 @@ bool PresetPromptListModel::setData(const QModelIndex &index, const QVariant &va
 
 void PresetPromptListModel::loadList(const QList<PromptEntity>& list)
 {
-    qDebug() << "loadList: before reset, items =" << m_items.size();
     beginResetModel();
     m_items.clear();
     m_items = list;
     endResetModel();
-    qDebug() << "loadList: after reset, items =" << m_items.size();
 }
 
 void PresetPromptListModel::appendItem(PromptEntity& item)

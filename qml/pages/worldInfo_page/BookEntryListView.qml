@@ -23,6 +23,11 @@ ListView {
         id: entryDetail
 
         ColumnLayout {
+            // 实例根节点必须有自己的 id：组件内部要用它取 bodyData。
+            // 注意不能写 entryRoot.bodyData —— entryDetail 是 Component 对象，没有这个属性，
+            // 那样取到的永远是 undefined（文本会全部显示为空）。
+            id: entryRoot
+
             // ExpandableRow 会把这个属性设为当前 delegate 的 model
             property var bodyData
 
@@ -34,8 +39,8 @@ ListView {
                 interval: 300
                 repeat: false
                 onTriggered: {
-                    if (entryDetail.bodyData)
-                        entryDetail.bodyData.content = contentArea.text
+                    if (entryRoot.bodyData)
+                        entryRoot.bodyData.content = contentArea.text
                 }
             }
 
@@ -59,7 +64,7 @@ ListView {
                     font.pixelSize: Theme.fontBody
                     font.family: Theme.fontFamily
                     color: Theme.textPrimary
-                    text: entryDetail.bodyData ? (entryDetail.bodyData.content || "") : ""
+                    text: entryRoot.bodyData ? (entryRoot.bodyData.content || "") : ""
                     onTextChanged: {
                         if (activeFocus)
                             debounceTimer.restart()
@@ -83,10 +88,10 @@ ListView {
                     to: 1000
                     stepSize: 1
                     editable: true
-                    value: entryDetail.bodyData ? entryDetail.bodyData.scanDepth : -1
+                    value: entryRoot.bodyData ? entryRoot.bodyData.scanDepth : -1
                     onValueModified: {
-                        if (entryDetail.bodyData)
-                            entryDetail.bodyData.scanDepth = value
+                        if (entryRoot.bodyData)
+                            entryRoot.bodyData.scanDepth = value
                     }
                 }
 
@@ -103,6 +108,12 @@ ListView {
         expanded: model.expandedState
         bodyComponent: entryDetail
         bodyData: model
+
+        // 数据行对象单独存一份。
+        // 原因：ComboBox 自己也有 model 属性，子项里一旦写 `model: [...]`，
+        // 就会把委托上下文里的 `model`（数据行）遮蔽掉，导致 `model.triggerControl`
+        // 变成 undefined → "Unable to assign [undefined] to int"。
+        readonly property var row: model
 
         IconButton {
             compact: true
@@ -132,8 +143,8 @@ ListView {
             Layout.preferredWidth: Theme.controlLg * 2
             implicitHeight: Theme.controlSm
             model: ["始终", "关键词", "向量化"]
-            currentIndex: model.triggerControl
-            onActivated: (index) => { model.triggerControl = index }
+            currentIndex: entryRow.row.triggerControl
+            onActivated: (index) => { entryRow.row.triggerControl = index }
         }
 
         // 窄窗口下这两个下拉/数字太长，隐藏后仍可在详情里查看
@@ -145,19 +156,19 @@ ListView {
                 "角色定义之前", "角色定义之后", "示例消息之前", "示例消息之后",
                 "作者注释之前", "作者注释之后", "@D[系统]在深度", "@D[用户]在深度", "@D[AI]在深度"
             ]
-            currentIndex: model.insertPosition
-            onActivated: (index) => { model.insertPosition = index }
+            currentIndex: entryRow.row.insertPosition
+            onActivated: (index) => { entryRow.row.insertPosition = index }
         }
 
         SpinBox {
             visible: !Theme.isCompact && entryRow.expanded === false
-                    && model.insertPosition === 4
+                    && entryRow.row.insertPosition === 4
             implicitHeight: Theme.controlSm
             from: 0
             to: 1000000
             editable: true
-            value: model.insertDepth
-            onValueModified: model.insertDepth = value
+            value: entryRow.row.insertDepth
+            onValueModified: entryRow.row.insertDepth = value
         }
 
         SpinBox {

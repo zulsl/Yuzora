@@ -46,4 +46,9 @@ QtObject {
     readonly property int shadowBlur: 16
     readonly property int shadowOffsetY: 2
     readonly property real shadowOpacity: 0.18
+
+    // ---- 长文本阈值（字符数）----
+    // 超过这个长度的文本字段改用"只读预览 + 点开编辑"，避免整段文本被 TextArea 排版。
+    // 实测：37 000 字 ≈ 330 ms，3 000 字以内基本无感。
+    readonly property int longTextThreshold: 3000
 }

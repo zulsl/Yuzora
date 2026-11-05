@@ -43,7 +43,6 @@ public:
         return inst;
     }
 
-    explicit WorldInfoEntryViewModel(QObject* parent = nullptr);
     ~WorldInfoEntryViewModel() override;
 
     // 条目列表数据源（供 QML 使用）
@@ -75,6 +74,11 @@ signals:
     void operationError(const QString& errorMsg);
 
 private:
+    // 构造函数必须 private：QML 单例只有在"无法默认构造"时才会调用 create()。
+    // 若这里保持 public，引擎会自己 new 一个实例，导致 C++ 侧 instance() 与
+    // QML 侧拿到的不是同一个对象（表现为"选中世界书后条目列表始终为空"）。
+    explicit WorldInfoEntryViewModel(QObject* parent = nullptr);
+
     QVariantMap entryToMap(const WorldInfoEntryEntity& entry) const;
     WorldInfoEntryEntity mapToEntry(const QVariantMap& map) const;
 

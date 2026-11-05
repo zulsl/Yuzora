@@ -20,6 +20,11 @@ ListView {
         id: promptDetail
 
         ColumnLayout {
+            // 实例根节点必须有自己的 id：组件内部要用它取 bodyData。
+            // 不能写 detailRoot.bodyData —— promptDetail 是 Component 对象，没有这个属性，
+            // 那样取到的永远是 undefined（提示词正文会显示为空）。
+            id: detailRoot
+
             property var bodyData
 
             spacing: Theme.spaceSm
@@ -29,8 +34,8 @@ ListView {
                 interval: 300
                 repeat: false
                 onTriggered: {
-                    if (promptDetail.bodyData)
-                        promptDetail.bodyData.content = contentArea.text
+                    if (detailRoot.bodyData)
+                        detailRoot.bodyData.content = contentArea.text
                 }
             }
 
@@ -40,10 +45,10 @@ ListView {
                     Layout.fillWidth: true
                     implicitHeight: Theme.controlMd
                     model: ["系统", "用户", "AI 助手"]
-                    currentIndex: promptDetail.bodyData ? promptDetail.bodyData.role : 0
+                    currentIndex: detailRoot.bodyData ? detailRoot.bodyData.role : 0
                     onActivated: (index) => {
-                        if (promptDetail.bodyData)
-                            promptDetail.bodyData.role = index
+                        if (detailRoot.bodyData)
+                            detailRoot.bodyData.role = index
                     }
                 }
             }
@@ -54,10 +59,10 @@ ListView {
                     Layout.fillWidth: true
                     implicitHeight: Theme.controlMd
                     model: ["相对", "聊天中"]
-                    currentIndex: promptDetail.bodyData ? promptDetail.bodyData.position : 0
+                    currentIndex: detailRoot.bodyData ? detailRoot.bodyData.position : 0
                     onActivated: (index) => {
-                        if (promptDetail.bodyData)
-                            promptDetail.bodyData.position = index
+                        if (detailRoot.bodyData)
+                            detailRoot.bodyData.position = index
                     }
                 }
             }
@@ -82,7 +87,7 @@ ListView {
                     font.pixelSize: Theme.fontBody
                     font.family: Theme.fontFamily
                     color: Theme.textPrimary
-                    text: promptDetail.bodyData ? (promptDetail.bodyData.content || "") : ""
+                    text: detailRoot.bodyData ? (detailRoot.bodyData.content || "") : ""
                     onTextChanged: {
                         if (activeFocus)
                             debounceTimer.restart()
