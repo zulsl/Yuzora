@@ -44,7 +44,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 set_source_files_properties(qml/theme/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 set_source_files_properties(qml/layouts/Ui.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-set_source_files_properties(qml/layouts/Perf.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(${PROJECT_NAME}
     URI ${PROJECT_NAME}
@@ -133,7 +132,6 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/theme/Metrics.qml
         qml/theme/Motion.qml
         qml/layouts/Ui.qml
-        qml/layouts/Perf.qml
         qml/layouts/PageScaffold.qml
         qml/layouts/AdaptiveSplit.qml
         qml/layouts/MasterDetailStack.qml

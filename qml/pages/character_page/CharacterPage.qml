@@ -38,22 +38,13 @@ PageScaffold {
         root.detailMode = root._hadSelection ? 2 : 0
     }
 
-    // 选中时刻（用于测量"选中 → 详情表单构建完成"的耗时）
-    property real _selectionStamp: 0
-
     Connections {
         target: CharacterViewModel
 
         function onCurrentCharacterChanged() {
             const selected = CharacterViewModel.hasSelection
 
-            // 性能探针：每次选中都记一行，便于确认这条路径是否真的走到
-            if (Perf.enabled)
-                console.log("[perf] 选中变化 hasSelection=" + selected
-                            + "  首次构建=" + (!root._hadSelection && selected))
-
             if (selected) {
-                root._selectionStamp = Date.now()
                 if (!root._hadSelection) {
                     // 先切到"加载中"，让 Loader 只构建一个 BusyIndicator，
                     // 真正的表单等下一帧再建，避免信号里同步建完整表单
@@ -101,14 +92,6 @@ PageScaffold {
 
         CharacterDetailForm {
             onExportRequested: exportDialog.open()
-
-            // 性能探针：从"选中"到"详情表单创建完成"的耗时
-            Component.onCompleted: {
-                if (root._selectionStamp > 0) {
-                    Perf.record("角色详情（首次构建）", Date.now() - root._selectionStamp)
-                    root._selectionStamp = 0
-                }
-            }
         }
     }
 

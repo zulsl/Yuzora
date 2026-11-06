@@ -13,8 +13,6 @@
 #include <QSettings>
 #include <QStyleHints>
 #include <QFile>
-#include <QTextStream>
-#include <QDateTime>
 
 
 #ifdef Q_OS_ANDROID
@@ -513,59 +511,6 @@ void DeviceHelper::setTestKeyboardInset(int inset)
 qreal DeviceHelper::dp(qreal value) const
 {
     return dpToPx(value);
-}
-
-bool DeviceHelper::perfEnabled() const
-{
-    // 两种开启方式：
-    //   1) 环境变量 YUZORA_PERF=1
-    //   2) 启动参数 --perf
-    // 关闭时所有探针函数立即返回，零开销、零日志。
-    static const bool enabled = []() {
-        bool ok = false;
-        if (qEnvironmentVariableIntValue("YUZORA_PERF", &ok) > 0 && ok)
-            return true;
-
-        return QCoreApplication::arguments().contains(QStringLiteral("--perf"));
-    }();
-    return enabled;
-}
-
-void DeviceHelper::perfLog(const QString& text)
-{
-    if (!perfEnabled()) return;
-
-    const QString logPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
-                            + QStringLiteral("/perf.log");
-
-    const bool isNew = !QFile::exists(logPath);
-
-    QFile file(logPath);
-    if (!file.open(QIODevice::Append | QIODevice::Text))
-        return;
-
-    QTextStream out(&file);
-    // 显式 UTF-8：否则在中文 Windows 上按本地代码页写，记事本打开是乱码
-    out.setEncoding(QStringConverter::Utf8);
-    // 新文件先写一行会话头，便于区分多次运行
-    if (isNew)
-        out << "===== Yuzora 性能日志 =====\n";
-
-    out << QDateTime::currentDateTime().toString("HH:mm:ss.zzz")
-        << "  " << text << '\n';
-}
-
-void DeviceHelper::perfLogClear()
-{
-    const QString logPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
-                            + QStringLiteral("/perf.log");
-    QFile::remove(logPath);
-}
-
-QString DeviceHelper::perfLogPath() const
-{
-    return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
-           + QStringLiteral("/perf.log");
 }
 
 

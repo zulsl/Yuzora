@@ -1,7 +1,6 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
-#include <QElapsedTimer>
 #include <QIcon>
 #include <qqml.h>
 
@@ -61,18 +60,7 @@ int main(int argc, char *argv[])
         &app, []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
 
-    // 性能探针：测量引擎加载 + 主界面构建的耗时（仅在 YUZORA_PERF=1 / --perf 时输出）
-    QElapsedTimer startupTimer;
-    if (deviceHelper.perfEnabled())
-        startupTimer.start();
-
     engine.loadFromModule("Yuzora", "Main");
-
-    if (startupTimer.isValid()) {
-        const QString perfLine = QStringLiteral("启动构建 %1 ms").arg(startupTimer.elapsed());
-        qDebug().noquote() << "[perf]" << perfLine;
-        deviceHelper.perfLog(perfLine);
-    }
 
     return app.exec();
 }

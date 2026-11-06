@@ -41,9 +41,6 @@ public:
     Q_PROPERTY(DeviceType deviceType READ deviceType CONSTANT)
     Q_PROPERTY(qreal screenDensity READ screenDensity CONSTANT)
     Q_PROPERTY(QSize screenSize READ screenSize CONSTANT)
-    // 性能探针开关（供 QML 使用）：设置环境变量 YUZORA_PERF=1 或启动参数 --perf 时为 true。
-    // 供 QML 使用。
-    Q_PROPERTY(bool perfEnabled READ perfEnabled CONSTANT)
 
     // ===== 以下属性供 QML 使用（响应式布局 / 安全区 / 主题系统）=====
     // 安全区内边距：Qt 6.8 未向 QML 暴露系统 insets，只能由 C++ 计算后暴露。
@@ -96,14 +93,6 @@ public:
     int safeAreaRight() const { return m_safeAreaRight; }
     bool isTouchDevice() const;
     bool systemDarkMode() const;
-    // 性能探针是否开启（供 QML 使用）
-    bool perfEnabled() const;
-    // 追加一行性能日志到 <应用数据目录>/perf.log（供 QML 使用）
-    Q_INVOKABLE void perfLog(const QString& text);
-    // 清空 perf.log（供 QML 使用）
-    Q_INVOKABLE void perfLogClear();
-    // 性能日志文件路径（供 QML 使用）
-    Q_INVOKABLE QString perfLogPath() const;
     int testKeyboardInset() const { return m_testKeyboardInset; }
     void setTestKeyboardInset(int inset);
     // QML 里按 dp 取尺寸：DeviceHelper.dp(48)
