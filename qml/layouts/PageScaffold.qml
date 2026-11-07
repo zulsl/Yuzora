@@ -1,6 +1,8 @@
 import QtQuick
 import QtQuick.Layouts
 
+import Yuzora 1.0
+
 // 页面骨架
 // 职责：统一"顶栏 + 内容区"，并处理安全区。
 // 键盘避让说明：Android 用 android:windowSoftInputMode="adjustResize" 让窗口自身收缩，
@@ -57,11 +59,12 @@ Item {
             onLeftClicked: root.leftClicked()
         }
 
-        // 内容外框：左右安全区 + 页面内边距 + 底部安全区/键盘
+        // 内容外框：页面内边距
         Item {
             id: bodyFrame
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.topMargin: root.contentPadding
             Layout.leftMargin: DeviceHelper.safeAreaLeft + root.contentPadding
             Layout.rightMargin: DeviceHelper.safeAreaRight + root.contentPadding
             Layout.bottomMargin: root.bottomInset

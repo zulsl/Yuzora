@@ -149,6 +149,8 @@ ApplicationWindow {
         }
     }
 
+
+
     // 角色切换到聊天页
     Connections {
         target: CharacterViewModel
@@ -156,6 +158,8 @@ ApplicationWindow {
             mainWindow.switchPage(0)
         }
     }
+
+
 
     // ========== 页面组件 ==========
     Component {

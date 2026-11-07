@@ -166,16 +166,23 @@ void ApiConfigService::fetchModelList(const QString &configId)
     ApiConfigEntity config = getConfigById(configId);
     if (config.id.isEmpty()) {
         emit operationError(QStringLiteral("配置不存在"));
+        emit fetchModelListEnd(configId);
         return;
     }
     if (config.baseDomain.isEmpty()) {
         emit operationError(QStringLiteral("请先填写API域名"));
+        emit fetchModelListEnd(configId);
         return;
     }
 
     // 根据id判断客户端类型
     // 创建临时客户端，完成后自动销毁
     BaseApiClient* tempClient = ModelFactory::instance().createClient(config.modelType);
+    if (!tempClient) {
+        emit operationError(QStringLiteral("该模型类型暂不支持获取模型列表"));
+        emit fetchModelListEnd(configId);
+        return;
+    }
     tempClient->loadConfig(config);
 
     connect(tempClient, &BaseApiClient::modelListFetched,

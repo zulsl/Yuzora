@@ -59,7 +59,7 @@ qt_add_qml_module(${PROJECT_NAME}
         src/crossplatform/DeviceHelper.cpp
         src/crossplatform/DeviceHelper.h
         src/model/DatabaseManager.cpp src/model/DatabaseManager.h
-        src/viewmodel/ApiConfigViewModel.h src/viewmodel/ApiConfigFormViewModel.h src/viewmodel/CharacterViewModel.h src/viewmodel/ChatViewModel.h src/viewmodel/CompletionPresetViewModel.h src/viewmodel/SettingsViewModel.h src/viewmodel/WorldInfoViewModel.h src/viewmodel/WorldInfoEntryViewModel.h
+        src/viewmodel/ApiConfigViewModel.h src/viewmodel/CharacterViewModel.h src/viewmodel/ChatViewModel.h src/viewmodel/CompletionPresetViewModel.h src/viewmodel/SettingsViewModel.h src/viewmodel/WorldInfoViewModel.h src/viewmodel/WorldInfoEntryViewModel.h
         src/model/dao/CharacterDao.h src/model/dao/ChatMessageDao.h src/model/dao/ChatSessionDao.h src/model/dao/CompletionPresetDao.h src/model/dao/SettingsDao.h src/model/dao/VectorMemoryDao.h src/model/dao/WorldInfoBookDao.h
         src/model/network/BaseApiClient.cpp src/model/network/BaseApiClient.h src/model/network/ClaudeApiClient.cpp src/model/network/ClaudeApiClient.h src/model/network/DeepSeekApiClient.cpp src/model/network/DeepSeekApiClient.h src/model/network/DoubaoApiClient.cpp src/model/network/DoubaoApiClient.h src/model/network/GeminiApiClient.cpp src/model/network/GeminiApiClient.h src/model/network/ModelFactory.cpp src/model/network/ModelFactory.h
         src/model/Repository/ICharacterRepository.h src/model/Repository/IChatRepository.h src/model/Repository/ICompletionPresetRepository.h
@@ -68,7 +68,7 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/list/CharacterListModel.h src/model/list/ChatMessageListModel.h
         src/model/service/CharacterCardParser.cpp src/model/service/ChatService.cpp src/model/service/MemoryService.cpp src/model/service/WorldInfoMatcher.cpp
         src/test/Net_test_VM.cpp src/test/Net_test_VM.h
-        src/viewmodel/ApiConfigViewModel.cpp src/viewmodel/ApiConfigFormViewModel.cpp src/viewmodel/CharacterViewModel.cpp src/viewmodel/ChatViewModel.cpp src/viewmodel/CompletionPresetViewModel.cpp src/viewmodel/SettingsViewModel.cpp src/viewmodel/WorldInfoViewModel.cpp src/viewmodel/WorldInfoEntryViewModel.cpp
+        src/viewmodel/ApiConfigViewModel.cpp src/viewmodel/CharacterViewModel.cpp src/viewmodel/ChatViewModel.cpp src/viewmodel/CompletionPresetViewModel.cpp src/viewmodel/SettingsViewModel.cpp src/viewmodel/WorldInfoViewModel.cpp src/viewmodel/WorldInfoEntryViewModel.cpp
         src/model/list/CharacterListModel.cpp src/model/list/ChatMessageListModel.cpp
         src/model/list/ChatMessageItemModel.cpp src/model/list/ChatMessageItemModel.h
         src/model/dao/ApiConfigDao.h src/model/dao/ApiConfigDao.cpp
@@ -110,6 +110,7 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/components/TagChip.qml
         qml/components/EmptyState.qml
         qml/components/ConfirmDialog.qml
+        qml/components/TextInputDialog.qml
         qml/components/SectionCard.qml
         qml/components/LabeledField.qml
         qml/components/LongTextField.qml
@@ -136,6 +137,7 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/layouts/AdaptiveSplit.qml
         qml/layouts/MasterDetailStack.qml
         qml/layouts/NavigationHost.qml
+        qml/layouts/NavigationPanel.qml
         qml/pages/worldInfo_page/BookEntryListView.qml
 )
 

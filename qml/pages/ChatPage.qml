@@ -11,7 +11,7 @@ PageScaffold {
     id: root
 
     title: ChatViewModel.currentCharName.length > 0 ? ChatViewModel.currentCharName : "未选择角色"
-    subtitle: {
+    subtitle: {// 次级标题
         const parts = []
         if (ChatViewModel.currentSessionTitle.length > 0)
             parts.push(ChatViewModel.currentSessionTitle)
@@ -78,7 +78,7 @@ PageScaffold {
                     timeText: SettingsViewModel.showTimeStamp ? model.timeText : ""
                     isEdited: model.isEdited
                     avatarSource: model.messageType === GlobalConstants.User
-                                  ? "qrc:/default/res/user-circle.png"
+                                  ? SettingsViewModel.userAvatar
                                   : ChatViewModel.currentCharAvatarPath
                 }
             }

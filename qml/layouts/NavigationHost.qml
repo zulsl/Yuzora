@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Dialogs
 
@@ -25,9 +24,10 @@ Item {
 
     signal activated(int index)
 
-    readonly property bool wide: width >= Theme.bpExpanded
-    readonly property int railWidth: Theme.controlLg * 2 + Theme.spaceXl
-    readonly property int drawerWidth: Math.min(320, Math.round(root.width * 0.84))
+    readonly property bool wide: width >= Theme.bpExpanded  //宽态
+    readonly property int railWidth: Theme.controlLg * 3 + Theme.spaceLg    //菜单宽度
+    readonly property int drawerWidth: Math.min(320, Math.round(root.width * 0.6))
+        //窄态抽屉宽度
 
     function openDrawer() { if (!wide) drawerOpen = true }
     function closeDrawer() { drawerOpen = false }
@@ -35,6 +35,7 @@ Item {
     // 窗口拉宽到侧栏形态时自动收起抽屉
     onWideChanged: if (wide) drawerOpen = false
 
+    // ========== 快捷键 ==========
     // Esc 关闭抽屉
     Shortcut {
         sequence: "Esc"
@@ -42,51 +43,14 @@ Item {
         onActivated: root.closeDrawer()
     }
 
-    // ---- 导航项（侧栏与抽屉共用，保证两种形态外观一致）----
-    Component {
-        id: navItemComponent
-
-        ItemDelegate {
-            id: navDelegate
-            required property int index
-            required property var modelData
-
-            width: ListView.view.width
-            height: Theme.touchTarget + Theme.spaceSm
-            padding: Theme.spaceMd
-            highlighted: root.currentIndex === index
-
-            // 用控件自带的 icon 渲染（IconLabel）而不是裸 Image：
-            // 裸 Image 加载 SVG 时用的是文件里写死的黑色 fill，不会跟随主题；
-            // icon.color 会对单色图标做着色，深色主题下才是白的。
-            display: AbstractButton.TextBesideIcon
-            icon.source: navDelegate.modelData.icon || ""
-            icon.width: Theme.iconMd
-            icon.height: Theme.iconMd
-            icon.color: navDelegate.highlighted ? Theme.primaryColor : Theme.textPrimary
-            text: navDelegate.modelData.title || ""
-            font.pixelSize: Theme.fontBody
-            font.family: Theme.fontFamily
-
-            onClicked: {
-                root.closeDrawer()
-                root.activated(index)
-            }
-
-            background: Rectangle {
-                radius: Theme.radiusSm
-                color: navDelegate.highlighted ? Theme.accentSubtle
-                     : navDelegate.hovered ? Theme.rowHover
-                     : "transparent"
-            }
-        }
-    }
-
+    // ==========================================================
+    // 宽态
+    // ==========================================================
     RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        // ---- 展开态：常驻侧栏 ----
+        // ---- 常驻侧栏 ----
         Rectangle {
             visible: root.wide
             Layout.fillHeight: true
@@ -99,39 +63,15 @@ Item {
                 color: Theme.borderDefault
             }
 
-            ColumnLayout {
+            NavigationPanel {
                 anchors.fill: parent
-                spacing: 0
-
-                Item {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Theme.avatarLg + Theme.spaceXl
-                    Layout.topMargin: DeviceHelper.safeAreaTop
-
-                    CircleAvatar {
-                        anchors.centerIn: parent
-                        size: Theme.avatarMd
-                        source: SettingsViewModel.userAvatar
-                        fallbackText: SettingsViewModel.userName.length > 0
-                                      ? SettingsViewModel.userName.charAt(0) : "?"
-
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: avatarDialog.open()
-                        }
-                    }
+                items: root.items
+                currentIndex: root.currentIndex
+                onActivated: (index) => {
+                    root.closeDrawer()
+                    root.activated(index)
                 }
-
-                ListView {
-                    id: railList
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    model: root.items
-                    delegate: navItemComponent
-                    clip: true
-                    spacing: Theme.spaceXs
-                }
+                onAvatarRequested: avatarDialog.open()
             }
         }
 
@@ -191,84 +131,16 @@ Item {
                 anchors.fill: parent
             }
 
-            ColumnLayout {
+            NavigationPanel {
                 anchors.fill: parent
-                spacing: 0
-
-                // 顶部：头像（点击更换）+ 用户名（双击改名）
-                Item {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Theme.avatarLg + Theme.space2xl
-                    Layout.topMargin: DeviceHelper.safeAreaTop
-                    Layout.leftMargin: Theme.spaceMd
-                    Layout.rightMargin: Theme.spaceMd
-
-                    RowLayout {
-                        anchors.fill: parent
-                        spacing: Theme.spaceMd
-
-                        CircleAvatar {
-                            size: Theme.avatarMd
-                            source: SettingsViewModel.userAvatar
-                            fallbackText: SettingsViewModel.userName.length > 0
-                                          ? SettingsViewModel.userName.charAt(0) : "?"
-
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: avatarDialog.open()
-                            }
-                        }
-
-                        TextInput {
-                            id: nameInput
-                            Layout.fillWidth: true
-                            text: SettingsViewModel.userName
-                            font.pixelSize: Theme.fontBody
-                            font.bold: true
-                            font.family: Theme.fontFamily
-                            color: Theme.textPrimary
-                            readOnly: true
-                            selectByMouse: true
-
-                            MouseArea {
-                                anchors.fill: parent
-                                acceptedButtons: Qt.LeftButton
-                                cursorShape: Qt.IBeamCursor
-                                onDoubleClicked: {
-                                    nameInput.readOnly = false
-                                    nameInput.forceActiveFocus()
-                                }
-                            }
-
-                            onAccepted: nameInput.readOnly = true
-                            onActiveFocusChanged: {
-                                if (!activeFocus) nameInput.readOnly = true
-                            }
-                            Keys.onEscapePressed: nameInput.readOnly = true
-                            onReadOnlyChanged: {
-                                if (readOnly && text.trim().length > 0)
-                                    SettingsViewModel.userName = text.trim()
-                            }
-                        }
-                    }
+                items: root.items
+                currentIndex: root.currentIndex
+                showBottomSafeArea: true
+                onActivated: (index) => {
+                    root.closeDrawer()
+                    root.activated(index)
                 }
-
-                ListView {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.leftMargin: Theme.spaceSm
-                    Layout.rightMargin: Theme.spaceSm
-                    model: root.items
-                    delegate: navItemComponent
-                    clip: true
-                    spacing: Theme.spaceXs
-                }
-
-                Item {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: DeviceHelper.safeAreaBottom
-                }
+                onAvatarRequested: avatarDialog.open()
             }
         }
     }

@@ -119,7 +119,7 @@ PageScaffold {
                     AppButton {
                         text: "删除"
                         variant: "danger"
-                        visible: !ApiConfigFormViewModel.isCurrentBuiltin
+                        visible: !ApiConfigViewModel.isCurrentBuiltin
                         onClicked: deleteDialog.open()
                     }
 
@@ -142,15 +142,15 @@ PageScaffold {
 
                 LabeledField {
                     label: "配置名称"
-                    visible: !ApiConfigFormViewModel.isCurrentBuiltin
+                    visible: !ApiConfigViewModel.isCurrentBuiltin
                     TextField {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        text: ApiConfigFormViewModel.configName
+                        text: ApiConfigViewModel.configName
                         placeholderText: "给这个 API 配置起个名字"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
-                        onTextEdited: ApiConfigFormViewModel.setConfigName(text)
+                        onTextEdited: ApiConfigViewModel.setConfigName(text)
                     }
                 }
 
@@ -161,13 +161,13 @@ PageScaffold {
                         id: keyField
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        text: ApiConfigFormViewModel.apiKey
+                        text: ApiConfigViewModel.apiKey
                         echoMode: TextInput.Password
                         placeholderText: "sk-*************"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
                         rightPadding: Theme.touchTarget
-                        onTextEdited: ApiConfigFormViewModel.setApiKey(text)
+                        onTextEdited: ApiConfigViewModel.setApiKey(text)
 
                         IconButton {
                             anchors.right: parent.right
@@ -185,29 +185,29 @@ PageScaffold {
 
                 LabeledField {
                     label: "API 地址"
-                    visible: ApiConfigFormViewModel.showDomainInput
+                    visible: ApiConfigViewModel.showDomainInput
                     TextField {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        text: ApiConfigFormViewModel.baseDomain
+                        text: ApiConfigViewModel.baseDomain
                         placeholderText: "https://api.openai.com"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
-                        onTextEdited: ApiConfigFormViewModel.setBaseDomain(text)
+                        onTextEdited: ApiConfigViewModel.setBaseDomain(text)
                     }
                 }
 
                 LabeledField {
                     label: "接口路径"
-                    visible: ApiConfigFormViewModel.showDomainInput
+                    visible: ApiConfigViewModel.showDomainInput
                     TextField {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        text: ApiConfigFormViewModel.apiPath
+                        text: ApiConfigViewModel.apiPath
                         placeholderText: "/chat/completions"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
-                        onTextEdited: ApiConfigFormViewModel.setApiPath(text)
+                        onTextEdited: ApiConfigViewModel.setApiPath(text)
                     }
                 }
 
@@ -216,11 +216,11 @@ PageScaffold {
                     ComboBox {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        model: ApiConfigFormViewModel.modelList
-                        currentIndex: ApiConfigFormViewModel.currentModelsIndex
+                        model: ApiConfigViewModel.modelList
+                        currentIndex: ApiConfigViewModel.currentModelsIndex
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
-                        onActivated: (index) => ApiConfigFormViewModel.setCurrentModelsIndex(index)
+                        onActivated: (index) => ApiConfigViewModel.setCurrentModelsIndex(index)
                     }
                 }
 
@@ -304,7 +304,7 @@ PageScaffold {
         onConfirmed: ApiConfigViewModel.deleteCurrentConfig()
     }
 
-    Connections {
+    Connections {// 兼容旧接口
         target: ApiConfigViewModel
         function onOperationError(message) { Ui.toast(message, true) }
         function onOperationTip(message) { Ui.toast(message, false) }

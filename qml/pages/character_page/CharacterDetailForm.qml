@@ -16,8 +16,7 @@ Item {
     implicitWidth: 480
     implicitHeight: 600
 
-    // Q_GADGET 值类型只能用 var 承接（QML 不接受 QML_VALUE_TYPE 注册名做类型注解）
-    property var editingCharacter: CharacterViewModel.currentCharacter
+    property characterEntity editingCharacter: CharacterViewModel.currentCharacter
 
     signal exportRequested()
     signal bookRequested()
@@ -30,12 +29,15 @@ Item {
     }
 
     ScrollView {
+        id: formScroll
         anchors.fill: parent
         contentWidth: availableWidth
         clip: true
+        ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
         ColumnLayout {
-            width: parent.width
+            // 给右侧滚动条留出空间，避免滚动条压在输入框/文字上
+            width: formScroll.availableWidth - Theme.spaceLg
             spacing: Theme.spaceMd
 
             // ========== 操作栏 ==========
@@ -222,11 +224,16 @@ Item {
                     }
 
                     ScrollView {
+                        id: advancedFieldScroll
                         Layout.fillWidth: true
                         Layout.preferredHeight: modelData.height
+                        contentWidth: availableWidth
                         clip: true
+                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
 
                         TextArea {
+                            // 内层滚动条同样预留右侧空间，避免遮住文字
+                            width: advancedFieldScroll.availableWidth - Theme.spaceMd
                             wrapMode: Text.WordWrap
                             textFormat: TextEdit.PlainText
                             font.pixelSize: Theme.fontBody

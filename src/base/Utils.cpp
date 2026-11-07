@@ -432,7 +432,7 @@ QString Utils::avatarPathToUrl(const QString & avatarPath)
 
     // 空路径返回默认头像资源
     if (avatarPath.isEmpty()) {
-        return "qrc:/default/res/user-circle.png";
+        return "qrc:/default/res/default/user-hexagon.svg";
     }
     // 相对路径拼接应用头像目录，生成绝对路径供QML直接加载
     QString avatarDir = Utils::getAvatarDirPath();

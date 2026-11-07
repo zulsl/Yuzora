@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
+import Yuzora 1.0
+
 // 聊天消息行
 // 职责：一条消息的完整呈现（头像 + 发送者 + 气泡 + 时间/已编辑标记）。
 // 从 ChatPage 的内联 delegate 抽出，使气泡配色、圆角、最大宽度在全项目唯一。
@@ -42,9 +44,6 @@ Item {
             Layout.alignment: Qt.AlignTop
             spacing: Theme.spaceXs
 
-            LayoutMirroring.enabled: root.isUser
-            LayoutMirroring.childrenInherit: true
-
             Label {
                 Layout.fillWidth: true
                 text: root.senderName
@@ -53,10 +52,12 @@ Item {
                 font.family: Theme.fontFamily
                 color: Theme.textSecondary
                 elide: Text.ElideRight
+                horizontalAlignment: root.isUser ? Text.AlignRight : Text.AlignLeft
             }
 
             Rectangle {
                 id: bubble
+                Layout.alignment: root.isUser ? Qt.AlignRight : Qt.AlignLeft
                 Layout.maximumWidth: row.width - Theme.avatarMd - Theme.spaceSm * 2
                 implicitWidth: Math.min(text.implicitWidth + Theme.spaceMd * 2, Layout.maximumWidth)
                 implicitHeight: text.implicitHeight + Theme.spaceSm * 2
@@ -82,6 +83,7 @@ Item {
             }
 
             RowLayout {
+                Layout.alignment: root.isUser ? Qt.AlignRight : Qt.AlignLeft
                 spacing: Theme.spaceSm
                 Label {
                     text: root.timeText

@@ -40,7 +40,7 @@ ToolBar {
         anchors.topMargin: root.safeTop
         spacing: Theme.spaceSm
 
-        IconButton {
+        IconButton {// 菜单按钮
             visible: root.showLeftButton
             icon.source: root.leftIconSource
             onClicked: root.leftClicked()
@@ -50,7 +50,7 @@ ToolBar {
             Layout.fillWidth: true
             spacing: 0
 
-            Label {
+            Label {// 标题
                 width: parent.width
                 text: root.title
                 font.pixelSize: Theme.fontTitle
@@ -61,7 +61,7 @@ ToolBar {
                 elide: Text.ElideRight
             }
 
-            Label {
+            Label {// 次要标题
                 width: parent.width
                 visible: root.subtitle.length > 0
                 text: root.subtitle
