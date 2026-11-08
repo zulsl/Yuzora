@@ -10,6 +10,9 @@
 #include "CharacterEntity.h"
 
 class QJSEngine;
+class CharacterService;
+class ChatService;
+class WorldInfoService;
 
 /**
  * @brief 角色管理视图模型
@@ -101,6 +104,9 @@ private:
 
     int m_currentIndex = -1;//当前列表索引
     CharacterListModel* m_characterListModel = nullptr;//列表数据源
+    CharacterService* m_characterService = nullptr;
+    ChatService* m_chatService = nullptr;
+    WorldInfoService* m_worldInfoService = nullptr;
     CharacterEntity m_currentCharacter;//当前表单数据
     QString m_searchKeyword;
 

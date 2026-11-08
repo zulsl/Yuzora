@@ -47,6 +47,14 @@ PageScaffold {
                             when: configCombo.indexOfValue(ApiConfigViewModel.currentConfigId) !== -1
                         }
 
+                        // 页面切换回来时 ComboBox 是新建的，Binding 的 when 初始可能为 false；
+                        // 创建完成后补一次按 currentConfigId 定位，避免回到第 0 项。
+                        Component.onCompleted: {
+                            const idx = indexOfValue(ApiConfigViewModel.currentConfigId)
+                            if (idx >= 0)
+                                currentIndex = idx
+                        }
+
                         onActivated: ApiConfigViewModel.selectConfig(currentValue)
 
                         contentItem: Row {
@@ -169,11 +177,10 @@ PageScaffold {
                         rightPadding: Theme.touchTarget
                         onTextEdited: ApiConfigViewModel.setApiKey(text)
 
-                        IconButton {
+                        ToolButton {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            compact: true
-                            tip: keyField.echoMode === TextInput.Password ? "显示" : "隐藏"
+                            // compact: true
                             icon.source: keyField.echoMode === TextInput.Password
                                          ? "qrc:/icons/res/eye-off.svg"
                                          : "qrc:/icons/res/eye.svg"

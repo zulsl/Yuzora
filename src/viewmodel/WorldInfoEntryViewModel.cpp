@@ -10,12 +10,11 @@ WorldInfoEntryViewModel* WorldInfoEntryViewModel::instance()
 
 WorldInfoEntryViewModel::WorldInfoEntryViewModel(QObject* parent)
     : QObject(parent)
+    , m_service(&WorldInfoService::instance())
     , m_entryModel(new WorldInfoEntryListModel(this))
 {
-    auto& service = WorldInfoService::instance();
-
     // 当前文集下的条目发生变化时刷新列表
-    connect(&service, &WorldInfoService::entryListChanged,
+    connect(m_service, &WorldInfoService::entryListChanged,
             this, [this](const QString& bookId) {
                 if (bookId == m_currentBookId)
                     refreshEntryList();
@@ -23,11 +22,11 @@ WorldInfoEntryViewModel::WorldInfoEntryViewModel(QObject* parent)
 
     // 列表项的业务字段变化 → 通知 Service 落盘
     connect(m_entryModel, &WorldInfoEntryListModel::entryChanged,
-            this, [](const WorldInfoEntryEntity& entry) {
-                WorldInfoService::instance().updateEntry(entry);
+            this, [this](const WorldInfoEntryEntity& entry) {
+                m_service->updateEntry(entry);
             });
 
-    connect(&service, &WorldInfoService::operationError,
+    connect(m_service, &WorldInfoService::operationError,
             this, &WorldInfoEntryViewModel::operationError);
 }
 
@@ -59,7 +58,7 @@ void WorldInfoEntryViewModel::refreshEntryList()
     }
 
     QList<WorldInfoEntryEntity> entries =
-        WorldInfoService::instance().getEntriesByBook(m_currentBookId);
+        m_service->getEntriesByBook(m_currentBookId);
     m_entryModel->resetData(entries);
 }
 
@@ -76,7 +75,7 @@ void WorldInfoEntryViewModel::createEntry()
         return;
     }
 
-    QString id = WorldInfoService::instance().createEntry(m_currentBookId);
+    QString id = m_service->createEntry(m_currentBookId);
     if (!id.isEmpty())
         selectEntry(id);
 }
@@ -89,7 +88,7 @@ void WorldInfoEntryViewModel::saveEntry(const QVariantMap& entryData)
 
 void WorldInfoEntryViewModel::deleteEntry(const QString& entryId)
 {
-    bool success = WorldInfoService::instance().deleteEntry(entryId);
+    bool success = m_service->deleteEntry(entryId);
     if (success && m_currentEntry.id == entryId) {
         m_currentEntry = {};
         emit currentEntryChanged();
@@ -98,7 +97,7 @@ void WorldInfoEntryViewModel::deleteEntry(const QString& entryId)
 
 void WorldInfoEntryViewModel::toggleEntryEnabled(const QString& entryId)
 {
-    WorldInfoService::instance().toggleEntryEnabled(entryId);
+    m_service->toggleEntryEnabled(entryId);
 
     if (m_currentEntry.id == entryId) {
         m_currentEntry.isEnabled = !m_currentEntry.isEnabled;
@@ -108,7 +107,7 @@ void WorldInfoEntryViewModel::toggleEntryEnabled(const QString& entryId)
 
 void WorldInfoEntryViewModel::moveEntry(const QString& entryId, const QString& targetBookId)
 {
-    WorldInfoService::instance().moveEntryToBook(entryId, targetBookId);
+    m_service->moveEntryToBook(entryId, targetBookId);
 
     if (m_currentEntry.id == entryId) {
         m_currentEntry = {};
@@ -118,7 +117,7 @@ void WorldInfoEntryViewModel::moveEntry(const QString& entryId, const QString& t
 
 void WorldInfoEntryViewModel::batchDelete(const QStringList& entryIds)
 {
-    WorldInfoService::instance().batchDeleteEntries(entryIds);
+    m_service->batchDeleteEntries(entryIds);
 
     if (entryIds.contains(m_currentEntry.id)) {
         m_currentEntry = {};
@@ -128,7 +127,7 @@ void WorldInfoEntryViewModel::batchDelete(const QStringList& entryIds)
 
 void WorldInfoEntryViewModel::batchSetEnabled(const QStringList& entryIds, bool enabled)
 {
-    WorldInfoService::instance().batchToggleEntries(entryIds, enabled);
+    m_service->batchToggleEntries(entryIds, enabled);
 }
 
 // ======================================

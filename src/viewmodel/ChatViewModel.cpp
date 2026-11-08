@@ -2,6 +2,7 @@
 #include "ChatService.h"
 #include "ChatMessageItemModel.h"
 #include "CharacterService.h"
+#include "CompletionPresetService.h"
 #include "Utils.h"
 #include "GlobalConstants.h"
 
@@ -11,15 +12,16 @@ ChatViewModel::ChatViewModel(QObject* parent)
     : QObject(parent)
     , m_messageModel(new ChatMessageListModel(this))
     , m_sessionModel(new ChatSessionListModel(this))
+    , m_chatService(&ChatService::instance())
+    , m_characterService(&CharacterService::instance())
+    , m_completionPresetService(&CompletionPresetService::instance())
 {
-    ChatService& chatService = ChatService::instance();
-
     // 会话状态信号连接
-    connect(&chatService, &ChatService::sessionSwitched,
+    connect(m_chatService, &ChatService::sessionSwitched,
             this, &ChatViewModel::onSessionSwitched);
-    connect(&chatService, &ChatService::sessionDeleted,
+    connect(m_chatService, &ChatService::sessionDeleted,
             this, [this](const QString& sessionId) {
-                if (sessionId == ChatService::instance().currentSessionId()) {
+                if (sessionId == m_chatService->currentSessionId()) {
                     m_messageModel->clear();
                     m_currentCharName.clear();
                     m_currentCharAvatarPath.clear();
@@ -33,35 +35,35 @@ ChatViewModel::ChatViewModel(QObject* parent)
             });
 
     // 消息变更信号连接
-    connect(&chatService, &ChatService::messageAppended,
+    connect(m_chatService, &ChatService::messageAppended,
             this, &ChatViewModel::onMessageAppended);
-    connect(&chatService, &ChatService::messageUpdated,
+    connect(m_chatService, &ChatService::messageUpdated,
             this, &ChatViewModel::onMessageUpdated);
-    connect(&chatService, &ChatService::messageStatusChanged,
+    connect(m_chatService, &ChatService::messageStatusChanged,
             this, &ChatViewModel::onMessageStatusChanged);
-    connect(&chatService, &ChatService::messageDeleted,
+    connect(m_chatService, &ChatService::messageDeleted,
             this, &ChatViewModel::onMessageDeleted);
 
     // 生成生命周期信号连接
-    connect(&chatService, &ChatService::generationStarted,
+    connect(m_chatService, &ChatService::generationStarted,
             this, &ChatViewModel::onGenerationStarted);
-    connect(&chatService, &ChatService::generationChunk,
+    connect(m_chatService, &ChatService::generationChunk,
             this, &ChatViewModel::onGenerationChunk);
-    connect(&chatService, &ChatService::generationFinished,
+    connect(m_chatService, &ChatService::generationFinished,
             this, &ChatViewModel::onGenerationFinished);
-    connect(&chatService, &ChatService::generationFailed,
+    connect(m_chatService, &ChatService::generationFailed,
             this, &ChatViewModel::onGenerationFailed);
-    connect(&chatService, &ChatService::generationCanceled,
+    connect(m_chatService, &ChatService::generationCanceled,
             this, &ChatViewModel::onGenerationCanceled);
 
-    connect(&chatService, &ChatService::operationTip,
+    connect(m_chatService, &ChatService::operationTip,
             this, &ChatViewModel::operationTip);
-    connect(&chatService, &ChatService::operationError,
+    connect(m_chatService, &ChatService::operationError,
             this, &ChatViewModel::operationError);
 
 
     //加载最后会话角色
-    chatService.restoreLastSession();
+    m_chatService->restoreLastSession();
 
     //加载角色会话列表
     refreshSessionList();
@@ -90,10 +92,9 @@ ChatMessageListModel* ChatViewModel::messageModel() const
     return m_messageModel;
 }
 
-#include "CompletionPresetService.h"
 QString ChatViewModel::currentPresetName() const
 {
-    return CompletionPresetService::instance().getActivePreset().name;
+    return m_completionPresetService->getActivePreset().name;
     // return m_currentPresetName;
 }
 
@@ -103,36 +104,36 @@ QString ChatViewModel::currentPresetName() const
 void ChatViewModel::sendMessage(const QString& content)
 {
     QString text = content.trimmed();
-    ChatService::instance().sendMessage(text);
+    m_chatService->sendMessage(text);
 }
 
 void ChatViewModel::regenerateLastMessage()
 {
     if (m_isGenerating) return;
-    ChatService::instance().regenerateLastMessage();
+    m_chatService->regenerateLastMessage();
 
-    // ChatService::instance().regenerateLastMessage(m_currentCharId, m_currentSessionId);
+    // m_chatService->regenerateLastMessage(m_currentCharId, m_currentSessionId);
 }
 
 void ChatViewModel::continueGeneration()
 {
     if (m_isGenerating) return;
-    ChatService::instance().continueGeneration();
+    m_chatService->continueGeneration();
 }
 
 void ChatViewModel::cancelGeneration()
 {
-    ChatService::instance().cancelGeneration();
+    m_chatService->cancelGeneration();
 }
 
 void ChatViewModel::editMessage(const QString& messageId, const QString& newContent)
 {
-    ChatService::instance().editMessage(messageId, newContent);
+    m_chatService->editMessage(messageId, newContent);
 }
 
 void ChatViewModel::deleteMessage(const QString& messageId)
 {
-    ChatService::instance().deleteMessage(messageId);
+    m_chatService->deleteMessage(messageId);
 }
 
 void ChatViewModel::switchCharacter(const QString& charId)
@@ -140,38 +141,37 @@ void ChatViewModel::switchCharacter(const QString& charId)
     //(待优化)
     if (charId.isEmpty()) return;
     // 切换角色时自动创建新会话
-    QString sessionId = ChatService::instance().createSession(charId);
+    QString sessionId = m_chatService->createSession(charId);
     if (!sessionId.isEmpty()) {
-        ChatService::instance().switchSession(sessionId);
+        m_chatService->switchSession(sessionId);
     }
 }
 
 void ChatViewModel::createNewSession()
 {
-    QString charId = ChatService::instance().currentCharacterId();
+    QString charId = m_chatService->currentCharacterId();
     if (charId.isEmpty()) return;
-    QString sessionId = ChatService::instance().createSession(charId);
-    ChatService::instance().switchSession(sessionId);
+    QString sessionId = m_chatService->createSession(charId);
+    m_chatService->switchSession(sessionId);
 }
 
 void ChatViewModel::switchSession(const QString& sessionId)
 {
     //转发
-    ChatService::instance().switchSession(sessionId);
+    m_chatService->switchSession(sessionId);
 }
 
 void ChatViewModel::deleteAllSession()
 {
-    ChatService::instance().deleteAllSession();
+    m_chatService->deleteAllSession();
 }
 
 void ChatViewModel::loadMoreHistory()
 {
-    ChatService& service = ChatService::instance();
-    QString sessionId = service.currentSessionId();
+    QString sessionId = m_chatService->currentSessionId();
     if (sessionId.isEmpty()) return;
 
-    QList<ChatMessageEntity> olderMsgs = service.loadMessagePage(
+    QList<ChatMessageEntity> olderMsgs = m_chatService->loadMessagePage(
         sessionId, m_historyLoadOffset, 50);
     if (olderMsgs.isEmpty()) return;
 
@@ -191,14 +191,14 @@ void ChatViewModel::onSessionSwitched(const QString& characterId, const QString&
 
     Q_UNUSED(sessionId)
     // 同步角色数据
-    CharacterEntity character = CharacterService::instance().getCharacterById(characterId);
+    CharacterEntity character = m_characterService->getCharacterById(characterId);
     m_currentCharName = character.name;
     m_currentCharAvatarPath = character.avatarPath;
     emit currentCharNameChanged();
     emit currentCharAvatarPathChanged();
 
     // 同步会话标题
-    ChatSessionEntity session = ChatService::instance().currentSession();
+    ChatSessionEntity session = m_chatService->currentSession();
     m_currentSessionTitle = session.title;
     emit currentSessionTitleChanged();
 
@@ -254,7 +254,7 @@ void ChatViewModel::onGenerationFinished(const QString& messageId, const QString
         static_cast<int>(GlobalConstants::MessageGenerationStatus::Normal));
 
     // 同步会话标题
-    ChatSessionEntity session = ChatService::instance().currentSession();
+    ChatSessionEntity session = m_chatService->currentSession();
     m_currentSessionTitle = session.title;
     emit currentSessionTitleChanged();
 }
@@ -282,11 +282,10 @@ void ChatViewModel::onGenerationCanceled(const QString& messageId)
 // ======================================
 void ChatViewModel::loadInitialMessages()
 {
-    ChatService& service = ChatService::instance();
-    QString sessionId = service.currentSessionId();
+    QString sessionId = m_chatService->currentSessionId();
     if (sessionId.isEmpty()) return;
 
-    QList<ChatMessageEntity> messages = service.loadMessagePage(sessionId, 0, 50);
+    QList<ChatMessageEntity> messages = m_chatService->loadMessagePage(sessionId, 0, 50);
     m_historyLoadOffset = messages.size();
 
     QList<ChatMessageItemModel*> items;
@@ -300,7 +299,7 @@ void ChatViewModel::loadInitialMessages()
 void ChatViewModel::refreshSessionList()
 {
     // qDebug()<<"刷新会话列表";
-    QList<ChatSessionEntity> entities = ChatService::instance().getSessionListByCurrentCharacter();
+    QList<ChatSessionEntity> entities = m_chatService->getSessionListByCurrentCharacter();
     m_sessionModel->loadList(entities);
 }
 

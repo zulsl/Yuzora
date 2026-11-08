@@ -10,6 +10,9 @@
 #include "WorldInfoBookListModel.h"
 
 class QJSEngine;
+class WorldInfoService;
+class WorldInfoEntryViewModel;
+class ExceptionHandler;
 
 /**
  * @brief 世界书文集视图模型（文集域）
@@ -74,6 +77,10 @@ signals:
     void currentBookNameChanged();
 
 private:
+    WorldInfoService* m_service = nullptr;
+    WorldInfoEntryViewModel* m_entryViewModel = nullptr;
+    ExceptionHandler* m_exceptionHandler = nullptr;
+
     WorldInfoBookListModel* m_bookModel = nullptr;
     QString m_currentBookId;
 

@@ -8,17 +8,18 @@
 CharacterViewModel::CharacterViewModel(QObject* parent)
     : QObject(parent)
     , m_characterListModel(new CharacterListModel(this))
+    , m_characterService(&CharacterService::instance())
+    , m_chatService(&ChatService::instance())
+    , m_worldInfoService(&WorldInfoService::instance())
 {
-    CharacterService& service = CharacterService::instance();
-
     // 绑定业务层信号，自动同步视图状态
-    connect(&service, &CharacterService::characterListChanged,
+    connect(m_characterService, &CharacterService::characterListChanged,
             this, &CharacterViewModel::onCharacterListChanged);
-    connect(&service, &CharacterService::operationError,
+    connect(m_characterService, &CharacterService::operationError,
             this, &CharacterViewModel::operationError);
-    connect(&service, &CharacterService::importSuccess,
+    connect(m_characterService, &CharacterService::importSuccess,
             this, &CharacterViewModel::importSuccess);
-    connect(&service, &CharacterService::exportSuccess,
+    connect(m_characterService, &CharacterService::exportSuccess,
             this, &CharacterViewModel::exportSuccess);
 
     // 初始化加载角色列表
@@ -73,13 +74,13 @@ bool CharacterViewModel::hasSelection() const
 // ==================== UI 可调用方法 ====================
 void CharacterViewModel::refreshList()
 {
-    QList<CharacterEntity> entities = CharacterService::instance().getAllCharacters();
+    QList<CharacterEntity> entities = m_characterService->getAllCharacters();
     updateListModel(entities);
 }
 
 void CharacterViewModel::searchCharacters()
 {
-    QList<CharacterEntity> entities = CharacterService::instance().searchByName(m_searchKeyword);
+    QList<CharacterEntity> entities = m_characterService->searchByName(m_searchKeyword);
     updateListModel(entities);
 }
 
@@ -90,7 +91,7 @@ void CharacterViewModel::createNewCharacter()
     newChar.cardFormatVersion = 2;
     newChar.characterVersion = "1.0.0";
 
-    CharacterService::instance().createCharacter(newChar);
+    m_characterService->createCharacter(newChar);
 
     refreshList();
 
@@ -101,7 +102,7 @@ void CharacterViewModel::createNewCharacter()
 void CharacterViewModel::saveCurrentCharacter(const CharacterEntity& entity)
 {
     CharacterEntity updated = entity;
-    CharacterService::instance().updateCharacter(updated);
+    m_characterService->updateCharacter(updated);
 
     m_currentCharacter = updated;
     refreshForm();
@@ -110,7 +111,7 @@ void CharacterViewModel::saveCurrentCharacter(const CharacterEntity& entity)
 void CharacterViewModel::deleteCurrentCharacter()
 {
     if (!hasSelection()) return;
-    CharacterService::instance().deleteCharacter(m_currentCharacter.id);
+    m_characterService->deleteCharacter(m_currentCharacter.id);
     clearSelection();
 }
 
@@ -118,7 +119,7 @@ void CharacterViewModel::duplicateCurrentCharacter()
 {
     if (!hasSelection()) return;
 
-    QString newId = CharacterService::instance().duplicateCharacter(m_currentCharacter.id);
+    QString newId = m_characterService->duplicateCharacter(m_currentCharacter.id);
     if (!newId.isEmpty()) {
         selectCharacter(newId);
     }
@@ -128,7 +129,7 @@ void CharacterViewModel::importCharacter(const QUrl& fileUrl)
 {
     qDebug()<<"文件url:"<<fileUrl;
     QString filePath = fileUrl.toLocalFile();
-    QString newId = CharacterService::instance().importCharacterFromFile(filePath);
+    QString newId = m_characterService->importCharacterFromFile(filePath);
 
     //切换表单
     // if (!newId.isEmpty()) {
@@ -139,12 +140,12 @@ void CharacterViewModel::importCharacter(const QUrl& fileUrl)
 void CharacterViewModel::exportCurrentCharacter(const QString& savePath)
 {
     if (!hasSelection()) return;
-    CharacterService::instance().exportCharacterToFile(m_currentCharacter.id, savePath);
+    m_characterService->exportCharacterToFile(m_currentCharacter.id, savePath);
 }
 
 void CharacterViewModel::toggleFavorite(const QString& charId)
 {
-    CharacterService::instance().toggleFavorite(charId);
+    m_characterService->toggleFavorite(charId);
 }
 
 void CharacterViewModel::selectCharacter(const QString& charId)
@@ -153,7 +154,7 @@ void CharacterViewModel::selectCharacter(const QString& charId)
     // （与 CompletionPresetViewModel::selectPreset 的行为保持一致）
     if (m_currentCharacter.id == charId) return;
 
-    CharacterEntity entity = CharacterService::instance().getCharacterById(charId);
+    CharacterEntity entity = m_characterService->getCharacterById(charId);
     if (entity.id.isEmpty()) return;
 
     m_currentCharacter = entity;
@@ -182,7 +183,7 @@ void CharacterViewModel::openSelectedCharChat()
 
 
     // 调用ChatService业务方法
-    QString sessionId = ChatService::instance().openCharacterSession(charId);
+    QString sessionId = m_chatService->openCharacterSession(charId);
     if (sessionId.isEmpty())
     {
         emit operationError("打开角色会话失败");
@@ -235,7 +236,7 @@ QString CharacterViewModel::getCharacterBookName() const
     if (m_currentCharacter.worldBookIds.isEmpty()) return "无";
 
     QString bookId=m_currentCharacter.worldBookIds.first();
-    WorldInfoBookEntity entity = WorldInfoService::instance().getBookById(bookId);
+    WorldInfoBookEntity entity = m_worldInfoService->getBookById(bookId);
 
     return entity.name.isEmpty() ? "无" : entity.name;
 }

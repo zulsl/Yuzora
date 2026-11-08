@@ -9,6 +9,9 @@
 #include "ChatSessionListModel.h"
 
 class QJSEngine;
+class ChatService;
+class CharacterService;
+class CompletionPresetService;
 
 /**
  * @brief 聊天视图模型
@@ -116,6 +119,10 @@ private:
     // 列表模型
     ChatMessageListModel* m_messageModel = nullptr;
     ChatSessionListModel* m_sessionModel = nullptr;
+
+    ChatService* m_chatService = nullptr;
+    CharacterService* m_characterService = nullptr;
+    CompletionPresetService* m_completionPresetService = nullptr;
 
     // 构造函数必须 private：QML 单例只有在"无法默认构造"时才会调用 create()。
     // 若保持 public，引擎会自己 new 一个实例，C++ 侧的静态实例就与 QML 拿到的

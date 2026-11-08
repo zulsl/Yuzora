@@ -22,8 +22,8 @@ CompletionPresetViewModel::CompletionPresetViewModel(QObject* parent)
 
     // Model 的业务字段变化 → 通知 Service 落盘
     connect(m_presetPromptListModel, &PresetPromptListModel::entryWriting,
-            this, [](const PromptEntity & entry) {
-                CompletionPresetService::instance().updatePrompt(entry);
+            this, [this](const PromptEntity & entry) {
+                m_service->updatePrompt(entry);
             });
 
     // 初始化加载列表
@@ -61,7 +61,7 @@ bool CompletionPresetViewModel::hasSelection() const
 void CompletionPresetViewModel::refreshList()
 {
     //刷新左侧整体列表
-    QList<CompletionPresetEntity> entities = CompletionPresetService::instance().getAllPresets();
+    QList<CompletionPresetEntity> entities = m_service->getAllPresets();
 
     m_presetModel->loadList(entities);
 }
@@ -70,7 +70,7 @@ void CompletionPresetViewModel::selectPreset(const QString& presetId)
 {
     if (m_currentEditingPreset.id == presetId) return;
 
-    m_currentEditingPreset = CompletionPresetService::instance().getPresetById(presetId);
+    m_currentEditingPreset = m_service->getPresetById(presetId);
     emit currentEditingPresetChanged();
 
     refreshPromptList();
@@ -84,13 +84,13 @@ void CompletionPresetViewModel::createPreset()
 {
     CompletionPresetEntity newEntity;
     newEntity.name="新预设";
-    CompletionPresetService::instance().createPreset(newEntity);
+    m_service->createPreset(newEntity);
     refreshList();
 }
 
 void CompletionPresetViewModel::deletePreset(const QString& presetId)
 {
-    bool success = CompletionPresetService::instance().deletePreset(presetId);
+    bool success = m_service->deletePreset(presetId);
     if (success && m_currentEditingPreset.id == presetId) {
         m_currentEditingPreset = {};
         emit currentEditingPresetChanged();
@@ -100,7 +100,7 @@ void CompletionPresetViewModel::deletePreset(const QString& presetId)
 
 void CompletionPresetViewModel::duplicatePreset(const QString& presetId)
 {
-    QString newId = CompletionPresetService::instance().duplicatePreset(presetId);
+    QString newId = m_service->duplicatePreset(presetId);
     if (!newId.isEmpty()) {
         selectPreset(newId);
     }
@@ -108,7 +108,7 @@ void CompletionPresetViewModel::duplicatePreset(const QString& presetId)
 
 void CompletionPresetViewModel::setActivePreset(const QString& presetId)
 {
-    bool success = CompletionPresetService::instance().setActivePreset(presetId);
+    bool success = m_service->setActivePreset(presetId);
     if (success && m_currentEditingPreset.id == presetId) {
         m_currentEditingPreset.isDefault = true;
         emit currentEditingPresetChanged();
@@ -118,7 +118,7 @@ void CompletionPresetViewModel::setActivePreset(const QString& presetId)
 
 void CompletionPresetViewModel::renamePreset(const QString& presetId, const QString& newName)
 {
-    bool success = CompletionPresetService::instance().renamePreset(presetId, newName);
+    bool success = m_service->renamePreset(presetId, newName);
     if (success && m_currentEditingPreset.id == presetId) {
         m_currentEditingPreset.name = newName.trimmed();
         emit currentEditingPresetChanged();
@@ -131,7 +131,7 @@ void CompletionPresetViewModel::applyEditingPreset(const CompletionPresetEntity&
     if (!hasSelection()) return;
 
 
-    CompletionPresetService::instance().updatePreset(newPreset);
+    m_service->updatePreset(newPreset);
     m_currentEditingPreset = newPreset;
     emit currentEditingPresetChanged();
 
@@ -147,7 +147,7 @@ void CompletionPresetViewModel::refreshPromptList()
 {
     if (m_currentEditingPreset.id.isEmpty()) return;
 
-    QList<PromptEntity> prompts = CompletionPresetService::instance().getPromptsByPresetId(m_currentEditingPreset.id);
+    QList<PromptEntity> prompts = m_service->getPromptsByPresetId(m_currentEditingPreset.id);
     QStringList promptOrder=m_currentEditingPreset.promptOrder;
 
 
@@ -194,7 +194,7 @@ void CompletionPresetViewModel::importFromFile(const QUrl& fileUrl)
     QFileInfo fi(filePath);
     QString fileName = fi.completeBaseName();
 
-    const int count = CompletionPresetService::instance().importFromSillyTavern(filePath, fileName);
+    const int count = m_service->importFromSillyTavern(filePath, fileName);
 
     // 导入后必须刷新列表并通知界面：原先只调用了 Service，模型没有重载，
     // 新导入的预设不会出现在列表里，用户看到的就是"导入没反应"。
@@ -206,10 +206,10 @@ void CompletionPresetViewModel::importFromFile(const QUrl& fileUrl)
 
 void CompletionPresetViewModel::exportCurrent(const QString& presetId, const QString& savePath)
 {
-    CompletionPresetService::instance().exportToSillyTavern(presetId, savePath);
+    m_service->exportToSillyTavern(presetId, savePath);
 }
 
 void CompletionPresetViewModel::exportAll(const QString& savePath)
 {
-    CompletionPresetService::instance().exportAllToSillyTavern(savePath);
+    m_service->exportAllToSillyTavern(savePath);
 }

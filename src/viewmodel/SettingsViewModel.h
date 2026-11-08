@@ -7,6 +7,9 @@
 #include "GlobalConstants.h"
 
 class QJSEngine;
+class SettingsService;
+class DeviceHelper;
+class ExceptionHandler;
 
 /**
  * @brief 系统设置视图模型
@@ -120,6 +123,10 @@ signals:
     void userNameChanged();
 
 private:
+    SettingsService* m_service = nullptr;
+    DeviceHelper* m_deviceHelper = nullptr;
+    ExceptionHandler* m_exceptionHandler = nullptr;
+
     // 构造函数必须 private：QML 单例只有在"无法默认构造"时才会调用 create()。
     // 若保持 public，引擎会自己 new 一个实例，C++ 侧的静态实例就与 QML 拿到的
     // 不是同一个对象（会出现"数据写进 A、界面读的是 B"这类极难定位的问题）。

@@ -11,6 +11,7 @@
 #include "WorldInfoEntryEntity.h"
 
 class QJSEngine;
+class WorldInfoService;
 
 /**
  * @brief 世界书条目视图模型
@@ -82,6 +83,7 @@ private:
     QVariantMap entryToMap(const WorldInfoEntryEntity& entry) const;
     WorldInfoEntryEntity mapToEntry(const QVariantMap& map) const;
 
+    WorldInfoService* m_service = nullptr;
     WorldInfoEntryListModel* m_entryModel = nullptr;
     WorldInfoEntryEntity m_currentEntry;
     QString m_currentBookId;

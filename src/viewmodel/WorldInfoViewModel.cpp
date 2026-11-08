@@ -10,11 +10,12 @@
 // ======================================
 WorldInfoViewModel::WorldInfoViewModel(QObject* parent)
     : QObject(parent)
+    , m_service(&WorldInfoService::instance())
+    , m_entryViewModel(WorldInfoEntryViewModel::instance())
+    , m_exceptionHandler(&ExceptionHandler::instance())
     , m_bookModel(new WorldInfoBookListModel(this))
 {
-    auto& service = WorldInfoService::instance();
-
-    connect(&service, &WorldInfoService::operationError,
+    connect(m_service, &WorldInfoService::operationError,
             this, &WorldInfoViewModel::operationError);
 
     // 初始化加载文集列表
@@ -41,7 +42,7 @@ QString WorldInfoViewModel::currentBookId() const
 // ======================================
 void WorldInfoViewModel::refreshBookList()
 {
-    QList<WorldInfoBookEntity> books = WorldInfoService::instance().getAllBooks();
+    QList<WorldInfoBookEntity> books = m_service->getAllBooks();
     QList<WorldInfoBookItemModel*> items;
     items.reserve(books.size());
 
@@ -61,12 +62,12 @@ void WorldInfoViewModel::selectBook(const QString& bookId)
     emit currentBookNameChanged();
 
     // 条目域跟着切换（清空当前条目并重新加载列表）
-    WorldInfoEntryViewModel::instance()->setCurrentBookId(bookId);
+    m_entryViewModel->setCurrentBookId(bookId);
 }
 
 void WorldInfoViewModel::createBook()
 {
-    QString id = WorldInfoService::instance().createBook(QStringLiteral("新世界书"));
+    QString id = m_service->createBook(QStringLiteral("新世界书"));
     if (!id.isEmpty())
         selectBook(id); // 新建后自动选中
 }
@@ -77,32 +78,32 @@ void WorldInfoViewModel::deleteBook()
         if (m_currentBookId.isEmpty())
             THROW(UnknownError, "[WorldInfoViewModel]m_currentBookId为空");
 
-        bool success = WorldInfoService::instance().deleteBook(m_currentBookId);
+        bool success = m_service->deleteBook(m_currentBookId);
         if (success) {
             m_currentBookId.clear();
             emit currentBookIdChanged();
             // 清空条目域
-            WorldInfoEntryViewModel::instance()->setCurrentBookId(QString());
+            m_entryViewModel->setCurrentBookId(QString());
         }
         refreshBookList();
 
-        ExceptionHandler::instance().tipOccurred("删除成功");
+        m_exceptionHandler->tipOccurred("删除成功");
     }
-    catch (const AppException& e) { ExceptionHandler::instance().handleException(e); }
-    catch (const std::exception& e) { ExceptionHandler::instance().handleException(e); }
-    catch (...) { ExceptionHandler::instance().handleException(); }
+    catch (const AppException& e) { m_exceptionHandler->handleException(e); }
+    catch (const std::exception& e) { m_exceptionHandler->handleException(e); }
+    catch (...) { m_exceptionHandler->handleException(); }
 }
 
 void WorldInfoViewModel::duplicateBook(const QString& bookId)
 {
-    QString newId = WorldInfoService::instance().duplicateBook(bookId);
+    QString newId = m_service->duplicateBook(bookId);
     if (!newId.isEmpty())
         selectBook(newId);
 }
 
 void WorldInfoViewModel::toggleBookEnabled(const QString& bookId)
 {
-    WorldInfoService::instance().toggleBookEnabled(bookId);
+    m_service->toggleBookEnabled(bookId);
     refreshBookList();
 }
 
@@ -119,11 +120,11 @@ void WorldInfoViewModel::renameBook(const QString& bookId, const QString& newNam
         return;
     }
 
-    WorldInfoBookEntity book = WorldInfoService::instance().getBookById(bookId);
+    WorldInfoBookEntity book = m_service->getBookById(bookId);
     if (book.id.isEmpty()) return;
 
     book.name = trimmedName;
-    WorldInfoService::instance().updateBook(book);
+    m_service->updateBook(book);
 }
 
 // ======================================
@@ -132,7 +133,7 @@ void WorldInfoViewModel::renameBook(const QString& bookId, const QString& newNam
 void WorldInfoViewModel::importBook(const QUrl& fileUrl)
 {
     QString filePath = fileUrl.toLocalFile();
-    WorldInfoService::instance().importBookFromSillyTavern(filePath);
+    m_service->importBookFromSillyTavern(filePath);
 }
 
 void WorldInfoViewModel::exportCurrentBook(const QString& savePath)
@@ -141,12 +142,12 @@ void WorldInfoViewModel::exportCurrentBook(const QString& savePath)
         emit operationError(QStringLiteral("请先选择要导出的文集"));
         return;
     }
-    WorldInfoService::instance().exportBookToSillyTavern(m_currentBookId, savePath);
+    m_service->exportBookToSillyTavern(m_currentBookId, savePath);
 }
 
 void WorldInfoViewModel::exportAllBooks(const QString& savePath)
 {
-    WorldInfoService::instance().exportAllBooksToSillyTavern(savePath);
+    m_service->exportAllBooksToSillyTavern(savePath);
 }
 
 // ======================================
@@ -157,7 +158,7 @@ QString WorldInfoViewModel::getCurrentBookName() const
     if (m_currentBookId.isEmpty())
         return {};
 
-    WorldInfoBookEntity entity = WorldInfoService::instance().getBookById(m_currentBookId);
+    WorldInfoBookEntity entity = m_service->getBookById(m_currentBookId);
     return entity.name;
 }
 
@@ -167,12 +168,12 @@ void WorldInfoViewModel::setCurrentBookName(const QString &newCurrentBookName)
         if (m_currentBookId.isEmpty())
             THROW(UnknownError, "[WorldInfoViewModel]m_currentBookId为空");
 
-        WorldInfoBookEntity entity = WorldInfoService::instance().getBookById(m_currentBookId);
+        WorldInfoBookEntity entity = m_service->getBookById(m_currentBookId);
         entity.name = newCurrentBookName;
-        WorldInfoService::instance().updateBook(entity);
+        m_service->updateBook(entity);
         emit currentBookNameChanged();
     }
-    catch (const AppException& e) { ExceptionHandler::instance().handleException(e); }
-    catch (const std::exception& e) { ExceptionHandler::instance().handleException(e); }
-    catch (...) { ExceptionHandler::instance().handleException(); }
+    catch (const AppException& e) { m_exceptionHandler->handleException(e); }
+    catch (const std::exception& e) { m_exceptionHandler->handleException(e); }
+    catch (...) { m_exceptionHandler->handleException(); }
 }
