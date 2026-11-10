@@ -38,6 +38,7 @@
         <file>res/save.svg</file>
         <file>res/file-plus.svg</file>
         <file>res/edit.svg</file>
+        <file>res/lock.svg</file>
         <file>res/circle-chevron-up.svg</file>
         <file>res/circle-chevron-down.svg</file>
     </qresource>

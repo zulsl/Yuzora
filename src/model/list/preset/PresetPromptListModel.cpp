@@ -46,6 +46,8 @@ QVariant PresetPromptListModel::data(const QModelIndex &index, int role) const
             return item.injection_depth;
         case SortOrderRole:
             return item.injection_order;
+        case SystemPromptRole:
+            return item.system_prompt;
         case ExpandedStateRole:
             return m_expandedIds.contains(item.id);
         default:
@@ -66,6 +68,7 @@ QHash<int, QByteArray> PresetPromptListModel::roleNames() const
     roles[IsActiveRole] = "isActive";
     roles[DepthRole] = "depth";
     roles[SortOrderRole] = "order";
+    roles[SystemPromptRole] = "systemPrompt";
     roles[ExpandedStateRole] = "expandedState";
     return roles;
 }

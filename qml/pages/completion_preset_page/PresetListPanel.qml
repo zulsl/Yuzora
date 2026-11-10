@@ -14,7 +14,7 @@ Item {
     implicitHeight: 480
 
     signal importRequested()
-    signal exportAllRequested()
+    signal exportRequested()
     // 窄窗口下选中预设后要求推入编辑页（由 MasterDetailStack 自动接线）
     signal detailRequested()
 
@@ -36,23 +36,18 @@ Item {
             }
 
             IconButton {
-                tip: "新建预设"
-                compact: true
-                icon.source: "qrc:/icons/res/file-plus.svg"
-                onClicked: CompletionPresetViewModel.createPreset()
-            }
-            IconButton {
                 tip: "导入预设"
                 compact: true
                 icon.source: "qrc:/icons/res/file-import.svg"
                 onClicked: root.importRequested()
             }
             IconButton {
-                tip: "导出全部"
+                tip: "新建预设"
                 compact: true
-                icon.source: "qrc:/icons/res/file-export.svg"
-                onClicked: root.exportAllRequested()
+                icon.source: "qrc:/icons/res/file-plus.svg"
+                onClicked: CompletionPresetViewModel.createPreset()
             }
+
         }
 
         ListView {

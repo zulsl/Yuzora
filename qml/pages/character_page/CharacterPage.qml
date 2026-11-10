@@ -11,9 +11,24 @@ import Yuzora 1.0
 PageScaffold {
     id: root
 
-    title: "角色管理"
+    readonly property bool compactDetailVisible: layoutLoader.item
+                                                ? layoutLoader.item.detailShown === true
+                                                : false
+
+    title: compactDetailVisible
+           ? (CharacterViewModel.currentCharacter && CharacterViewModel.currentCharacter.name
+              ? CharacterViewModel.currentCharacter.name : "角色详情")
+           : "角色管理"
+    leftIconSource: compactDetailVisible
+                    ? "qrc:/icons/res/arrow-narrow-left.svg"
+                    : "qrc:/icons/res/menu.svg"
     contentPadding: Theme.spaceSm
-    onLeftClicked: Ui.requestDrawer()
+    onLeftClicked: {
+        if (compactDetailVisible && layoutLoader.item)
+            layoutLoader.item.hideDetail()
+        else
+            Ui.requestDrawer()
+    }
 
     // ========== 首次构建详情表单时的加载态 ==========
     // 为什么要它：从"未选中"切到"有选中"时，右侧要一次性创建整个表单
@@ -81,6 +96,7 @@ PageScaffold {
     }
 
     Loader {
+        id: layoutLoader
         anchors.fill: parent
         sourceComponent: Theme.isCompact ? compactLayout : wideLayout
     }
@@ -174,27 +190,10 @@ PageScaffold {
     Component {
         id: compactDetail
 
-        // 详情页以整页形式呈现：自带返回按钮。
-        // backRequested 由 MasterDetailStack 自动连接到 hideDetail()。
-        PageScaffold {
-            id: compactDetailPage
-            signal backRequested()
-
-            title: root.detailStackTitle()
-            leftIconSource: "qrc:/icons/res/arrow-narrow-left.svg"
-            onLeftClicked: compactDetailPage.backRequested()
-
-            CharacterDetailForm {
-                anchors.fill: parent
-                onExportRequested: exportDialog.open()
-            }
+        CharacterDetailForm {
+            anchors.fill: parent
+            onExportRequested: exportDialog.open()
         }
-    }
-
-    function detailStackTitle() {
-        return CharacterViewModel.currentCharacter
-               && CharacterViewModel.currentCharacter.name
-               ? CharacterViewModel.currentCharacter.name : "角色详情"
     }
 
     // ========== 对话框 ==========

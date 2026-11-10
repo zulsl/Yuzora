@@ -41,6 +41,9 @@ public:
 
     //有选择
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY currentEditingPresetChanged)
+    //预设详情的当前 Tab：0=基础参数，1=提示词条目
+    Q_PROPERTY(int presetDetailTab READ presetDetailTab WRITE setPresetDetailTab
+               NOTIFY presetDetailTabChanged)
 
 public:
     ~CompletionPresetViewModel() override;
@@ -50,6 +53,8 @@ public:
     PresetPromptListModel* presetPromptModel() const;
     CompletionPresetEntity currentEditingPreset() const;
     bool hasSelection() const;
+    int presetDetailTab() const;
+    void setPresetDetailTab(int tab);
 
     //预设操作
     Q_INVOKABLE void refreshList();//刷新列表
@@ -64,22 +69,15 @@ public:
 
     //提示词条目操作
     Q_INVOKABLE void refreshPromptList();//刷新列表
-    // Q_INVOKABLE void selectPrompt(const QString& promptId);//选择
-    // Q_INVOKABLE void createPrompt();//新建
-    //插入
-    //删除
-    //编辑条目
-    // Q_INVOKABLE void savePrompt(const QString& id,const PromptEntity& newPrompt);//保存
-    // Q_INVOKABLE void togglePromptEnabled(const QString& promptId);//设置开关
-    // Q_INVOKABLE void deletePrompt(const QString& promptId);//删除
-    // Q_INVOKABLE void updatePrompt(const QString& promptId, const QVariantMap& data);//更新
-    // Q_INVOKABLE void renamePreset(const QString& promptId, const QString& newName);//重命名
+    Q_INVOKABLE void addPrompt();//追加到末尾
+    Q_INVOKABLE void insertPromptBefore(const QString& beforeIdentifier);//插入到选中项之前
+    Q_INVOKABLE void deletePrompt(const QString& promptId);//删除非系统提示词
 
 
     // 导入导出
     Q_INVOKABLE void importFromFile(const QUrl& fileUrl);//导入预设
-    Q_INVOKABLE void exportCurrent(const QString& presetId, const QString& savePath);//导出当前
-    Q_INVOKABLE void exportAll(const QString& savePath);
+    Q_INVOKABLE void exportCurrent(const QString& presetId, const QUrl& savePath);//导出当前
+    Q_INVOKABLE void exportAll(const QString& savePath);//弃用
 
 signals:
     void importSuccess(int count);
@@ -87,6 +85,7 @@ signals:
     void operationError(const QString& errorMsg);
     void operationTip(const QString& tipMsg);
     void currentEditingPresetChanged();
+    void presetDetailTabChanged();
 
 private:
     CompletionPresetService* m_service = nullptr;
@@ -96,6 +95,10 @@ private:
 
 
     CompletionPresetEntity m_currentEditingPreset;//当前表单
+    int m_presetDetailTab = 0;
+
+    PromptEntity makeNewPrompt() const;
+    void reloadCurrentPresetAndPrompts();
 
     // 构造函数必须 private：QML 单例只有在"无法默认构造"时才会调用 create()。
     // 若保持 public，引擎会自己 new 一个实例，C++ 侧的静态实例就与 QML 拿到的

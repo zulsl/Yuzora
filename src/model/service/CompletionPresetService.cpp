@@ -1,6 +1,10 @@
 #include "CompletionPresetService.h"
 #include "Utils.h"
 #include "ScopeTimer.h"
+#include "DatabaseManager.h"
+
+#include <QSet>
+#include <QSqlDatabase>
 
 CompletionPresetService& CompletionPresetService::instance()
 {
@@ -267,6 +271,140 @@ bool CompletionPresetService::updatePrompt(const PromptEntity &prompt)
         emit operationError("更新提示词失败");
     }
     return success;
+}
+
+QStringList CompletionPresetService::normalizePromptOrder(const QStringList& order) const
+{
+    QStringList result;
+    QSet<QString> seen;
+    for (const QString& identifier : order) {
+        if (identifier.isEmpty() || seen.contains(identifier)) continue;
+        seen.insert(identifier);
+        result.append(identifier);
+    }
+    return result;
+}
+
+bool CompletionPresetService::writePromptChange(
+    const CompletionPresetEntity& preset,
+    const PromptEntity& prompt,
+    const QStringList& promptOrder,
+    bool insertPrompt,
+    const QString& deletePromptId)
+{
+    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    if (!db.transaction()) {
+        emit operationError("开启提示词事务失败");
+        return false;
+    }
+
+    bool success = insertPrompt
+        ? m_promptDao->insert(prompt)
+        : m_promptDao->remove(deletePromptId);
+
+    if (success) {
+        CompletionPresetEntity updatedPreset = preset;
+        updatedPreset.promptOrder = promptOrder;
+        // 删除时若 promptOrder 里本来就没有这个 identifier，预设内容没有变化，
+        // 不需要再 UPDATE 一次（否则 BaseDao 会因 0 行受影响而误判失败）。
+        if (updatedPreset.promptOrder != preset.promptOrder) {
+            success = m_completionPresetDao->update(updatedPreset);
+        }
+    }
+
+    if (!success) {
+        db.rollback();
+        emit operationError("保存提示词失败");
+        return false;
+    }
+
+    if (!db.commit()) {
+        db.rollback();
+        emit operationError("提交提示词事务失败");
+        return false;
+    }
+    return true;
+}
+
+bool CompletionPresetService::addPrompt(const QString& presetId, const PromptEntity& prompt)
+{
+    CompletionPresetEntity preset = m_completionPresetDao->selectById(presetId);
+    if (preset.id.isEmpty()) {
+        emit operationError("预设不存在");
+        return false;
+    }
+
+    PromptEntity newPrompt = prompt;
+    if (newPrompt.id.isEmpty()) newPrompt.id = Utils::generateUuid();
+    if (newPrompt.identifier.isEmpty()) {
+        newPrompt.identifier = newPrompt.id;
+    }
+    newPrompt.presetId = presetId;
+
+    QStringList order = normalizePromptOrder(preset.promptOrder);
+    if (order.contains(newPrompt.identifier)) {
+        emit operationError("提示词 identifier 重复");
+        return false;
+    }
+
+    order.append(newPrompt.identifier);
+    return writePromptChange(preset, newPrompt, order, true, QString());
+}
+
+bool CompletionPresetService::insertPromptBefore(
+    const QString& presetId, const QString& beforeIdentifier, const PromptEntity& prompt)
+{
+    CompletionPresetEntity preset = m_completionPresetDao->selectById(presetId);
+    if (preset.id.isEmpty()) {
+        emit operationError("预设不存在");
+        return false;
+    }
+
+    PromptEntity newPrompt = prompt;
+    if (newPrompt.id.isEmpty()) newPrompt.id = Utils::generateUuid();
+    if (newPrompt.identifier.isEmpty()) {
+        newPrompt.identifier = QStringLiteral("custom-") + newPrompt.id;
+    }
+    newPrompt.presetId = presetId;
+
+    QStringList order = normalizePromptOrder(preset.promptOrder);
+    if (order.contains(newPrompt.identifier)) {
+        emit operationError("提示词 identifier 重复");
+        return false;
+    }
+
+    const int beforeIndex = order.indexOf(beforeIdentifier);
+    if (beforeIndex < 0) {
+        order.append(newPrompt.identifier);
+    } else {
+        order.insert(beforeIndex, newPrompt.identifier);
+    }
+
+    return writePromptChange(preset, newPrompt, order, true, QString());
+}
+
+bool CompletionPresetService::deletePrompt(const QString& presetId, const QString& promptId)
+{
+    CompletionPresetEntity preset = m_completionPresetDao->selectById(presetId);
+    if (preset.id.isEmpty()) {
+        emit operationError("预设不存在");
+        return false;
+    }
+
+    PromptEntity prompt = m_promptDao->selectById(promptId);
+    if (prompt.id.isEmpty() || prompt.presetId != presetId) {
+        emit operationError("提示词不存在");
+        return false;
+    }
+    if (prompt.system_prompt) {
+        emit operationError("系统内置提示词不可删除");
+        return false;
+    }
+
+    QStringList order = normalizePromptOrder(preset.promptOrder);
+    order.removeAll(prompt.identifier);
+
+    return writePromptChange(preset, prompt, order, false, promptId);
 }
 
 CompletionPresetEntity CompletionPresetService::parsePresetDataToEntity(const QJsonObject& stJson,const QString& fileName,QList<PromptEntity>& promptList)

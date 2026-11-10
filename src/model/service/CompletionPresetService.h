@@ -39,6 +39,10 @@ public:
     bool createPrompts(const QList<PromptEntity>& prompts);
     bool createPrompt(const PromptEntity& prompt);
     bool updatePrompt(const PromptEntity& prompt);
+    bool addPrompt(const QString& presetId, const PromptEntity& prompt);
+    bool insertPromptBefore(const QString& presetId, const QString& beforeIdentifier,
+                            const PromptEntity& prompt);
+    bool deletePrompt(const QString& presetId, const QString& promptId);
 
 
 
@@ -60,6 +64,10 @@ private:
     QStringList parsePromptOrder(const QJsonObject& cpJson,QHash<QString, bool>& h_isActive);
     void CreateDefaultPromptEntries(const QString& presetId,QStringList & promptOrderList);
     bool validatePreset(const CompletionPresetEntity& preset, QString& outError);//验证预设(用处不大)
+    QStringList normalizePromptOrder(const QStringList& order) const;
+    bool writePromptChange(const CompletionPresetEntity& preset, const PromptEntity& prompt,
+                           const QStringList& promptOrder, bool insertPrompt,
+                           const QString& deletePromptId);
 
     // SillyTavern 格式互转
     CompletionPresetEntity parsePresetDataToEntity(const QJsonObject& stJson,const QString& fileName,QList<PromptEntity>& promptList);//json转结构体

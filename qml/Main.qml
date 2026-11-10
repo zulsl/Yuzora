@@ -80,7 +80,7 @@ ApplicationWindow {
             items: [
                 { title: "聊天", icon: "qrc:/icons/res/main_page/message-circle.svg" },
                 { title: "API 连接配置", icon: "qrc:/icons/res/main_page/plug-connected.svg" },
-                { title: "对话补全预设", icon: "qrc:/icons/res/main_page/adjustments-horizontal.svg" },
+                { title: "对话预设", icon: "qrc:/icons/res/main_page/adjustments-horizontal.svg" },
                 { title: "角色管理", icon: "qrc:/icons/res/main_page/users.svg" },
                 { title: "世界书管理", icon: "qrc:/icons/res/main_page/book-2.svg" },
                 { title: "系统设置", icon: "qrc:/icons/res/main_page/settings.svg" }

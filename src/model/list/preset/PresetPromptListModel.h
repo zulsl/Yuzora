@@ -19,6 +19,7 @@ public:
         IsActiveRole,//启用
         DepthRole,//深度
         SortOrderRole,//顺序
+        SystemPromptRole,//系统内置提示词
         ExpandedStateRole// 展开状态
     };
 

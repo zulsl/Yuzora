@@ -2,6 +2,7 @@
 #include "PresetItemModel.h"
 #include "GlobalConstants.h"
 #include "ScopeTimer.h"
+#include "Utils.h"
 
 #include <QFileInfo>
 
@@ -55,6 +56,20 @@ bool CompletionPresetViewModel::hasSelection() const
     return !m_currentEditingPreset.id.isEmpty();
 }
 
+int CompletionPresetViewModel::presetDetailTab() const
+{
+    return m_presetDetailTab;
+}
+
+void CompletionPresetViewModel::setPresetDetailTab(int tab)
+{
+    if (tab != 0 && tab != 1) return;
+    if (m_presetDetailTab == tab) return;
+
+    m_presetDetailTab = tab;
+    emit presetDetailTabChanged();
+}
+
 // ======================================
 // 列表与选中管理
 // ======================================
@@ -71,6 +86,13 @@ void CompletionPresetViewModel::selectPreset(const QString& presetId)
     if (m_currentEditingPreset.id == presetId) return;
 
     m_currentEditingPreset = m_service->getPresetById(presetId);
+
+    // 切换预设时回到“基础参数”Tab
+    if (m_presetDetailTab != 0) {
+        m_presetDetailTab = 0;
+        emit presetDetailTabChanged();
+    }
+
     emit currentEditingPresetChanged();
 
     refreshPromptList();
@@ -93,6 +115,10 @@ void CompletionPresetViewModel::deletePreset(const QString& presetId)
     bool success = m_service->deletePreset(presetId);
     if (success && m_currentEditingPreset.id == presetId) {
         m_currentEditingPreset = {};
+        if (m_presetDetailTab != 0) {
+            m_presetDetailTab = 0;
+            emit presetDetailTabChanged();
+        }
         emit currentEditingPresetChanged();
     }
     refreshList();
@@ -170,18 +196,73 @@ void CompletionPresetViewModel::refreshPromptList()
         }
     }
 
-
-    // //按 promptOrder 顺序遍历，直接查哈希
-    // QList<PresetPromptItemModel*> items;
-    // items.reserve(promptOrder.size());
-    // for (const auto& orderEntry : promptOrder) {
-    //     // auto it = promptLookup.find(orderEntry.identifier);//返回迭代器
-    //     auto it = promptLookup.find(orderEntry);//返回迭代器
-    //     if (it != promptLookup.end()) {//找到
-    //         items.append(new PresetPromptItemModel(it.value()));
-    //     }
-    // }
     m_presetPromptListModel->loadList(items);
+}
+
+PromptEntity CompletionPresetViewModel::makeNewPrompt() const
+{
+    PromptEntity prompt;
+    prompt.id = Utils::generateUuid();
+    prompt.identifier = prompt.id;
+    prompt.presetId = m_currentEditingPreset.id;
+    prompt.name = QStringLiteral("新提示词");
+    prompt.role = GlobalConstants::MessageType::System;
+    prompt.content.clear();
+    prompt.isActive = true;
+    prompt.system_prompt = false;
+    prompt.marker = false;
+    prompt.extension = false;
+    prompt.injection_position = 0;
+    prompt.injection_depth = 4;
+    prompt.injection_order = 100;
+    return prompt;
+}
+
+void CompletionPresetViewModel::reloadCurrentPresetAndPrompts()
+{
+    if (m_currentEditingPreset.id.isEmpty()) return;
+
+    // 提示词增删只改变 promptOrder；不要用数据库实体覆盖基础参数草稿。
+    const CompletionPresetEntity fresh = m_service->getPresetById(m_currentEditingPreset.id);
+    if (fresh.id.isEmpty()) return;
+
+    m_currentEditingPreset.promptOrder = fresh.promptOrder;
+    emit currentEditingPresetChanged();
+    refreshPromptList();
+}
+
+void CompletionPresetViewModel::addPrompt()
+{
+    if (m_currentEditingPreset.id.isEmpty()) {
+        emit operationError(QStringLiteral("请先选择预设"));
+        return;
+    }
+
+    if (m_service->addPrompt(m_currentEditingPreset.id, makeNewPrompt()))
+        reloadCurrentPresetAndPrompts();
+}
+
+void CompletionPresetViewModel::insertPromptBefore(const QString& beforeIdentifier)
+{
+    if (m_currentEditingPreset.id.isEmpty()) {
+        emit operationError(QStringLiteral("请先选择预设"));
+        return;
+    }
+    if (beforeIdentifier.isEmpty()) {
+        addPrompt();
+        return;
+    }
+
+    if (m_service->insertPromptBefore(m_currentEditingPreset.id, beforeIdentifier, makeNewPrompt()))
+        reloadCurrentPresetAndPrompts();
+}
+
+void CompletionPresetViewModel::deletePrompt(const QString& promptId)
+{
+    if (m_currentEditingPreset.id.isEmpty() || promptId.isEmpty()) return;
+
+    if (m_service->deletePrompt(m_currentEditingPreset.id, promptId))
+        reloadCurrentPresetAndPrompts();
 }
 
 
@@ -204,9 +285,10 @@ void CompletionPresetViewModel::importFromFile(const QUrl& fileUrl)
     }
 }
 
-void CompletionPresetViewModel::exportCurrent(const QString& presetId, const QString& savePath)
+void CompletionPresetViewModel::exportCurrent(const QString& presetId, const QUrl& savePath)
 {
-    m_service->exportToSillyTavern(presetId, savePath);
+    QString filePath = savePath.toLocalFile();
+    m_service->exportToSillyTavern(presetId, filePath);
 }
 
 void CompletionPresetViewModel::exportAll(const QString& savePath)

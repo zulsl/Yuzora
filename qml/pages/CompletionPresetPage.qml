@@ -10,20 +10,24 @@ import Yuzora 1.0
 PageScaffold {
     id: root
 
-    title: "对话补全预设"
-    contentPadding: Theme.spaceSm
-    onLeftClicked: Ui.requestDrawer()
+    readonly property bool compactDetailVisible: layoutLoader.item
+                                                ? layoutLoader.item.detailShown === true
+                                                : false
 
-    function localPath(url) {
-        const s = String(url)
-        if (s.indexOf("file:///") === 0)
-            return decodeURIComponent(s.substring(8))
-        if (s.indexOf("file://") === 0)
-            return decodeURIComponent(s.substring(7))
-        return s
+    title: compactDetailVisible ? "预设编辑" : "对话预设"
+    leftIconSource: compactDetailVisible
+                    ? "qrc:/icons/res/arrow-narrow-left.svg"
+                    : "qrc:/icons/res/menu.svg"
+    contentPadding: Theme.spaceSm
+    onLeftClicked: {
+        if (compactDetailVisible && layoutLoader.item)
+            layoutLoader.item.hideDetail()
+        else
+            Ui.requestDrawer()
     }
 
     Loader {
+        id: layoutLoader
         anchors.fill: parent
         sourceComponent: Theme.isCompact ? compactLayout : wideLayout
     }
@@ -37,8 +41,8 @@ PageScaffold {
             secondRatio: 3
 
             first: PresetListPanel {
-                onImportRequested: importDialog.open()
-                onExportAllRequested: exportAllDialog.open()
+                onImportRequested: importDialog.open()// 连接信号
+                onExportRequested: exportDialog.open()
             }
 
             // 没选中预设时显示空态，而不是一个空的编辑表单
@@ -49,15 +53,15 @@ PageScaffold {
         }
     }
 
-    Component {
+    Component {// 详情界面
         id: presetEditComp
 
         PresetEditForm {
-            onExportRequested: exportSingleDialog.open()
+            onExportRequested: exportDialog.open()
         }
     }
 
-    Component {
+    Component {// 空态占位
         id: noPresetComp
 
         EmptyState {
@@ -81,7 +85,7 @@ PageScaffold {
 
         PresetListPanel {
             onImportRequested: importDialog.open()
-            onExportAllRequested: exportAllDialog.open()
+            onExportRequested: exportDialog.open()
             // detailRequested 由 MasterDetailStack 自动连接到 showDetail()
         }
     }
@@ -89,18 +93,9 @@ PageScaffold {
     Component {
         id: compactDetail
 
-        PageScaffold {
-            id: compactDetailPage
-            signal backRequested()
-
-            title: "预设编辑"
-            leftIconSource: "qrc:/icons/res/arrow-narrow-left.svg"
-            onLeftClicked: compactDetailPage.backRequested()
-
-            PresetEditForm {
-                anchors.fill: parent
-                onExportRequested: exportSingleDialog.open()
-            }
+        PresetEditForm {
+            anchors.fill: parent
+            onExportRequested: exportDialog.open()
         }
     }
 
@@ -114,24 +109,15 @@ PageScaffold {
     }
 
     FileDialog {
-        id: exportAllDialog
-        title: "导出全部预设"
-        nameFilters: ["JSON 文件 (*.json)"]
-        fileMode: FileDialog.SaveFile
-        onAccepted: CompletionPresetViewModel.exportAll(root.localPath(selectedFile))
-    }
-
-    FileDialog {
-        id: exportSingleDialog
+        id: exportDialog
         title: "导出预设"
         nameFilters: ["JSON 文件 (*.json)"]
         fileMode: FileDialog.SaveFile
         onAccepted: CompletionPresetViewModel.exportCurrent(
-                        CompletionPresetViewModel.currentEditingPreset.id,
-                        root.localPath(selectedFile))
+                        CompletionPresetViewModel.currentEditingPreset.id,selectedFile)
     }
 
-    Connections {
+    Connections {// 兼容旧接口
         target: CompletionPresetViewModel
         function onOperationError(message) { Ui.toast(message, true) }
         function onOperationTip(message) { Ui.toast(message, false) }

@@ -11,9 +11,24 @@ import Yuzora 1.0
 PageScaffold {
     id: root
 
-    title: "世界书 / 知识书"
+    readonly property bool compactDetailVisible: layoutLoader.item
+                                                ? layoutLoader.item.detailShown === true
+                                                : false
+
+    title: compactDetailVisible
+           ? (WorldInfoViewModel.currentBookName.length > 0
+              ? WorldInfoViewModel.currentBookName : "条目列表")
+           : "世界书 / 知识书"
+    leftIconSource: compactDetailVisible
+                    ? "qrc:/icons/res/arrow-narrow-left.svg"
+                    : "qrc:/icons/res/menu.svg"
     contentPadding: Theme.spaceSm
-    onLeftClicked: Ui.requestDrawer()
+    onLeftClicked: {
+        if (compactDetailVisible && layoutLoader.item)
+            layoutLoader.item.hideDetail()
+        else
+            Ui.requestDrawer()
+    }
 
     function localPath(url) {
         const s = String(url)
@@ -25,6 +40,7 @@ PageScaffold {
     }
 
     Loader {
+        id: layoutLoader
         anchors.fill: parent
         sourceComponent: Theme.isCompact ? compactLayout : wideLayout
     }
@@ -73,18 +89,8 @@ PageScaffold {
     Component {
         id: compactEntries
 
-        PageScaffold {
-            id: compactEntriesPage
-            signal backRequested()
-
-            title: WorldInfoViewModel.currentBookName.length > 0
-                   ? WorldInfoViewModel.currentBookName : "条目列表"
-            leftIconSource: "qrc:/icons/res/arrow-narrow-left.svg"
-            onLeftClicked: compactEntriesPage.backRequested()
-
-            EntryListPanel {
-                anchors.fill: parent
-            }
+        EntryListPanel {
+            anchors.fill: parent
         }
     }
 

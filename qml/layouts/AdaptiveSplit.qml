@@ -14,15 +14,15 @@ import QtQuick.Layouts
 Item {
     id: root
 
-    property alias first: firstHost.data
-    property alias second: secondHost.data
+    property alias first: firstHost.data    //主栏
+    property alias second: secondHost.data  //次栏
 
     property real firstRatio: 1
     property real secondRatio: 3
     property int spacing: Theme.gutter
 
     // 窄窗口只保留主栏，详情改由页面自行 push（MasterDetailStack）
-    readonly property bool showSecond: width >= Theme.bpCompact
+    readonly property bool showSecond: width >= Theme.bpCompact //宽度判断
 
     readonly property real _total: Math.max(1, firstRatio + secondRatio)
 
@@ -36,13 +36,15 @@ Item {
     property Item firstTarget: null
     property Item secondTarget: null
 
-    Component.onCompleted: {
+    Component.onCompleted: {// 防止循环依赖
         if (firstHost.children.length > 0)
             firstTarget = firstHost.children[0]
         if (secondHost.children.length > 0)
             secondTarget = secondHost.children[0]
     }
 
+    // 主体
+    // 宽态显示两栏,窄态只显示主栏
     RowLayout {
         anchors.fill: parent
         spacing: root.showSecond ? root.spacing : 0
