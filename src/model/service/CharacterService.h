@@ -32,6 +32,7 @@ public:
     // ========== 角色基础增删改 ==========
     QString createCharacter(const CharacterEntity& character);//创建角色
     bool updateCharacter(const CharacterEntity& character);
+    bool updateAvatar(const QString& charId, const QString& sourceFilePath);//更新角色头像
     bool deleteCharacter(const QString& id);
     QString duplicateCharacter(const QString& sourceId);
 

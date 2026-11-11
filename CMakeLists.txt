@@ -116,7 +116,9 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/components/LongTextField.qml
         qml/components/MessageBubble.qml
         qml/components/ExpandableRow.qml
+        qml/components/CameraMask.qml
         qml/pages/character_page/CharacterDetailForm.qml
+        qml/pages/character_page/AlternateGreetingsList.qml
         qml/pages/character_page/CharacterListPanel.qml
         qml/pages/character_page/CharacterPage.qml
         qml/pages/SettingsPage.qml
@@ -139,6 +141,7 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/layouts/NavigationHost.qml
         qml/layouts/NavigationPanel.qml
         qml/pages/worldInfo_page/BookEntryListView.qml
+
 )
 
 

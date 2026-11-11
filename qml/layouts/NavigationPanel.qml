@@ -41,11 +41,11 @@ ColumnLayout {
                 fallbackText: SettingsViewModel.userName.length > 0
                               ? SettingsViewModel.userName.charAt(0) : "?"
 
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.avatarRequested()
+
+                CameraMask{
+                    onMaskClicked: root.avatarRequested()
                 }
+
             }
 
             Text {

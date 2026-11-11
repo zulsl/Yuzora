@@ -38,14 +38,14 @@
         <file>res/save.svg</file>
         <file>res/file-plus.svg</file>
         <file>res/edit.svg</file>
-        <file>res/lock.svg</file>
         <file>res/circle-chevron-up.svg</file>
         <file>res/circle-chevron-down.svg</file>
+        <file>res/switch-3.svg</file>
+        <file>res/camera.svg</file>
     </qresource>
     <qresource prefix="/default">
         <file>res/default/user.png</file>
         <file>res/default/user.svg</file>
-        <file>res/default/user-circle.png</file>
         <file>res/default/user-hexagon.png</file>
         <file>res/default/user-hexagon.svg</file>
     </qresource>

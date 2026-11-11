@@ -11,7 +11,7 @@ import Yuzora 1.0
 Item {
     id: root
 
-    implicitWidth: 320
+    implicitWidth: 300
     implicitHeight: 480
 
     signal importRequested()
@@ -24,29 +24,29 @@ Item {
         // 顶部：搜索 + 操作
         RowLayout {
             Layout.fillWidth: true
-            spacing: Theme.spaceSm
+            spacing: Theme.spaceXs
 
-            TextField {
-                id: searchField
+            Label {
                 Layout.fillWidth: true
-                implicitHeight: Theme.controlMd
-                placeholderText: "搜索角色名称…"
+                text: "角色列表"
                 font.pixelSize: Theme.fontBody
+                font.bold: true
                 font.family: Theme.fontFamily
-                onTextChanged: CharacterViewModel.searchKeyword = text
-                onAccepted: CharacterViewModel.searchCharacters()
-            }
-
-            IconButton {
-                tip: "新建角色"
-                icon.source: "qrc:/icons/res/file-plus.svg"
-                onClicked: CharacterViewModel.createNewCharacter()
+                color: Theme.textPrimary
             }
 
             IconButton {
                 tip: "导入角色卡"
+                compact: true
                 icon.source: "qrc:/icons/res/file-import.svg"
                 onClicked: root.importRequested()
+            }
+
+            IconButton {
+                tip: "新建角色"
+                compact: true
+                icon.source: "qrc:/icons/res/file-plus.svg"
+                onClicked: CharacterViewModel.createNewCharacter()
             }
         }
 
@@ -69,10 +69,11 @@ Item {
                 height: Theme.avatarLg + Theme.spaceMd
                 highlighted: CharacterViewModel.currentIndex === index
 
-                // 单击只做选中（详情在右侧或推入新页），进入对话用右侧省略号菜单里的显式动作
+                // 单击只做选中（详情在右侧或推入新页）
                 onClicked: {
                     CharacterViewModel.setCurrentIndex(index)
                     CharacterViewModel.selectCharacter(rowDelegate.modelData.id)
+                    root.detailRequested()
                 }
 
                 contentItem: RowLayout {
@@ -110,13 +111,13 @@ Item {
                     }
 
                     IconButton {
-                        tip: "角色详情"
+                        tip: "角色切换"
                         compact: true
-                        icon.source: "qrc:/icons/res/dots.svg"
+                        icon.source: "qrc:/icons/res/switch-3.svg"
                         onClicked: {
                             CharacterViewModel.setCurrentIndex(rowDelegate.index)
                             CharacterViewModel.selectCharacter(rowDelegate.modelData.id)
-                            root.detailRequested()
+                            CharacterViewModel.openSelectedCharChat()
                         }
                     }
                 }

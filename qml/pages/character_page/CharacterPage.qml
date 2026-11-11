@@ -85,16 +85,6 @@ PageScaffold {
         }
     }
 
-    // QML 的 url 没有 toLocalFile()，这里做一次统一的 file:// → 本地路径转换
-    function localPath(url) {
-        const s = String(url)
-        if (s.indexOf("file:///") === 0)
-            return decodeURIComponent(s.substring(8))
-        if (s.indexOf("file://") === 0)
-            return decodeURIComponent(s.substring(7))
-        return s
-    }
-
     Loader {
         id: layoutLoader
         anchors.fill: parent
@@ -211,8 +201,7 @@ PageScaffold {
         nameFilters: ["PNG 角色卡 (*.png)", "JSON 角色卡 (*.json)"]
         fileMode: FileDialog.SaveFile
         defaultSuffix: "png"
-        onAccepted: CharacterViewModel.exportCurrentCharacter(
-                        root.localPath(selectedFile))
+        onAccepted: CharacterViewModel.exportCurrentCharacter(selectedFile)
     }
 
     // 页面级错误统一走全局吐司

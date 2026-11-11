@@ -35,3 +35,17 @@ _Avoid_: Append, add to end
 **Prompt Addition**:
 Appending a new Prompt Entry to the end of Prompt Order.
 _Avoid_: Insertion, insert before
+
+## Character
+
+**Long Text Field**:
+A multi-line character field that starts at one line, grows with its content, and scrolls internally after reaching its field-specific limit.
+_Avoid_: Text box, text area
+
+**Max Lines**:
+The maximum number of natural text lines a Long Text Field displays before it stops growing; it is a height limit, not a character limit.
+_Avoid_: Max length, character limit
+
+**Alternate Greeting**:
+A variant opening message that can be selected instead of the character's first message; one character may have several.
+_Avoid_: Backup greeting, extra first message

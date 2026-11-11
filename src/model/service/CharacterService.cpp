@@ -118,6 +118,52 @@ bool CharacterService::updateCharacter(const CharacterEntity& character)
     return true;
 }
 
+bool CharacterService::updateAvatar(const QString& charId, const QString& sourceFilePath)
+{
+    if (charId.isEmpty()) {
+        emit operationError("更新头像失败：角色ID不能为空");
+        return false;
+    }
+    if (sourceFilePath.isEmpty()) {
+        emit operationError("更新头像失败：文件路径为空");
+        return false;
+    }
+
+    CharacterEntity existing = m_dao->selectById(charId);
+    if (existing.id.isEmpty()) {
+        emit operationError("更新头像失败：角色不存在");
+        return false;
+    }
+
+    QImage image(sourceFilePath);
+    if (image.isNull()) {
+        emit operationError("更新头像失败：无法读取图片");
+        return false;
+    }
+
+    // 头像文件名带唯一后缀，保证 QML Image 的 source 变化后能重新加载，
+    // 而不是继续命中旧文件缓存。
+    const QString newAvatarPath = charId + "_" + Utils::generateUuid() + ".png";
+    const QString avatarFullPath = QDir(Utils::getAvatarDirPath()).filePath(newAvatarPath);
+    if (!image.save(avatarFullPath, "PNG")) {
+        emit operationError("更新头像失败：无法写入头像文件");
+        return false;
+    }
+
+    if (!m_dao->updateAvatar(charId, newAvatarPath)) {
+        cleanupAvatarFile(newAvatarPath);
+        emit operationError("更新头像失败：数据库写入错误");
+        return false;
+    }
+
+    if (!existing.avatarPath.isEmpty() && existing.avatarPath != newAvatarPath)
+        cleanupAvatarFile(existing.avatarPath);
+
+    emit characterUpdated(charId);
+    emit characterListChanged();
+    return true;
+}
+
 bool CharacterService::deleteCharacter(const QString& id)
 {
     if (id.isEmpty()) {

@@ -4,6 +4,7 @@
 #include "CharacterListModel.h"
 #include "ChatService.h"
 #include "WorldInfoService.h"
+#include "Utils.h"
 
 CharacterViewModel::CharacterViewModel(QObject* parent)
     : QObject(parent)
@@ -51,6 +52,11 @@ CharacterListModel* CharacterViewModel::characterListModel() const
 CharacterEntity CharacterViewModel::currentCharacter() const
 {
     return m_currentCharacter;
+}
+
+QString CharacterViewModel::currentAvatarUrl() const
+{
+    return Utils::avatarPathToUrl(m_currentCharacter.avatarPath);
 }
 
 QString CharacterViewModel::searchKeyword() const
@@ -108,6 +114,28 @@ void CharacterViewModel::saveCurrentCharacter(const CharacterEntity& entity)
     refreshForm();
 }
 
+void CharacterViewModel::updateAvatar(const QUrl& fileUrl)
+{
+    if (!hasSelection()) {
+        emit operationError("请先选择角色");
+        return;
+    }
+
+    const QString filePath = fileUrl.toLocalFile();
+    if (filePath.isEmpty()) {
+        emit operationError("头像路径无效");
+        return;
+    }
+
+    if (!m_characterService->updateAvatar(m_currentCharacter.id, filePath))
+        return;
+
+    m_currentCharacter.avatarPath =
+        m_characterService->getCharacterById(m_currentCharacter.id).avatarPath;
+    refreshForm();
+    emit operationTip("头像已更新");
+}
+
 void CharacterViewModel::deleteCurrentCharacter()
 {
     if (!hasSelection()) return;
@@ -137,10 +165,11 @@ void CharacterViewModel::importCharacter(const QUrl& fileUrl)
     // }
 }
 
-void CharacterViewModel::exportCurrentCharacter(const QString& savePath)
+void CharacterViewModel::exportCurrentCharacter(const QUrl& fileUrl)
 {
+    QString filePath = fileUrl.toLocalFile();
     if (!hasSelection()) return;
-    m_characterService->exportCharacterToFile(m_currentCharacter.id, savePath);
+    m_characterService->exportCharacterToFile(m_currentCharacter.id, filePath);
 }
 
 void CharacterViewModel::toggleFavorite(const QString& charId)

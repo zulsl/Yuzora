@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QVariantMap>
 #include <QStringList>
+#include <QUrl>
 #include <QtQml/qqmlregistration.h>
 #include <QQmlEngine>
 #include "CharacterListModel.h"
@@ -40,6 +41,7 @@ public:
     Q_PROPERTY(int currentIndex READ currentIndex WRITE setCurrentIndex NOTIFY currentIndexChanged)
     //当前角色
     Q_PROPERTY(CharacterEntity currentCharacter READ currentCharacter NOTIFY currentCharacterChanged)
+    Q_PROPERTY(QString currentAvatarUrl READ currentAvatarUrl NOTIFY currentCharacterChanged)
     Q_PROPERTY(QString characterBookName READ getCharacterBookName NOTIFY characterBookNameChanged FINAL)
 
     //搜索关键词
@@ -58,6 +60,7 @@ public:
     // 属性读取
     CharacterListModel* characterListModel() const;
     CharacterEntity currentCharacter() const;
+    QString currentAvatarUrl() const;
     QString searchKeyword() const;
     void setSearchKeyword(const QString& keyword);
     bool hasSelection() const;
@@ -67,10 +70,11 @@ public:
     Q_INVOKABLE void searchCharacters();//搜索
     Q_INVOKABLE void createNewCharacter();//新建角色
     Q_INVOKABLE void saveCurrentCharacter(const CharacterEntity& entity);//保存当前角色
+    Q_INVOKABLE void updateAvatar(const QUrl& fileUrl);//更新角色头像
     Q_INVOKABLE void deleteCurrentCharacter();//删除角色
     Q_INVOKABLE void duplicateCurrentCharacter();//复制角色
     Q_INVOKABLE void importCharacter(const QUrl& fileUrl);//导入角色
-    Q_INVOKABLE void exportCurrentCharacter(const QString& savePath);//导出当前角色
+    Q_INVOKABLE void exportCurrentCharacter(const QUrl& fileUrl);//导出当前角色
     Q_INVOKABLE void toggleFavorite(const QString& charId);//切换收藏
     Q_INVOKABLE void selectCharacter(const QString& charId);//选中角色
     Q_INVOKABLE void clearSelection();//清除选择

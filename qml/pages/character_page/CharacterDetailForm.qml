@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 
 import Yuzora 1.0
 
@@ -83,45 +84,60 @@ Item {
                 }
             }
 
-            // ========== 基础字段 ==========
-            LabeledField {
-                label: "角色名称"
-                TextField {
-                    Layout.fillWidth: true
-                    implicitHeight: Theme.controlMd
-                    placeholderText: "角色名称 *"
-                    text: root.editingCharacter ? (root.editingCharacter.name || "") : ""
-                    onTextChanged: if (activeFocus) root.commit("name", text)
-                }
-            }
+            // ========== 角色档案 ==========
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: profileLayout.implicitHeight + Theme.spaceMd * 2
+                radius: Theme.radiusMd
+                color: Theme.bgSurface
+                border.width: 1
+                border.color: Theme.borderDefault
 
-            LabeledField {
-                label: "作者"
                 RowLayout {
-                    Layout.fillWidth: true
+                    id: profileLayout
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: Theme.spaceMd
+                    height: implicitHeight
+                    spacing: Theme.spaceMd
+
+                    Item {
+                        Layout.preferredWidth: Theme.avatarLg
+                        Layout.preferredHeight: Theme.avatarLg
+                        Layout.alignment: Qt.AlignTop
+
+                        CircleAvatar {
+                            anchors.fill: parent
+                            size: Theme.avatarLg
+                            source: CharacterViewModel.currentAvatarUrl
+                            fallbackText: root.editingCharacter
+                                          && root.editingCharacter.name
+                                          ? root.editingCharacter.name.charAt(0) : ""
+                        }
+
+                        CameraMask{
+                            onMaskClicked : avatarDialog.open()
+                        }
+                    }
+
+
                     TextField {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        placeholderText: "作者"
-                        text: root.editingCharacter ? (root.editingCharacter.creator || "") : ""
-                        onTextChanged: if (activeFocus) root.commit("creator", text)
-                    }
-                    TextField {
-                        Layout.preferredWidth: Theme.controlMd * 3
-                        implicitHeight: Theme.controlMd
-                        placeholderText: "版本号"
-                        text: root.editingCharacter ? (root.editingCharacter.characterVersion || "") : ""
-                        onTextChanged: if (activeFocus) root.commit("characterVersion", text)
+                        placeholderText: "角色名称"
+                        text: root.editingCharacter ? (root.editingCharacter.name || "") : ""
+                        onTextChanged: if (activeFocus) root.commit("name", text)
                     }
                 }
             }
 
-            // 长文本区（描述 / 开场白 / 备选开场白 / 作者备注）
+            // 长文本区（描述 / 开场白）
             Repeater {
                 model: [
-                    { field: "description", label: "角色描述（系统提示词）", hint: "", height: Theme.controlLg * 7 },
-                    { field: "firstMessage", label: "初始开场白", hint: "", height: Theme.controlLg * 7 },
-                    { field: "creatorNotes", label: "作者备注", hint: "", height: Theme.controlLg * 3 }
+                    { field: "description", label: "角色描述（系统提示词）", hint: "", maxLines: 8 },
+                    { field: "firstMessage", label: "初始开场白", hint: "", maxLines: 8 },
+                    { field: "creatorNotes", label: "作者备注", hint: "", maxLines: 4 }
                 ]
 
                 // 超过阈值的文本会退化为"只读预览 + 点开编辑"，
@@ -132,38 +148,61 @@ Item {
                     recordId: root.editingCharacter ? root.editingCharacter.id : ""
                     label: modelData.label
                     placeholder: modelData.hint
-                    fieldHeight: modelData.height
+                    maxLines: modelData.maxLines
                     content: root.editingCharacter
                              ? (root.editingCharacter[modelData.field] || "") : ""
                     onEdited: (value) => root.commit(modelData.field, value)
                 }
             }
 
-            // 备选开场白：多行文本 ↔ 字符串数组
-            LongTextField {
+            // 备选开场白：一条一个 ListView 项，支持折叠和确认删除
+            AlternateGreetingsList {
                 Layout.fillWidth: true
                 recordId: root.editingCharacter ? root.editingCharacter.id : ""
-                label: "备选开场白（每行一个）"
-                placeholder: "每行一个备选开场白"
-                fieldHeight: Theme.controlLg * 5
-                content: root.editingCharacter
-                         ? (root.editingCharacter.alternateGreetings || []).join("\n") : ""
-                onEdited: (value) => root.commit(
-                              "alternateGreetings",
-                              value.split("\n").filter(line => line.trim().length > 0))
+                greetings: root.editingCharacter
+                           ? (root.editingCharacter.alternateGreetings || []) : []
+                onGreetingsEdited: (values) => root.commit("alternateGreetings", values)
             }
+
+            // ========== 其他字段 ==========
+            RowLayout {
+                Layout.fillWidth: true
+                TextField {
+                    Layout.fillWidth: true
+                    implicitHeight: Theme.controlMd
+                    placeholderText: "作者"
+                    text: root.editingCharacter ? (root.editingCharacter.creator || "") : ""
+                    onTextChanged: if (activeFocus) root.commit("creator", text)
+                }
+                TextField {
+                    Layout.preferredWidth: Theme.controlMd * 3
+                    implicitHeight: Theme.controlMd
+                    placeholderText: "版本号"
+                    text: root.editingCharacter ? (root.editingCharacter.characterVersion || "") : ""
+                    onTextChanged: if (activeFocus) root.commit("characterVersion", text)
+                }
+            }
+
 
             // ========== 高级定义 ==========
             AppButton {
                 Layout.fillWidth: true
                 variant: "ghost"
                 text: extraForm.expanded ? "收起高级定义 ▲" : "更多高级定义 ▼"
-                onClicked: extraForm.expanded = !extraForm.expanded
+                onClicked: {
+                    extraForm.animateExtraHeight = true
+                    extraForm.expanded = !extraForm.expanded
+                    extraHeightTimer.restart()
+                }
             }
 
             // 高级定义：折叠时**不创建**内部控件。
             // 这 4 个 TextArea 如果常驻，每次切换角色都要把它们的整段文本重新排版，
             // 是"选中角色卡一下"的主要来源（无文本的角色因此不会卡）。
+            Label {
+                Layout.fillWidth: true
+                text: "以下为测试功能"
+            }
             ColumnLayout {
                 id: extraForm
                 Layout.fillWidth: true
@@ -171,13 +210,23 @@ Item {
                 spacing: 0
                 clip: true
                 property bool expanded: false
+                // 只在展开/收起时允许高度动画；输入导致的内容高度变化直接生效
+                property bool animateExtraHeight: false
 
                 Layout.preferredHeight: expanded ? advancedLoader.implicitHeight : 0
                 Behavior on Layout.preferredHeight {
+                    enabled: extraForm.animateExtraHeight
                     NumberAnimation {
                         duration: Theme.durationBase
                         easing.type: Theme.easingOut
                     }
+                }
+
+                Timer {
+                    id: extraHeightTimer
+                    interval: Theme.durationBase + 32
+                    repeat: false
+                    onTriggered: extraForm.animateExtraHeight = false
                 }
 
                 Loader {
@@ -205,48 +254,21 @@ Item {
 
             Repeater {
                 model: [
-                    { field: "personality", label: "性格特征", height: Theme.controlLg * 2.5 },
-                    { field: "scenario", label: "对话场景设定", height: Theme.controlLg * 2.5 },
-                    { field: "exampleDialogue", label: "示例对话", height: Theme.controlLg * 4 },
-                    { field: "systemPrompt", label: "角色专属系统提示词", height: Theme.controlLg * 3 }
+                    { field: "personality", label: "性格特征", maxLines: 4 },
+                    { field: "scenario", label: "对话场景设定", maxLines: 4 },
+                    { field: "exampleDialogue", label: "示例对话", maxLines: 6 },
+                    { field: "systemPrompt", label: "角色专属系统提示词", maxLines: 4 }
                 ]
 
-                ColumnLayout {
+                LongTextField {
                     required property var modelData
                     Layout.fillWidth: true
-                    spacing: Theme.spaceXs
-
-                    Label {
-                        text: modelData.label
-                        font.pixelSize: Theme.fontBodySm
-                        font.family: Theme.fontFamily
-                        color: Theme.textSecondary
-                    }
-
-                    ScrollView {
-                        id: advancedFieldScroll
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: modelData.height
-                        contentWidth: availableWidth
-                        clip: true
-                        ScrollBar.vertical.policy: ScrollBar.AsNeeded
-
-                        TextArea {
-                            // 内层滚动条同样预留右侧空间，避免遮住文字
-                            width: advancedFieldScroll.availableWidth - Theme.spaceMd
-                            wrapMode: Text.WordWrap
-                            textFormat: TextEdit.PlainText
-                            font.pixelSize: Theme.fontBody
-                            font.family: Theme.fontFamily
-                            color: Theme.textPrimary
-                            text: root.editingCharacter
-                                  ? (root.editingCharacter[modelData.field] || "") : ""
-                            onTextChanged: {
-                                if (activeFocus)
-                                    root.commit(modelData.field, text)
-                            }
-                        }
-                    }
+                    recordId: root.editingCharacter ? root.editingCharacter.id : ""
+                    label: modelData.label
+                    maxLines: modelData.maxLines
+                    content: root.editingCharacter
+                             ? (root.editingCharacter[modelData.field] || "") : ""
+                    onEdited: (value) => root.commit(modelData.field, value)
                 }
             }
 
@@ -270,6 +292,14 @@ Item {
     }
 
     // ========== 对话框 ==========
+    FileDialog {
+        id: avatarDialog
+        title: "选择角色头像"
+        nameFilters: ["图片文件 (*.png *.jpg *.jpeg *.webp *.bmp)"]
+        fileMode: FileDialog.OpenFile
+        onAccepted: CharacterViewModel.updateAvatar(selectedFile)
+    }
+
     ConfirmDialog {
         id: characterDeleteDialog
         title: "确认删除"

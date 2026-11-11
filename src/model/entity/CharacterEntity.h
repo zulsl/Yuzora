@@ -72,6 +72,7 @@ public:
     Q_PROPERTY(QStringList tags MEMBER tags)
     Q_PROPERTY(QString systemPrompt MEMBER systemPrompt)
     Q_PROPERTY(QString postHistoryInstructions MEMBER postHistoryInstructions)
+    Q_PROPERTY(QString avatarPath MEMBER avatarPath)
 
 };
 Q_DECLARE_METATYPE(CharacterEntity)
