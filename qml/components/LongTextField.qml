@@ -12,8 +12,8 @@ import QtQuick.Layouts
 //   - 文本长度 > 阈值：只渲染**只读预览**（截断到 previewLength 字），
 //     点"编辑全文"才创建 TextArea 承载全文 —— 排版成本推迟到用户真正要改的时候。
 //
-// 尺寸：空内容一行高（Theme.controlMd），随内容自然增长，
-//       达到 maxLines 后封顶并在内部滚动。
+// 尺寸：最低 1 行、最高 10 行，近似行高即可，随内容自然增长；
+//       超过上限后在内部滚动。
 //
 // 回写：编辑时通过 edited(value) 交出最新文本，由使用方决定怎么存。
 Item {
@@ -22,8 +22,8 @@ Item {
     property string label: ""
     property string content: ""
     property string placeholder: ""
-    // 最大自然文本行数；空内容时仍保持一行高
-    property int maxLines: 8
+    // 上限 10 行；外部传更小的值时仍可收紧
+    property int maxLines: 10
     // 切换记录时用它判断"换人了"，避免编辑态残留
     // （不能用 content 判断：用户打字时 content 也在变）
     property string recordId: ""
@@ -35,11 +35,17 @@ Item {
     // 当前是否显示全文编辑器：短文本始终可编辑；长文本要用户点"编辑全文"
     readonly property bool showEditor: editing || !isLong
 
-    // 自然行高与高度上限
-    readonly property real lineHeight: fontMetrics.height
-    readonly property real minHeight: Theme.controlMd
-    readonly property real maxHeight: Math.max(minHeight,
-                         lineHeight * maxLines + area.topPadding + area.bottomPadding)
+    // 近似行高：只需要一个稳定值，不追求与 TextArea 逐像素一致。
+    readonly property real lineHeight:
+        Math.max(1, Math.ceil(fontMetrics.lineSpacing))
+    readonly property real textPadding: area.topPadding + area.bottomPadding
+    readonly property real minHeight: lineHeight + textPadding
+    readonly property real maxHeight:
+        lineHeight * Math.max(1, Math.min(maxLines, 10)) + textPadding
+    readonly property real editorHeight:
+        Math.min(maxHeight,
+                 Math.max(minHeight, area.contentHeight + textPadding))
+
 
     // 用户编辑了文本
     signal edited(string value)
@@ -98,11 +104,14 @@ Item {
 
         // ---------- 预览态（仅超长文本）----------
         Rectangle {
+            id: previewBorder
             visible: !root.showEditor
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(root.maxHeight,
-                Math.max(root.minHeight,
-                         previewText.contentHeight + Theme.spaceSm * 2))
+            Layout.preferredHeight:
+                Math.min(root.maxHeight,
+                    Math.max(root.minHeight,
+                             previewText.contentHeight
+                             + Theme.spaceSm * 2 + 2))
             radius: Theme.radiusSm
             color: Theme.bgSurfaceVariant
             border.width: 1
@@ -130,9 +139,7 @@ Item {
             id: editorScroll
             visible: root.showEditor
             Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(root.maxHeight,
-                Math.max(root.minHeight,
-                         area.contentHeight + area.topPadding + area.bottomPadding))
+            Layout.preferredHeight: root.editorHeight
             contentWidth: availableWidth
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded

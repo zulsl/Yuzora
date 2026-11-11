@@ -17,16 +17,11 @@ Item {
     implicitWidth: 480
     implicitHeight: 600
 
-    property characterEntity editingCharacter: CharacterViewModel.currentCharacter
-
     signal exportRequested()
-    signal bookRequested()
 
-    // 统一回写：只在用户正在编辑该字段时写回，避免模型刷新把编辑内容冲掉
-    function commit(field, value) {
-        if (!editingCharacter) return
-        if (editingCharacter[field] === value) return
-        editingCharacter[field] = value
+    function fieldValue(field) {
+        const draft = CharacterViewModel.characterDraft
+        return draft ? draft.fieldValue(field) : ""
     }
 
     ScrollView {
@@ -56,7 +51,7 @@ Item {
                 }
 
                 IconButton {
-                    tip: "角色世界书"
+                    tip: "角色世界书绑定"
                     icon.source: "qrc:/icons/res/main_page/book-2.svg"
                     onClicked: characterBookDialog.open()
                 }
@@ -78,8 +73,7 @@ Item {
                     icon.source: "qrc:/icons/res/save.svg"
                     enabled: CharacterViewModel.hasSelection
                     onClicked: {
-                        CharacterViewModel.saveCurrentCharacter(root.editingCharacter)
-                        Ui.toast("角色已保存", false)
+                        CharacterViewModel.saveCharacterDraft()
                     }
                 }
             }
@@ -100,7 +94,7 @@ Item {
                     anchors.top: parent.top
                     anchors.margins: Theme.spaceMd
                     height: implicitHeight
-                    spacing: Theme.spaceMd
+                    spacing: Theme.spaceLg
 
                     Item {
                         Layout.preferredWidth: Theme.avatarLg
@@ -111,9 +105,8 @@ Item {
                             anchors.fill: parent
                             size: Theme.avatarLg
                             source: CharacterViewModel.currentAvatarUrl
-                            fallbackText: root.editingCharacter
-                                          && root.editingCharacter.name
-                                          ? root.editingCharacter.name.charAt(0) : ""
+                            fallbackText: root.fieldValue("name").length > 0
+                                          ? root.fieldValue("name").charAt(0) : ""
                         }
 
                         CameraMask{
@@ -126,8 +119,11 @@ Item {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
                         placeholderText: "角色名称"
-                        text: root.editingCharacter ? (root.editingCharacter.name || "") : ""
-                        onTextChanged: if (activeFocus) root.commit("name", text)
+                        // 强类型草稿：QML 直接读写 typed property，setter 负责发通知
+                        text: CharacterViewModel.characterDraft
+                              ? CharacterViewModel.characterDraft.name : ""
+                        onTextChanged: if (activeFocus && CharacterViewModel.characterDraft)
+                            CharacterViewModel.characterDraft.name = text
                     }
                 }
             }
@@ -137,7 +133,6 @@ Item {
                 model: [
                     { field: "description", label: "角色描述（系统提示词）", hint: "", maxLines: 8 },
                     { field: "firstMessage", label: "初始开场白", hint: "", maxLines: 8 },
-                    { field: "creatorNotes", label: "作者备注", hint: "", maxLines: 4 }
                 ]
 
                 // 超过阈值的文本会退化为"只读预览 + 点开编辑"，
@@ -145,23 +140,22 @@ Item {
                 LongTextField {
                     required property var modelData
                     Layout.fillWidth: true
-                    recordId: root.editingCharacter ? root.editingCharacter.id : ""
+                    recordId: root.fieldValue("id")
                     label: modelData.label
                     placeholder: modelData.hint
                     maxLines: modelData.maxLines
-                    content: root.editingCharacter
-                             ? (root.editingCharacter[modelData.field] || "") : ""
-                    onEdited: (value) => root.commit(modelData.field, value)
+                    content: root.fieldValue(modelData.field)
+                    onEdited: (value) => CharacterViewModel.setCharacterDraftField(modelData.field, value)
                 }
             }
 
             // 备选开场白：一条一个 ListView 项，支持折叠和确认删除
             AlternateGreetingsList {
                 Layout.fillWidth: true
-                recordId: root.editingCharacter ? root.editingCharacter.id : ""
-                greetings: root.editingCharacter
-                           ? (root.editingCharacter.alternateGreetings || []) : []
-                onGreetingsEdited: (values) => root.commit("alternateGreetings", values)
+                recordId: root.fieldValue("id")
+                greetings: CharacterViewModel.characterDraft
+                           ? (CharacterViewModel.characterDraft.alternateGreetings || []) : []
+                onGreetingsEdited: (values) => CharacterViewModel.setCharacterDraftField("alternateGreetings", values)
             }
 
             // ========== 其他字段 ==========
@@ -171,18 +165,29 @@ Item {
                     Layout.fillWidth: true
                     implicitHeight: Theme.controlMd
                     placeholderText: "作者"
-                    text: root.editingCharacter ? (root.editingCharacter.creator || "") : ""
-                    onTextChanged: if (activeFocus) root.commit("creator", text)
+                    text: root.fieldValue("creator")
+                    onTextChanged: if (activeFocus) CharacterViewModel.setCharacterDraftField("creator", text)
                 }
                 TextField {
                     Layout.preferredWidth: Theme.controlMd * 3
                     implicitHeight: Theme.controlMd
                     placeholderText: "版本号"
-                    text: root.editingCharacter ? (root.editingCharacter.characterVersion || "") : ""
-                    onTextChanged: if (activeFocus) root.commit("characterVersion", text)
+                    text: root.fieldValue("characterVersion")
+                    onTextChanged: if (activeFocus) CharacterViewModel.setCharacterDraftField("characterVersion", text)
                 }
             }
-
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 100
+                TextArea {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 60
+                    placeholderText: "作者备注(不进提示词)"
+                    text: root.fieldValue("creatorNotes")
+                    onTextChanged: if (activeFocus) CharacterViewModel.setCharacterDraftField("creatorNotes", text)
+                    wrapMode: Text.WordWrap
+                }
+            }
 
             // ========== 高级定义 ==========
             AppButton {
@@ -263,12 +268,11 @@ Item {
                 LongTextField {
                     required property var modelData
                     Layout.fillWidth: true
-                    recordId: root.editingCharacter ? root.editingCharacter.id : ""
+                    recordId: root.fieldValue("id")
                     label: modelData.label
                     maxLines: modelData.maxLines
-                    content: root.editingCharacter
-                             ? (root.editingCharacter[modelData.field] || "") : ""
-                    onEdited: (value) => root.commit(modelData.field, value)
+                    content: root.fieldValue(modelData.field)
+                    onEdited: (value) => CharacterViewModel.setCharacterDraftField(modelData.field, value)
                 }
             }
 
@@ -278,11 +282,10 @@ Item {
                     Layout.fillWidth: true
                     implicitHeight: Theme.controlMd
                     placeholderText: "英文逗号分隔"
-                    text: root.editingCharacter
-                          ? (root.editingCharacter.tags || []).join(", ") : ""
+                    text: (root.fieldValue("tags") || []).join(", ")
                     onTextChanged: {
                         if (!activeFocus) return
-                        root.commit("tags",
+                        CharacterViewModel.setCharacterDraftField("tags",
                                     text.split(",").map(t => t.trim())
                                         .filter(t => t.length > 0))
                     }
@@ -309,63 +312,9 @@ Item {
         onConfirmed: CharacterViewModel.deleteCurrentCharacter()
     }
 
-    Dialog {
+    // 世界书绑定管理：解绑 / 无绑定时挑一本。
+    // 逻辑整体抽到独立文件（表单已接近 300 行上限），绑定写草稿、随「保存」提交。
+    CharacterBookDialog {
         id: characterBookDialog
-        title: "角色世界书"
-        modal: true
-        anchors.centerIn: Overlay.overlay
-        width: Math.min(parent ? parent.width - Theme.spaceXl * 2 : 360, 420)
-        padding: Theme.spaceLg
-
-        background: Rectangle {
-            color: Theme.bgElevated
-            radius: Theme.radiusMd
-            border.width: 1
-            border.color: Theme.borderDefault
-        }
-
-        contentItem: ColumnLayout {
-            spacing: Theme.spaceSm
-
-            Label {
-                Layout.fillWidth: true
-                text: "使用该角色聊天时会自动启用以下世界书"
-                wrapMode: Text.WordWrap
-                font.pixelSize: Theme.fontBody
-                font.family: Theme.fontFamily
-                color: Theme.textPrimary
-            }
-
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: Theme.controlLg
-                radius: Theme.radiusSm
-                color: Theme.bgSurfaceVariant
-                border.width: 1
-                border.color: Theme.borderDefault
-
-                Label {
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.spaceMd
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: CharacterViewModel.characterBookName
-                    font.pixelSize: Theme.fontBody
-                    font.family: Theme.fontFamily
-                    color: Theme.textPrimary
-                    elide: Text.ElideRight
-                }
-            }
-        }
-
-        footer: Item {
-            implicitHeight: Theme.touchTarget + Theme.spaceSm
-            AppButton {
-                anchors.right: parent.right
-                anchors.rightMargin: Theme.spaceLg
-                anchors.verticalCenter: parent.verticalCenter
-                text: "关闭"
-                onClicked: characterBookDialog.close()
-            }
-        }
     }
 }

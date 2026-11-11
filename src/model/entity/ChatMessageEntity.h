@@ -11,7 +11,7 @@
 struct ChatMessageEntity {
     QString id;
     QString sessionId;                                      //所属会话id
-    GlobalConstants::MessageType type;                      //聊天消息类型
+    GlobalConstants::MessageType type = GlobalConstants::MessageType::System; //聊天消息类型
     GlobalConstants::MessageGenerationStatus status
         = GlobalConstants::MessageGenerationStatus::Normal; //消息生成状态
     QString content;                                        //内容

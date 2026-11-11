@@ -55,20 +55,18 @@ qt_add_qml_module(${PROJECT_NAME}
         src/base/ExceptionHandler.h
         src/base/GlobalConstants.cpp
         src/base/GlobalConstants.h src/base/Utils.cpp
-        src/base/Utils.h
-        src/crossplatform/DeviceHelper.cpp
+        src/base/Utils.h        src/crossplatform/DeviceHelper.cpp
         src/crossplatform/DeviceHelper.h
         src/model/DatabaseManager.cpp src/model/DatabaseManager.h
-        src/viewmodel/ApiConfigViewModel.h src/viewmodel/CharacterViewModel.h src/viewmodel/ChatViewModel.h src/viewmodel/CompletionPresetViewModel.h src/viewmodel/SettingsViewModel.h src/viewmodel/WorldInfoViewModel.h src/viewmodel/WorldInfoEntryViewModel.h
+        src/model/ApplicationBootstrap.cpp src/model/ApplicationBootstrap.h
+        src/viewmodel/ApiConfigViewModel.h src/viewmodel/CharacterViewModel.h src/viewmodel/CharacterDraft.h src/viewmodel/ChatViewModel.h src/viewmodel/CompletionPresetViewModel.h src/viewmodel/CompletionPresetDraft.h src/viewmodel/SettingsViewModel.h src/viewmodel/WorldInfoViewModel.h src/viewmodel/WorldInfoEntryViewModel.h
         src/model/dao/CharacterDao.h src/model/dao/ChatMessageDao.h src/model/dao/ChatSessionDao.h src/model/dao/CompletionPresetDao.h src/model/dao/SettingsDao.h src/model/dao/VectorMemoryDao.h src/model/dao/WorldInfoBookDao.h
         src/model/network/BaseApiClient.cpp src/model/network/BaseApiClient.h src/model/network/ClaudeApiClient.cpp src/model/network/ClaudeApiClient.h src/model/network/DeepSeekApiClient.cpp src/model/network/DeepSeekApiClient.h src/model/network/DoubaoApiClient.cpp src/model/network/DoubaoApiClient.h src/model/network/GeminiApiClient.cpp src/model/network/GeminiApiClient.h src/model/network/ModelFactory.cpp src/model/network/ModelFactory.h
-        src/model/Repository/ICharacterRepository.h src/model/Repository/IChatRepository.h src/model/Repository/ICompletionPresetRepository.h
         src/model/service/CharacterCardParser.h src/model/service/ChatService.h src/model/service/MemoryService.h src/model/service/WorldInfoMatcher.h
-        src/model/dao/CharacterDao.cpp src/model/dao/ChatMessageDao.cpp src/model/dao/ChatSessionDao.cpp src/model/dao/CompletionPresetDao.cpp src/model/dao/SettingsDao.cpp src/model/dao/VectorMemoryDao.cpp src/model/dao/WorldInfoBookDao.cpp
         src/model/list/CharacterListModel.h src/model/list/ChatMessageListModel.h
+        src/model/dao/CharacterDao.cpp src/model/dao/ChatMessageDao.cpp src/model/dao/ChatSessionDao.cpp src/model/dao/CompletionPresetDao.cpp src/model/dao/SettingsDao.cpp src/model/dao/VectorMemoryDao.cpp src/model/dao/WorldInfoBookDao.cpp
         src/model/service/CharacterCardParser.cpp src/model/service/ChatService.cpp src/model/service/MemoryService.cpp src/model/service/WorldInfoMatcher.cpp
-        src/test/Net_test_VM.cpp src/test/Net_test_VM.h
-        src/viewmodel/ApiConfigViewModel.cpp src/viewmodel/CharacterViewModel.cpp src/viewmodel/ChatViewModel.cpp src/viewmodel/CompletionPresetViewModel.cpp src/viewmodel/SettingsViewModel.cpp src/viewmodel/WorldInfoViewModel.cpp src/viewmodel/WorldInfoEntryViewModel.cpp
+        src/viewmodel/ApiConfigViewModel.cpp src/viewmodel/CharacterViewModel.cpp src/viewmodel/CharacterDraft.cpp src/viewmodel/ChatViewModel.cpp src/viewmodel/CompletionPresetViewModel.cpp src/viewmodel/CompletionPresetDraft.cpp src/viewmodel/SettingsViewModel.cpp src/viewmodel/WorldInfoViewModel.cpp src/viewmodel/WorldInfoEntryViewModel.cpp
         src/model/list/CharacterListModel.cpp src/model/list/ChatMessageListModel.cpp
         src/model/list/ChatMessageItemModel.cpp src/model/list/ChatMessageItemModel.h
         src/model/dao/ApiConfigDao.h src/model/dao/ApiConfigDao.cpp
@@ -76,12 +74,15 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/list/ApiConfigListModel.h src/model/list/ApiConfigListModel.cpp
         src/model/network/OpenAICompatibleApiClient.h src/model/network/OpenAICompatibleApiClient.cpp
         src/model/dao/AbstractDao.h src/model/dao/AbstractDao.cpp
+        src/model/dao/IConnectionProvider.h
+        src/model/dao/ConnectionProviderRegistry.cpp src/model/dao/ConnectionProviderRegistry.h
         src/model/dao/BaseDao.h
         src/model/service/CharacterService.h src/model/service/CharacterService.cpp
         src/model/list/CharacterItemViewModel.cpp src/model/list/CharacterItemViewModel.h
         src/model/service/CompletionPresetService.h src/model/service/CompletionPresetService.cpp
         src/model/network/ChatMessage.h src/model/network/ChatMessage.cpp
         src/model/service/SettingsService.h src/model/service/SettingsService.cpp
+        src/model/service/StorageService.h src/model/service/StorageService.cpp
         src/model/service/WorldInfoService.h src/model/service/WorldInfoService.cpp
         src/model/list/WorldInfoBookListModel.h src/model/list/WorldInfoBookListModel.cpp
         src/model/list/WorldInfoEntryListModel.h src/model/list/WorldInfoEntryListModel.cpp
@@ -90,7 +91,7 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/entity/ApiConfigEntity.h src/model/entity/CharacterEntity.h src/model/entity/ChatMessageEntity.h src/model/entity/ChatSessionEntity.h src/model/entity/CompletionPresetEntity.h src/model/entity/PromptEntity.h src/model/entity/SettingsEntity.h src/model/entity/VectorMemoryEntity.h src/model/entity/WorldInfoBookEntity.h src/model/entity/WorldInfoEntryEntity.h
         src/model/service/prompt/PromptBuilder.cpp src/model/service/prompt/PromptBuilder.h
         src/model/list/preset/PresetPromptListModel.cpp src/model/list/preset/PresetPromptListModel.h
-        src/model/list/preset/PresetListModel.cpp src/model/list/preset/PresetListModel.h src/model/list/preset/PresetPromptListModel.cpp src/model/list/preset/PresetPromptListModel.h
+        src/model/list/preset/PresetListModel.cpp src/model/list/preset/PresetListModel.h
         src/model/dao/PromptDao.h src/model/dao/PromptDao.cpp
         src/base/ScopeTimer.h src/base/ScopeTimer.cpp
         src/model/dao/WorldInfoEntryDao.h src/model/dao/WorldInfoEntryDao.cpp
@@ -118,6 +119,7 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/components/ExpandableRow.qml
         qml/components/CameraMask.qml
         qml/pages/character_page/CharacterDetailForm.qml
+        qml/pages/character_page/CharacterBookDialog.qml
         qml/pages/character_page/AlternateGreetingsList.qml
         qml/pages/character_page/CharacterListPanel.qml
         qml/pages/character_page/CharacterPage.qml
@@ -138,6 +140,9 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/layouts/PageScaffold.qml
         qml/layouts/AdaptiveSplit.qml
         qml/layouts/MasterDetailStack.qml
+        qml/layouts/NotificationBridge.qml
+        qml/layouts/PageHost.qml
+        qml/layouts/MasterDetailPage.qml
         qml/layouts/NavigationHost.qml
         qml/layouts/NavigationPanel.qml
         qml/pages/worldInfo_page/BookEntryListView.qml
@@ -168,3 +173,8 @@ install(TARGETS Yuzora
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+
+include(CTest)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()

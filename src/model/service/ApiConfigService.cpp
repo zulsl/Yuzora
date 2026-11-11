@@ -16,11 +16,20 @@ ApiConfigService::ApiConfigService(QObject *parent)
     : QObject(parent)
     , m_dao(new ApiConfigDao(this))
 {
-    // 首次启动初始化内置预设配置
-    initBuiltinConfigs();
+}
+
+ApiConfigService::ApiConfigService(ApiConfigDao* dao, QObject* parent)
+    : QObject(parent)
+    , m_dao(dao ? dao : new ApiConfigDao(this))
+{
 }
 
 ApiConfigService::~ApiConfigService() = default;
+
+void ApiConfigService::ensureSeedData()
+{
+    initBuiltinConfigs();
+}
 
 // ==================== 列表与查询 ====================
 QList<ApiConfigEntity> ApiConfigService::getAllConfigs()
@@ -54,11 +63,9 @@ QString ApiConfigService::createCustomConfig(const QString &name)
     config.createdAt = QDateTime::currentDateTime();
     config.updatedAt = QDateTime::currentDateTime();
 
-    bool success = m_dao->insert(config);
-    if (success) {
-        //成功
-    } else {
+    if (!m_dao->insert(config)) {
         emit operationError(QStringLiteral("创建配置失败，数据库写入错误"));
+        return {};
     }
     return config.id;
 }
@@ -117,50 +124,7 @@ bool ApiConfigService::updateModelList(const QString &configId, const QStringLis
     return updateConfig(config);
 }
 
-// ==================== 连接测试 ====================
-void ApiConfigService::testConnection(const QString &configId)
-{
-    // ApiConfigEntity config = getConfigById(configId);
-    // if (config.id.isEmpty()) {
-    //     emit testFailed(configId, QStringLiteral("配置不存在"));
-    //     return;
-    // }
-    // if (config.baseDomain.isEmpty() || config.apiPath.isEmpty()) {
-    //     emit testFailed(configId, QStringLiteral("请先填写完整的 API 域名与接口路径"));
-    //     return;
-    // }
-
-    // // 创建临时客户端，测试完成后自动销毁
-    // OpenAICompatibleApiClient* testClient = new OpenAICompatibleApiClient(this);
-    // testClient->loadConfig(config);
-
-    // // 构造极简测试请求，max_tokens=1 快速返回
-    // QJsonArray testMessages;
-    // QJsonObject testMsg;
-    // testMsg["role"] = "user";
-    // testMsg["content"] = "hi";
-    // testMessages.append(testMsg);
-
-    // ModelConfig testCfg;
-    // testCfg.modelName = config.availableModels.isEmpty() ? QString() : config.availableModels.first();
-    // testCfg.maxResponseToken = 1;
-    // testCfg.stream = false;
-
-    // connect(testClient, &OpenAICompatibleApiClient::completionFinished,
-    //         this, [this, configId, testClient](const QString&) {
-    //             emit testSuccess(configId);
-    //             testClient->deleteLater();
-    //         });
-
-    // connect(testClient, &OpenAICompatibleApiClient::requestFailed,
-    //         this, [this, configId, testClient](const QString& error) {
-    //             emit testFailed(configId, error);
-    //             testClient->deleteLater();
-    //         });
-
-    // testClient->sendChatCompletion(testMessages, testCfg);
-}
-
+// ==================== 模型列表 ====================
 void ApiConfigService::fetchModelList(const QString &configId)
 {
     ApiConfigEntity config = getConfigById(configId);

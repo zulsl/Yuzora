@@ -7,24 +7,21 @@ import Yuzora 1.0
 // 响应式策略：差异大 → Loader
 //   宽窗口：AdaptiveSplit 1:3（预设列表 | 编辑表单）
 //   窄窗口：MasterDetailStack（列表 → 编辑页）
-PageScaffold {
+MasterDetailPage {
     id: root
 
     readonly property bool compactDetailVisible: layoutLoader.item
                                                 ? layoutLoader.item.detailShown === true
                                                 : false
 
-    title: compactDetailVisible ? "预设编辑" : "对话预设"
-    leftIconSource: compactDetailVisible
-                    ? "qrc:/icons/res/arrow-narrow-left.svg"
-                    : "qrc:/icons/res/menu.svg"
-    contentPadding: Theme.spaceSm
-    onLeftClicked: {
-        if (compactDetailVisible && layoutLoader.item)
+    listTitle: "对话预设"
+    detailTitle: "预设编辑"
+    detailVisible: compactDetailVisible
+    onBackRequested: {
+        if (layoutLoader.item)
             layoutLoader.item.hideDetail()
-        else
-            Ui.requestDrawer()
     }
+    contentPadding: Theme.spaceSm
 
     Loader {
         id: layoutLoader
@@ -115,13 +112,5 @@ PageScaffold {
         fileMode: FileDialog.SaveFile
         onAccepted: CompletionPresetViewModel.exportCurrent(
                         CompletionPresetViewModel.currentEditingPreset.id,selectedFile)
-    }
-
-    Connections {// 兼容旧接口
-        target: CompletionPresetViewModel
-        function onOperationError(message) { Ui.toast(message, true) }
-        function onOperationTip(message) { Ui.toast(message, false) }
-        function onImportSuccess(count) { Ui.toast("已导入 " + count + " 个预设", false) }
-        function onExportSuccess() { Ui.toast("导出成功", false) }
     }
 }

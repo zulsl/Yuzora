@@ -38,6 +38,10 @@ _Avoid_: Insertion, insert before
 
 ## Character
 
+**Character**:
+An AI persona profile that can be chatted with, made of a name, description, greetings and prompt fields.
+_Avoid_: persona, bot, agent
+
 **Long Text Field**:
 A multi-line character field that starts at one line, grows with its content, and scrolls internally after reaching its field-specific limit.
 _Avoid_: Text box, text area
@@ -49,3 +53,29 @@ _Avoid_: Max length, character limit
 **Alternate Greeting**:
 A variant opening message that can be selected instead of the character's first message; one character may have several.
 _Avoid_: Backup greeting, extra first message
+
+## World Info
+
+**World Info Book** (世界书文集):
+A named collection of World Info Entries; it is the unit of binding and of enabling.
+_Avoid_: 世界书, book, library, pack
+
+**World Info Entry** (世界书条目):
+A single piece of knowledge inside a World Info Book, carrying its own trigger rules; when a rule matches, its content is injected into the prompt.
+_Avoid_: entry card, rule, node
+
+**Enabled** (启用):
+Whether a World Info Book or a World Info Entry takes part in injection; it is a property of that item itself.
+_Avoid_: active, on, checked
+
+**Character Book Binding** (角色世界书绑定):
+The link between a Character and one World Info Book, marking the book that character's chats are meant to use. A character holds at most one binding; without one it is unbound.
+_Avoid_: association, mount, reference
+
+**Unbind** (解绑):
+Removing a Character Book Binding so the character becomes unbound. Unbinding neither deletes the World Info Book nor its entries.
+_Avoid_: remove, delete, disable
+
+**World Info Injection** (世界信息注入):
+The step before each generation that selects entries from World Info Books by their trigger rules and inserts them into the prompt context.
+_Avoid_: world book injection, RAG, retrieval

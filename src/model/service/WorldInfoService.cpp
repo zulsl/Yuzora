@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QSet>
 #include "ExceptionHandler.h"
 
 // ======================================
@@ -23,11 +24,35 @@ WorldInfoService::WorldInfoService(QObject* parent)
 {
 }
 
+WorldInfoService::WorldInfoService(WorldInfoBookDao* bookDao,
+                                   WorldInfoEntryDao* entryDao,
+                                   QObject* parent)
+    : QObject(parent)
+    , m_BookDao(bookDao ? bookDao : new WorldInfoBookDao(this))
+    , m_EntryDao(entryDao ? entryDao : new WorldInfoEntryDao(this))
+{
+}
+
 WorldInfoService::~WorldInfoService() = default;
 
 QList<WorldInfoEntryEntity> WorldInfoService::getEntryForEnabledBooks()
 {
-    return QList<WorldInfoEntryEntity>{};
+    QList<WorldInfoEntryEntity> result;
+
+    for (const WorldInfoBookEntity& book : m_BookDao->selectAll()) {
+        if (!book.isEnabled) {
+            continue;
+        }
+
+        const QList<WorldInfoEntryEntity> entries = m_EntryDao->selectEntriesByBookId(book.id);
+        for (const WorldInfoEntryEntity& entry : entries) {
+            if (entry.isEnabled) {
+                result.append(entry);
+            }
+        }
+    }
+
+    return result;
 }
 
 // ======================================
@@ -95,25 +120,25 @@ QString WorldInfoService::createBook(const QString& name, const QString& descrip
         return {};
     }
 
+    emit bookListChanged();
     return book.id;
 }
 
 bool WorldInfoService::updateBook(const WorldInfoBookEntity& book)
 {
-    // if (book.id.isEmpty() || book.name.trimmed().isEmpty()) {
-    //     emit operationError("文集ID和名称不能为空");
-    //     return false;
-    // }
+    if (book.id.isEmpty() || book.name.trimmed().isEmpty()) {
+        emit operationError("文集ID和名称不能为空");
+        return false;
+    }
 
-    // bool success = m_dao->updateBook(book);
-    // if (success) {
-    //     emit bookListChanged();
-    //     emit bookUpdated(book.id);
-    // } else {
-    //     emit operationError("更新文集失败");
-    // }
-    // return success;
-    return false;
+    if (!m_BookDao->update(book)) {
+        emit operationError("更新文集失败");
+        return false;
+    }
+
+    emit bookUpdated(book.id);
+    emit bookListChanged();
+    return true;
 }
 
 bool WorldInfoService::deleteBook(const QString& bookId)
@@ -127,6 +152,8 @@ bool WorldInfoService::deleteBook(const QString& bookId)
     if (!success) {
         THROW(OperationError, "删除文集失败");
     }
+
+    emit bookListChanged();
     return success;
 }
 
@@ -191,40 +218,37 @@ QList<WorldInfoEntryEntity> WorldInfoService::getEntriesByBook(const QString& bo
 
 QString WorldInfoService::createEntry(const QString& bookId, const QString& name)
 {
-    // if (bookId.isEmpty()) {
-    //     emit operationError("所属文集ID不能为空");
-    //     return {};
-    // }
-    // if (!m_dao->selectBookById(bookId).id.isEmpty()) {
-    //     emit operationError("所属文集不存在");
-    //     return {};
-    // }
+    if (bookId.isEmpty()) {
+        emit operationError("所属文集ID不能为空");
+        return {};
+    }
+    if (m_BookDao->selectById(bookId).id.isEmpty()) {
+        emit operationError("所属文集不存在");
+        return {};
+    }
 
-    // WorldInfoEntryEntity entry;
-    // entry.id = Utils::generateUuid();
-    // entry.bookId = bookId;
-    // entry.name = name.trimmed().isEmpty() ? "新条目" : name.trimmed();
-    // entry.content = "";
-    // entry.priority = 100;
-    // entry.depth = 4;
-    // entry.insertPosition = InsertPosition::AfterSystemPrompt;
-    // entry.probability = 100;
-    // entry.isEnabled = true;
-    // entry.isRecursive = false;
-    // entry.isCaseSensitive = false;
-    // entry.matchWholeWords = false;
-    // entry.useRegex = false;
-    // entry.isSelective = false;
+    WorldInfoEntryEntity entry;
+    entry.id = Utils::generateUuid();
+    entry.bookId = bookId;
+    entry.name = name.trimmed().isEmpty() ? QStringLiteral("新条目") : name.trimmed();
+    entry.content.clear();
+    entry.isEnabled = true;
+    entry.constant = false;
+    entry.vectorized = false;
+    entry.position = WorldInfoEntryEntity::BeforeChar;
+    entry.insertRole = GlobalConstants::MessageType::System;
+    entry.insertDepth = 4;
+    entry.sortOrder = 100;
+    entry.probability = 100;
+    entry.selective = true;
 
-    // QString id = m_dao->insertEntry(entry);
-    // if (id.isEmpty()) {
-    //     emit operationError("创建条目失败");
-    //     return {};
-    // }
+    if (!m_EntryDao->insert(entry)) {
+        emit operationError("创建条目失败");
+        return {};
+    }
 
-    // emit entryListChanged(bookId);
-    // return id;
-    return QString();
+    emit entryListChanged(bookId);
+    return entry.id;
 }
 
 bool WorldInfoService::updateEntry(const WorldInfoEntryEntity & entry)
@@ -246,115 +270,122 @@ bool WorldInfoService::updateEntry(const WorldInfoEntryEntity & entry)
 
 bool WorldInfoService::deleteEntry(const QString& entryId)
 {
-    // WorldInfoEntryEntity entry = m_dao->selectEntryById(entryId);
-    // if (entry.id.isEmpty()) {
-    //     emit operationError("条目不存在");
-    //     return false;
-    // }
+    const WorldInfoEntryEntity entry = m_EntryDao->selectById(entryId);
+    if (entry.id.isEmpty()) {
+        emit operationError("条目不存在");
+        return false;
+    }
 
-    // bool success = m_dao->removeEntry(entryId);
-    // if (success) {
-    //     emit entryListChanged(entry.bookId);
-    //     emit entryDeleted(entryId);
-    // } else {
-    //     emit operationError("删除条目失败");
-    // }
-    // return success;
-    return false;
+    if (!m_EntryDao->remove(entryId)) {
+        emit operationError("删除条目失败");
+        return false;
+    }
 
+    emit entryDeleted(entryId);
+    emit entryListChanged(entry.bookId);
+    return true;
 }
 
 bool WorldInfoService::toggleEntryEnabled(const QString& entryId)
 {
-    // WorldInfoEntryEntity entry = m_dao->selectEntryById(entryId);
-    // if (entry.id.isEmpty()) {
-    //     emit operationError("条目不存在");
-    //     return false;
-    // }
+    WorldInfoEntryEntity entry = m_EntryDao->selectById(entryId);
+    if (entry.id.isEmpty()) {
+        emit operationError("条目不存在");
+        return false;
+    }
 
-    // bool success = m_dao->setEntryEnabled(entryId, !entry.isEnabled);
-    // if (success) {
-    //     emit entryListChanged(entry.bookId);
-    //     emit entryUpdated(entryId);
-    // }
-    // return success;
-    return false;
+    entry.isEnabled = !entry.isEnabled;
+    if (!m_EntryDao->update(entry)) {
+        emit operationError("更新条目状态失败");
+        return false;
+    }
+
+    emit entryUpdated(entryId);
+    emit entryListChanged(entry.bookId);
+    return true;
 }
 
 bool WorldInfoService::moveEntryToBook(const QString& entryId, const QString& targetBookId)
 {
-    // WorldInfoEntryEntity entry = m_dao->selectEntryById(entryId);
-    // if (entry.id.isEmpty()) {
-    //     emit operationError("源条目不存在");
-    //     return false;
-    // }
-    // if (!m_dao->selectBookById(targetBookId).id.isEmpty()) {
-    //     emit operationError("目标文集不存在");
-    //     return false;
-    // }
-    // if (entry.bookId == targetBookId) {
-    //     return true; // 目标相同无需操作
-    // }
+    WorldInfoEntryEntity entry = m_EntryDao->selectById(entryId);
+    if (entry.id.isEmpty()) {
+        emit operationError("源条目不存在");
+        return false;
+    }
+    if (m_BookDao->selectById(targetBookId).id.isEmpty()) {
+        emit operationError("目标文集不存在");
+        return false;
+    }
+    if (entry.bookId == targetBookId) {
+        return true;
+    }
 
-    // QString oldBookId = entry.bookId;
-    // bool success = m_dao->moveEntry(entryId, targetBookId);
-    // if (success) {
-    //     emit entryListChanged(oldBookId);
-    //     emit entryListChanged(targetBookId);
-    // } else {
-    //     emit operationError("移动条目失败");
-    // }
-    // return success;
-    return false;
+    const QString oldBookId = entry.bookId;
+    entry.bookId = targetBookId;
+    if (!m_EntryDao->update(entry)) {
+        emit operationError("移动条目失败");
+        return false;
+    }
+
+    emit entryListChanged(oldBookId);
+    emit entryListChanged(targetBookId);
+    return true;
 }
 
 bool WorldInfoService::batchDeleteEntries(const QStringList& entryIds)
 {
-    // if (entryIds.isEmpty()) return false;
+    if (entryIds.isEmpty()) {
+        return true;
+    }
 
-    // // 收集涉及的文集ID，用于发送变更信号
-    // QSet<QString> affectedBooks;
-    // for (const QString& id : entryIds) {
-    //     WorldInfoEntryEntity entry = m_dao->selectEntryById(id);
-    //     if (!entry.id.isEmpty()) {
-    //         affectedBooks.insert(entry.bookId);
-    //     }
-    // }
+    QSet<QString> affectedBooks;
+    for (const QString& id : entryIds) {
+        const WorldInfoEntryEntity entry = m_EntryDao->selectById(id);
+        if (entry.id.isEmpty()) {
+            continue;
+        }
+        if (!m_EntryDao->remove(id)) {
+            emit operationError("批量删除条目失败");
+            return false;
+        }
+        affectedBooks.insert(entry.bookId);
+        emit entryDeleted(id);
+    }
 
-    // bool success = m_dao->batchRemoveEntries(entryIds);
-    // if (success) {
-    //     for (const QString& bookId : affectedBooks) {
-    //         emit entryListChanged(bookId);
-    //     }
-    // } else {
-    //     emit operationError("批量删除条目失败");
-    // }
-    // return success;
-    return false;
+    for (const QString& bookId : affectedBooks) {
+        emit entryListChanged(bookId);
+    }
+    return true;
 }
 
 bool WorldInfoService::batchToggleEntries(const QStringList& entryIds, bool enabled)
 {
-    // if (entryIds.isEmpty()) return false;
+    if (entryIds.isEmpty()) {
+        return true;
+    }
 
-    // QSet<QString> affectedBooks;
-    // for (const QString& id : entryIds) {
-    //     WorldInfoEntryEntity entry = m_dao->selectEntryById(id);
-    //     if (!entry.id.isEmpty()) {
-    //         affectedBooks.insert(entry.bookId);
-    //     }
-    // }
+    QSet<QString> affectedBooks;
+    for (const QString& id : entryIds) {
+        WorldInfoEntryEntity entry = m_EntryDao->selectById(id);
+        if (entry.id.isEmpty()) {
+            continue;
+        }
+        if (entry.isEnabled == enabled) {
+            continue;
+        }
+        entry.isEnabled = enabled;
+        if (!m_EntryDao->update(entry)) {
+            emit operationError("批量更新条目状态失败");
+            return false;
+        }
+        affectedBooks.insert(entry.bookId);
+        emit entryUpdated(id);
+    }
 
-    // bool success = m_dao->batchSetEntriesEnabled(entryIds, enabled);
-    // if (success) {
-    //     for (const QString& bookId : affectedBooks) {
-    //         emit entryListChanged(bookId);
-    //     }
-    // } else {
-    //     emit operationError("批量更新条目状态失败");
-    // }
-    // return success;
-    return false;
+    for (const QString& bookId : affectedBooks) {
+        emit entryListChanged(bookId);
+    }
+    return true;
 }
 
 
@@ -371,67 +402,83 @@ int WorldInfoService::importBookFromSillyTavern(const QString& filePath)
 
     QJsonObject bookData=doc.object().value("originalData").toObject();
 
-    importWorldBook(bookData);
+    const QString bookId = importWorldBook(bookData);
+    if (bookId.isEmpty()) {
+        return 0;
+    }
 
+    emit bookListChanged();
+    emit importSuccess(1);
     return 1;
 }
 
 bool WorldInfoService::exportBookToSillyTavern(const QString& bookId, const QString& savePath)
 {
-    // WorldInfoBookEntity book = m_dao->selectBookById(bookId);
-    // if (book.id.isEmpty()) {
-    //     emit operationError("文集不存在");
-    //     return false;
-    // }
+    const WorldInfoBookEntity book = m_BookDao->selectById(bookId);
+    if (book.id.isEmpty()) {
+        emit operationError("文集不存在");
+        return false;
+    }
 
-    // QList<WorldInfoEntryEntity> entries = m_dao->selectEntriesByBookId(bookId);
-    // QJsonObject stJson = bookToStJson(book, entries);
+    const QList<WorldInfoEntryEntity> entries = m_EntryDao->selectEntriesByBookId(bookId);
+    const QJsonObject stJson = bookToStJson(book, entries);
+    if (!Utils::writeJsonFile(savePath, QJsonDocument(stJson))) {
+        emit operationError("导出文件写入失败");
+        return false;
+    }
 
-    // if (!Utils::writeJsonFile(savePath, QJsonDocument(stJson))) {
-    //     emit operationError("导出文件写入失败");
-    //     return false;
-    // }
-    // emit exportSuccess();
-    // return true;
-    return false;
+    emit exportSuccess();
+    return true;
 }
 
 bool WorldInfoService::exportAllBooksToSillyTavern(const QString& savePath)
 {
-    // QList<WorldInfoBookEntity> books = m_dao->selectAllBooks();
-    // if (books.isEmpty()) {
-    //     emit operationError("无可导出的世界书");
-    //     return false;
-    // }
+    const QList<WorldInfoBookEntity> books = m_BookDao->selectAll();
+    if (books.isEmpty()) {
+        emit operationError("无可导出的世界书");
+        return false;
+    }
 
-    // QJsonArray arr;
-    // for (const auto& book : books) {
-    //     QList<WorldInfoEntryEntity> entries = m_dao->selectEntriesByBookId(book.id);
-    //     arr.append(bookToStJson(book, entries));
-    // }
+    QJsonArray arr;
+    for (const WorldInfoBookEntity& book : books) {
+        const QList<WorldInfoEntryEntity> entries = m_EntryDao->selectEntriesByBookId(book.id);
+        arr.append(bookToStJson(book, entries));
+    }
 
-    // if (!Utils::writeJsonFile(savePath, QJsonDocument(arr))) {
-    //     emit operationError("导出文件写入失败");
-    //     return false;
-    // }
-    // emit exportSuccess();
-    // return true;
-    return false;
+    if (!Utils::writeJsonFile(savePath, QJsonDocument(arr))) {
+        emit operationError("导出文件写入失败");
+        return false;
+    }
+
+    emit exportSuccess();
+    return true;
 }
 
 QString WorldInfoService::importWorldBook(QJsonObject &bookData)
 {
     //导入书
     WorldInfoBookEntity book = parseJsonToBook(bookData);
-    m_BookDao->insert(book);
+    if (book.name.isEmpty() || !m_BookDao->insert(book)) {
+        emit operationError("导入世界书失败");
+        return {};
+    }
+
     // 导入条目(json数组)
     QJsonArray entries = bookData.value("entries").toArray();
     for(const QJsonValue& e : entries)
     {
         if (!e.isObject()) continue;
         WorldInfoEntryEntity entry = parseJsonToEntry(e.toObject(), book.id);
-        m_EntryDao->insert(entry);
+        if (!m_EntryDao->insert(entry)) {
+            emit operationError("导入世界书条目失败");
+            // 回滚已插入的书，避免留下空壳
+            m_BookDao->remove(book.id);
+            return {};
+        }
     }
+
+    emit bookListChanged();
+
     return book.id;
 }
 
@@ -443,28 +490,32 @@ QJsonObject WorldInfoService::bookToStJson(
     const QList<WorldInfoEntryEntity>& entries)
 {
     QJsonObject obj;
-    // obj["name"] = book.name;
-    // obj["isEnabled"] = book.isEnabled;
+    obj["name"] = book.name;
+    obj["isEnabled"] = book.isEnabled;
 
-    // QJsonArray entriesArr;
-    // for (const auto& entry : entries) {
-    //     QJsonObject entryObj;
-    //     entryObj["name"] = entry.name;
-    //     entryObj["keys"] = QJsonArray::fromStringList(entry.keywords);
-    //     entryObj["secondary_keys"] = QJsonArray::fromStringList(entry.secondaryKeywords);
-    //     entryObj["content"] = entry.content;
-    //     entryObj["priority"] = entry.priority;
-    //     entryObj["probability"] = entry.probability;
-    //     entryObj["enabled"] = entry.isEnabled;
-    //     entryObj["recursive"] = entry.isRecursive;
-    //     entryObj["case_sensitive"] = entry.isCaseSensitive;
-    //     entryObj["match_whole_words"] = entry.matchWholeWords;
-    //     entryObj["use_regex"] = entry.useRegex;
-    //     entryObj["selective"] = entry.isSelective;
-    //     entryObj["extensions"] = Utils::variantMapToJsonObject(entry.extensions);
-    //     entriesArr.append(entryObj);
-    // }
-    // obj["entries"] = entriesArr;
+    QJsonArray entriesArr;
+    for (const WorldInfoEntryEntity& entry : entries) {
+        QJsonObject entryObj;
+        entryObj["name"] = entry.name;
+        entryObj["key"] = QJsonArray::fromStringList(entry.keywords);
+        entryObj["keysecondary"] = QJsonArray::fromStringList(entry.secondaryKeywords);
+        entryObj["comment"] = entry.name;
+        entryObj["content"] = entry.content;
+        entryObj["constant"] = entry.constant;
+        entryObj["vectorized"] = entry.vectorized;
+        entryObj["position"] = static_cast<int>(entry.position);
+        entryObj["role"] = static_cast<int>(entry.insertRole);
+        entryObj["order"] = entry.sortOrder;
+        entryObj["probability"] = entry.probability;
+        entryObj["selective"] = entry.selective;
+        entryObj["selectiveLogic"] = static_cast<int>(entry.selectiveLogic);
+        entryObj["scanDepth"] = entry.scanDepth;
+        entryObj["useGroupScoring"] = entry.useGroupScoring;
+        entryObj["automationId"] = entry.automationId;
+        entryObj["extensions"] = Utils::variantMapToJsonObject(entry.extensions);
+        entriesArr.append(entryObj);
+    }
+    obj["entries"] = entriesArr;
     return obj;
 }
 
@@ -474,8 +525,7 @@ WorldInfoBookEntity WorldInfoService::parseJsonToBook(const QJsonObject& json)
     WorldInfoBookEntity book;
     book.id = Utils::generateUuid();
     book.name = json.value("name").toString().trimmed();
-    // book.description = json.value("description").toString("").trimmed();
-    // book.isEnabled = json.value("isEnabled").toBool();
+    book.isEnabled = json.value("isEnabled").toBool(false);
     return book;
 }
 
@@ -492,6 +542,7 @@ WorldInfoEntryEntity WorldInfoService::parseJsonToEntry(const QJsonObject& json,
 
     entry.name = json.value("comment").toString("未命名条目").trimmed();
     entry.content = json.value("content").toString("");
+    entry.isEnabled = !json.value("disable").toBool(false);
 
     entry.constant = json.value("constant").toBool();
     entry.vectorized = json.value("vectorized").toBool();
@@ -500,8 +551,10 @@ WorldInfoEntryEntity WorldInfoService::parseJsonToEntry(const QJsonObject& json,
     entry.insertRole = role.isNull()
         ?GlobalConstants::MessageType::Other
         :static_cast<GlobalConstants::MessageType>(role.toInt());
+    entry.insertDepth = json.value("depth").toInt(4);
     entry.sortOrder = json.value("order").toInt();
-    entry.probability = json.value("probability").toInt();
+    entry.useProbability = json.value("useProbability").toBool(false);
+    entry.probability = json.value("probability").toInt(100);
 
     entry.selective = json.value("selective").toBool();
     entry.selectiveLogic = static_cast<WorldInfoEntryEntity::SelectiveLogic>(json.value("selectiveLogic").toInt());

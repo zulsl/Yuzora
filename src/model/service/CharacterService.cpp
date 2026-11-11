@@ -3,6 +3,7 @@
 #include "Utils.h"
 #include "AppException.h"
 #include "DatabaseManager.h"
+#include "WorldInfoService.h"
 #include <QDir>
 #include <QImage>
 #include <QJsonDocument>
@@ -20,8 +21,28 @@ CharacterService& CharacterService::instance()
 CharacterService::CharacterService(QObject* parent)
     : QObject(parent)
     , m_dao(new CharacterDao(this))
+    , m_worldInfoService(&WorldInfoService::instance())
 {
-    //添加预设角色
+}
+
+CharacterService::CharacterService(CharacterDao* dao, QObject* parent)
+    : CharacterService(dao, &WorldInfoService::instance(), parent)
+{
+}
+
+CharacterService::CharacterService(CharacterDao* dao,
+                                   WorldInfoService* worldInfoService,
+                                   QObject* parent)
+    : QObject(parent)
+    , m_dao(dao ? dao : new CharacterDao(this))
+    , m_worldInfoService(worldInfoService)
+{
+}
+
+CharacterService::~CharacterService() = default;
+
+void CharacterService::ensureSeedData()
+{
     initBuiltinCharacters();
 }
 
@@ -36,10 +57,7 @@ void CharacterService::initBuiltinCharacters()
     entity.createdAt=QDateTime::currentDateTime();
     entity.updatedAt=QDateTime::currentDateTime();
     createCharacter(entity);
-    emit characterListChanged();
 }
-
-CharacterService::~CharacterService() = default;
 
 // ==================== 查询类接口 ====================
 QList<CharacterEntity> CharacterService::getAllCharacters()
@@ -49,9 +67,11 @@ QList<CharacterEntity> CharacterService::getAllCharacters()
 
 QString CharacterService::getDefaultCharacterId()
 {
-    QList<CharacterEntity> list=m_dao->selectAll();
-    CharacterEntity item=list.first();
-    return item.id;
+    const QList<CharacterEntity> list = m_dao->selectAll();
+    if (list.isEmpty()) {
+        return {};
+    }
+    return list.first().id;
 }
 
 CharacterEntity CharacterService::getCharacterById(const QString& id)
@@ -281,10 +301,11 @@ QString CharacterService::importCharacterFromFile(const QString& filePath)
             }
         }
 
-        createCharacter(entity);
-
-        emit characterListChanged();
-        return entity.id;
+        const QString newId = createCharacter(entity);
+        if (newId.isEmpty()) {
+            return {};
+        }
+        return newId;
 
     } catch (const AppException& e) {
         emit operationError(e.getMessage());
@@ -470,7 +491,6 @@ QString CharacterService::saveAvatarFromImage(const QImage& image, const QString
     return fileName; // 返回相对路径
 }
 
-#include "WorldInfoService.h"
 void CharacterService::cleanupAvatarFile(const QString& relativePath)
 {
     if (relativePath.isEmpty()) return;
@@ -516,10 +536,14 @@ CharacterEntity CharacterService::parseCardDataToEntity(const QJsonObject& cardD
     //是否收藏
     entity.isFavorite = false;
 
-    //绑定世界书id
+    //导入并绑定世界书id
     QJsonObject characterBook = data.value("character_book").toObject();
-    QString bookId=WorldInfoService::instance().importWorldBook(characterBook);
-    entity.worldBookIds.append(bookId);
+    if (m_worldInfoService && !characterBook.isEmpty()) {
+        const QString bookId = m_worldInfoService->importWorldBook(characterBook);
+        if (!bookId.isEmpty()) {
+            entity.worldBookIds.append(bookId);
+        }
+    }
 
 
     // 扩展字段

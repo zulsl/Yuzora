@@ -7,6 +7,8 @@
 #include "dao/CharacterDao.h"
 #include "entity/CharacterEntity.h"
 
+class WorldInfoService;
+
 /**
  * @brief 角色管理业务服务层
  * 职责：业务逻辑封装、数据校验、导入导出流程、事务控制、关联资源管理
@@ -18,10 +20,19 @@ public:
     static CharacterService& instance();
     ~CharacterService() override;
 
+    // 测试/组合根可注入 DAO；生产仍使用 instance()。
+    explicit CharacterService(CharacterDao* dao, QObject* parent = nullptr);
+    // 测试可把世界书导入依赖设为 nullptr，角色卡导入时跳过世界书。
+    explicit CharacterService(CharacterDao* dao, WorldInfoService* worldInfoService,
+                              QObject* parent = nullptr);
+
     CharacterService(const CharacterService&) = delete;
     CharacterService& operator=(const CharacterService&) = delete;
     CharacterService(CharacterService&&) = delete;
     CharacterService& operator=(CharacterService&&) = delete;
+
+    // 由 ApplicationBootstrap 在数据库初始化后调用；构造函数不再写库。
+    void ensureSeedData();
 
     // ========== 查询类接口 ==========
     QList<CharacterEntity> getAllCharacters();
@@ -68,6 +79,7 @@ private:
     QJsonObject buildCardDataFromEntity(const CharacterEntity& entity);
 
     CharacterDao* m_dao = nullptr;
+    WorldInfoService* m_worldInfoService = nullptr;
 
 };
 

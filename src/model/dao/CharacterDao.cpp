@@ -15,7 +15,7 @@ CharacterDao::CharacterDao(QObject* parent)
 QList<CharacterEntity> CharacterDao::searchByName(const QString &keyword)
 {
     QList<CharacterEntity> result;
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = "SELECT * FROM characters WHERE name LIKE ? ORDER BY updated_at DESC";
@@ -35,7 +35,7 @@ QList<CharacterEntity> CharacterDao::searchByName(const QString &keyword)
 
 bool CharacterDao::updateAvatar(const QString &charId, const QString &avatarPath)
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     query.prepare("UPDATE characters SET avatar_path = ?, updated_at = ? WHERE id = ?");
@@ -65,7 +65,7 @@ QStringList CharacterDao::columnNames() const
     return {
         "id","name", "description","first_message","alternate_greetings",
         "creator_notes","creator","personality","scenario","example_dialogue",
-        "system_prompt","character_version","tags","card_format_version",
+        "system_prompt","post_history_instructions","character_version","tags","card_format_version",
         "avatar_path","world_book_ids","last_session_id",
         "is_favorite","extensions","created_at",
         "updated_at"
@@ -85,6 +85,7 @@ void CharacterDao::bindValues(QSqlQuery &query, const CharacterEntity &entity) c
     query.addBindValue(entity.scenario);
     query.addBindValue(entity.exampleDialogue);
     query.addBindValue(entity.systemPrompt);
+    query.addBindValue(entity.postHistoryInstructions);
     query.addBindValue(entity.characterVersion);
     query.addBindValue(Utils::stringListToJson(entity.tags));
     query.addBindValue(entity.cardFormatVersion);
@@ -111,6 +112,7 @@ CharacterEntity CharacterDao::parseFromQuery(const QSqlQuery &query) const
     entity.scenario=query.value("scenario").toString();
     entity.exampleDialogue = query.value("example_dialogue").toString();
     entity.systemPrompt = query.value("system_prompt").toString();
+    entity.postHistoryInstructions = query.value("post_history_instructions").toString();
     entity.characterVersion=query.value("character_version").toString();
     entity.tags=Utils::jsonToStringList(query.value("tags"));
     entity.cardFormatVersion=query.value("card_format_version").toInt();
@@ -138,7 +140,7 @@ CharacterEntity CharacterDao::parseFromQuery(const QSqlQuery &query) const
 // QList<CharacterEntity> CharacterDao::selectAll()
 // {
 //     QList<CharacterEntity> result;
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     const QString sql = QStringLiteral(R"(
@@ -187,7 +189,7 @@ CharacterEntity CharacterDao::parseFromQuery(const QSqlQuery &query) const
 // CharacterEntity CharacterDao::selectById(const QString& id)
 // {
 //     CharacterEntity entity;
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     const QString sql = QStringLiteral(R"(
@@ -235,7 +237,7 @@ CharacterEntity CharacterDao::parseFromQuery(const QSqlQuery &query) const
 
 // bool CharacterDao::insert(const CharacterEntity& character)
 // {
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     const QString sql = QStringLiteral(R"(
@@ -275,7 +277,7 @@ CharacterEntity CharacterDao::parseFromQuery(const QSqlQuery &query) const
 
 // bool CharacterDao::update(const CharacterEntity& character)
 // {
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     const QString sql = QStringLiteral(R"(
@@ -316,7 +318,7 @@ CharacterEntity CharacterDao::parseFromQuery(const QSqlQuery &query) const
 
 // bool CharacterDao::remove(const QString& id)
 // {
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     query.prepare("DELETE FROM characters WHERE id = :id");
@@ -327,7 +329,7 @@ CharacterEntity CharacterDao::parseFromQuery(const QSqlQuery &query) const
 
 // bool CharacterDao::exists(const QString& id)
 // {
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     query.prepare("SELECT COUNT(*) FROM characters WHERE id = :id");

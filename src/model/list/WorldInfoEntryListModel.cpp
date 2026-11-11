@@ -30,6 +30,7 @@ QVariant WorldInfoEntryListModel::data(const QModelIndex& index, int role) const
         case TriggerControlRole:    return calcTrigger(e);
         case InsertPositionRole:    return calcPositionIndex(e);
         case InsertDepthRole:       return e.insertDepth;
+        case ScanDepthRole:         return e.scanDepth;
         case SortOrderRole:         return e.sortOrder;
         case UseProbabilityRole:    return e.useProbability;
         case ProbabilityRole:       return e.probability;
@@ -46,75 +47,97 @@ bool WorldInfoEntryListModel::setData(const QModelIndex& index, const QVariant& 
     if (!index.isValid() || index.row() < 0 || index.row() >= m_entries.size())
         return false;
 
-    WorldInfoEntryEntity& e = m_entries[index.row()];
+    // 模型只保留 UI 状态（展开）可写；业务字段必须通过 ViewModel 命令更新。
+    if (role != ExpandedStateRole) {
+        return false;
+    }
 
-    switch (role)
-    {
-    // ========== 业务字段：改内存 + 通知外部落盘 ==========
+    WorldInfoEntryEntity& e = m_entries[index.row()];
+    const bool v = value.toBool();
+    const bool current = m_expandedIds.contains(e.id);
+    if (current == v) {
+        return false;
+    }
+
+    if (v) {
+        m_expandedIds.insert(e.id);
+    } else {
+        m_expandedIds.remove(e.id);
+    }
+    emit dataChanged(index, index, { ExpandedStateRole });
+    return true;
+}
+
+bool WorldInfoEntryListModel::updateField(const QString& id, int role, const QVariant& value)
+{
+    const int row = rowByIdInternal(id);
+    if (row < 0) {
+        return false;
+    }
+
+    WorldInfoEntryEntity& e = m_entries[row];
+    switch (role) {
     case NameRole: {
         const QString v = value.toString().trimmed();
         if (e.name == v) return false;
         e.name = v;
-        emit dataChanged(index, index, { NameRole});
-        return true;
+        break;
     }
     case ContentRole: {
         const QString v = value.toString();
         if (e.content == v) return false;
         e.content = v;
-        emit dataChanged(index, index, { ContentRole });
-        return true;
+        break;
     }
     case KeywordsRole: {
         const QStringList v = value.toStringList();
         if (e.keywords == v) return false;
         e.keywords = v;
-        emit dataChanged(index, index, { KeywordsRole });
-        return true;
+        break;
     }
     case SecondaryKeywordsRole: {
         const QStringList v = value.toStringList();
         if (e.secondaryKeywords == v) return false;
         e.secondaryKeywords = v;
-        emit dataChanged(index, index, { SecondaryKeywordsRole });
-        return true;
+        break;
     }
     case IsEnabledRole: {
         const bool v = value.toBool();
         if (e.isEnabled == v) return false;
         e.isEnabled = v;
-        emit dataChanged(index, index, { IsEnabledRole });
-        return true;
+        break;
     }
-    case TriggerControlRole:{
-        const bool idx = value.toInt();
-        parseTrigger(e,idx);
-        emit dataChanged(index, index, { TriggerControlRole });
-        return true;
+    case TriggerControlRole:
+        parseTrigger(e, value.toInt());
+        break;
+    case InsertPositionRole:
+        parsePositionIndex(e, value.toInt());
+        break;
+    case InsertDepthRole: {
+        const int v = value.toInt();
+        if (e.insertDepth == v) return false;
+        e.insertDepth = v;
+        break;
     }
-    case InsertPositionRole:{
-        const bool idx = value.toInt();
-        parsePositionIndex(e,idx);
-        emit dataChanged(index, index, { InsertPositionRole });
-        return true;
+    case ScanDepthRole: {
+        const int v = value.toInt();
+        if (e.scanDepth == v) return false;
+        e.scanDepth = v;
+        break;
     }
-    // ========== UI 状态：改内存，不通知外部落盘 ==========
-    case ExpandedStateRole: {
-        const bool v = value.toBool();
-        const bool current = m_expandedIds.contains(e.id);
-        if (current == v) return false;
-        if (v) m_expandedIds.insert(e.id);
-        else   m_expandedIds.remove(e.id);
-        emit dataChanged(index, index, { ExpandedStateRole });
-        //不发 entryFieldChanged，展开状态不落库
-        return true;
+    case SortOrderRole: {
+        const int v = value.toInt();
+        if (e.sortOrder == v) return false;
+        e.sortOrder = v;
+        break;
     }
     default:
         return false;
     }
 
-    updateEntry(e);
-    emit entryChanged(e);
+    const QModelIndex idx = index(row, 0);
+    emit dataChanged(idx, idx, { role });
+    return true;
 }
 
 Qt::ItemFlags WorldInfoEntryListModel::flags(const QModelIndex &index) const
@@ -135,6 +158,7 @@ QHash<int, QByteArray> WorldInfoEntryListModel::roleNames() const
     roles[TriggerControlRole]    = "triggerControl";
     roles[InsertPositionRole]    = "insertPosition";
     roles[InsertDepthRole]       = "insertDepth";
+    roles[ScanDepthRole]         = "scanDepth";
     roles[SortOrderRole]         = "sortOrder";
     roles[UseProbabilityRole]    = "useProbability";
     roles[ProbabilityRole]       = "probability";
@@ -332,14 +356,11 @@ int WorldInfoEntryListModel::calcPositionIndex(const WorldInfoEntryEntity& en)co
 
 int WorldInfoEntryListModel::calcTrigger(const WorldInfoEntryEntity &en)const
 {
-    int idx=0;
-    if(en.vectorized) idx=2;
-    if(en.constant){
-        idx=0;
-    }else{
-        idx=1;
-    }
-    return idx;
+    if (en.constant)
+        return 0;
+    if (en.vectorized)
+        return 2;
+    return 1;
 }
 
 void WorldInfoEntryListModel::parseTrigger(WorldInfoEntryEntity &e,int idx)

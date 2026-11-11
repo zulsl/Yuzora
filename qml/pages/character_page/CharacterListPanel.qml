@@ -71,9 +71,8 @@ Item {
 
                 // 单击只做选中（详情在右侧或推入新页）
                 onClicked: {
-                    CharacterViewModel.setCurrentIndex(index)
-                    CharacterViewModel.selectCharacter(rowDelegate.modelData.id)
-                    root.detailRequested()
+                    if (CharacterViewModel.requestSelectCharacter(rowDelegate.modelData.id))
+                        root.detailRequested()
                 }
 
                 contentItem: RowLayout {
@@ -98,16 +97,6 @@ Item {
                             color: Theme.textPrimary
                             elide: Text.ElideRight
                         }
-
-                        Label {
-                            Layout.fillWidth: true
-                            text: rowDelegate.modelData.lastUsedText || ""
-                            visible: text.length > 0
-                            font.pixelSize: Theme.fontCaption
-                            font.family: Theme.fontFamily
-                            color: Theme.textSecondary
-                            elide: Text.ElideRight
-                        }
                     }
 
                     IconButton {
@@ -115,9 +104,8 @@ Item {
                         compact: true
                         icon.source: "qrc:/icons/res/switch-3.svg"
                         onClicked: {
-                            CharacterViewModel.setCurrentIndex(rowDelegate.index)
-                            CharacterViewModel.selectCharacter(rowDelegate.modelData.id)
-                            CharacterViewModel.openSelectedCharChat()
+                            if (CharacterViewModel.requestSelectCharacter(rowDelegate.modelData.id))
+                                CharacterViewModel.openSelectedCharChat()
                         }
                     }
                 }
@@ -138,5 +126,20 @@ Item {
         visible: characterListView.count === 0
         text: "还没有角色"
         detail: "点击右上角的 + 新建，或导入角色卡"
+    }
+
+    Connections {
+        target: CharacterViewModel
+        function onUnsavedChanges() { unsavedDialog.open() }
+    }
+
+    ConfirmDialog {
+        id: unsavedDialog
+        title: "未保存的修改"
+        text: "当前角色有未保存的修改，切换后将丢失。"
+        acceptText: "丢弃并切换"
+        danger: true
+        onConfirmed: CharacterViewModel.confirmPendingCharacterSelection()
+        onDeclined: CharacterViewModel.cancelPendingCharacterSelection()
     }
 }

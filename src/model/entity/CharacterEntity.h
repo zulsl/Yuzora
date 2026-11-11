@@ -76,4 +76,36 @@ public:
 
 };
 Q_DECLARE_METATYPE(CharacterEntity)
+
+inline bool operator==(const CharacterEntity& a, const CharacterEntity& b)
+{
+    return a.id == b.id
+        && a.name == b.name
+        && a.description == b.description
+        && a.firstMessage == b.firstMessage
+        && a.alternateGreetings == b.alternateGreetings
+        && a.creatorNotes == b.creatorNotes
+        && a.creator == b.creator
+        && a.personality == b.personality
+        && a.scenario == b.scenario
+        && a.exampleDialogue == b.exampleDialogue
+        && a.characterVersion == b.characterVersion
+        && a.tags == b.tags
+        && a.systemPrompt == b.systemPrompt
+        && a.postHistoryInstructions == b.postHistoryInstructions
+        && a.cardFormatVersion == b.cardFormatVersion
+        && a.avatarPath == b.avatarPath
+        && a.worldBookIds == b.worldBookIds
+        && a.lastSessionId == b.lastSessionId
+        && a.isFavorite == b.isFavorite
+        && a.extensions == b.extensions
+        && a.createdAt == b.createdAt
+        && a.updatedAt == b.updatedAt;
+}
+
+inline bool operator!=(const CharacterEntity& a, const CharacterEntity& b)
+{
+    return !(a == b);
+}
+
 #endif // CHARACTERENTITY_H

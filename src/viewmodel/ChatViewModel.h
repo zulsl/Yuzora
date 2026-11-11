@@ -41,8 +41,14 @@ public:
     Q_PROPERTY(QString currentCharAvatarPath READ currentCharAvatarPath NOTIFY currentCharAvatarPathChanged FINAL)
     //当前会话标题
     Q_PROPERTY(QString currentSessionTitle READ currentSessionTitle NOTIFY currentSessionTitleChanged)
+    //当前会话 id（历史抽屉按 id 高亮）
+    Q_PROPERTY(QString currentSessionId READ currentSessionId NOTIFY currentSessionIdChanged)
+    //是否还有更早的历史消息
+    Q_PROPERTY(bool hasMoreHistory READ hasMoreHistory NOTIFY hasMoreHistoryChanged)
     //当前预设名称
     Q_PROPERTY(QString currentPresetName READ currentPresetName NOTIFY currentPresetChanged)
+    // Enter 是否发送；false 时 Ctrl+Enter 发送
+    Q_PROPERTY(bool sendWithEnter READ sendWithEnter NOTIFY sendWithEnterChanged)
     //聊天列表数据源
     Q_PROPERTY(ChatMessageListModel* messageModel READ messageModel CONSTANT)
     //历史会话数据源
@@ -55,7 +61,10 @@ public:
     bool isGenerating() const;//正在生成
     QString currentCharName() const;//角色名称
     QString currentSessionTitle() const;
+    QString currentSessionId() const;
+    bool hasMoreHistory() const;
     QString currentPresetName() const;//预设名称
+    bool sendWithEnter() const;
     QString currentCharAvatarPath();//角色头像
 
     ChatMessageListModel* messageModel() const;
@@ -70,7 +79,6 @@ public:
     Q_INVOKABLE void cancelGeneration();//取消生成
     Q_INVOKABLE void editMessage(const QString& messageId, const QString& newContent);//编辑消息
     Q_INVOKABLE void deleteMessage(const QString& messageId);//删除消息
-    Q_INVOKABLE void switchCharacter(const QString& charId);//切换角色(无用,待优化)
     Q_INVOKABLE void createNewSession();//新建会话()
     Q_INVOKABLE void switchSession(const QString& sessionId);//切换会话
     Q_INVOKABLE void deleteAllSession();//删除当前角色全部会话
@@ -82,7 +90,10 @@ signals:
     void isGeneratingChanged();
     void currentCharNameChanged();
     void currentSessionTitleChanged();
+    void currentSessionIdChanged();
+    void hasMoreHistoryChanged();
     void currentPresetChanged();
+    void sendWithEnterChanged();
     void generationError(const QString& errorMsg);
 
     void operationError(const QString& errorMsg);//错误信息
@@ -113,8 +124,11 @@ private:
     QString m_currentCharName;
     QString m_currentCharAvatarPath;
     QString m_currentSessionTitle;
+    QString m_currentSessionId;
     QString m_currentPresetName;
-    int m_historyLoadOffset = 0;//历史负载偏移
+    QDateTime m_oldestMessageTime;
+    QString m_oldestMessageId;
+    bool m_hasMoreHistory = false;
 
     // 列表模型
     ChatMessageListModel* m_messageModel = nullptr;

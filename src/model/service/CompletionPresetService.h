@@ -15,10 +15,18 @@ public:
     static CompletionPresetService& instance();
     ~CompletionPresetService() override;
 
+    // 测试/组合根可注入 DAO；生产仍使用 instance()。
+    explicit CompletionPresetService(CompletionPresetDao* presetDao,
+                                     PromptDao* promptDao,
+                                     QObject* parent = nullptr);
+
     CompletionPresetService(const CompletionPresetService&) = delete;
     CompletionPresetService& operator=(const CompletionPresetService&) = delete;
     CompletionPresetService(CompletionPresetService&&) = delete;
     CompletionPresetService& operator=(CompletionPresetService&&) = delete;
+
+    // 由 ApplicationBootstrap 在数据库初始化后调用；构造函数不再写库。
+    void ensureSeedData();
 
     //----------预设----------
     // 查询

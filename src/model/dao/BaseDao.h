@@ -7,7 +7,8 @@
 #include <QSqlRecord>
 #include <QDebug>
 
-#include "DatabaseManager.h"
+#include "ConnectionProviderRegistry.h"
+#include "IConnectionProvider.h"
 #include "Utils.h"
 
 /**
@@ -20,12 +21,32 @@ template<typename T>
 class BaseDao : public AbstractDao<T>
 {
 public:
+    explicit BaseDao(IConnectionProvider* provider = nullptr)
+        : m_connectionProvider(provider)
+    {}
     ~BaseDao() override = default;
+
+    void setConnectionProvider(IConnectionProvider* provider)
+    {
+        m_connectionProvider = provider;
+    }
+
+protected:
+    QSqlDatabase connection() const
+    {
+        IConnectionProvider* provider = m_connectionProvider
+            ? m_connectionProvider : ConnectionProviderRegistry::provider();
+        return provider ? provider->connection() : QSqlDatabase();
+    }
+
+    IConnectionProvider* m_connectionProvider = nullptr;
+
+public:
 
     QList<T> selectAll() override
     {
         QList<T> result;
-        QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+        QSqlDatabase db = connection();
         QSqlQuery query(db);
 
         QString sql = QString("SELECT * FROM %1").arg(tableName());
@@ -41,7 +62,7 @@ public:
     }
     T selectById(const QString& id) override
     {
-        QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+        QSqlDatabase db = connection();
         QSqlQuery query(db);
 
         QString sql = QString("SELECT * FROM %1 WHERE %2 = ?").arg(tableName(), primaryKey());
@@ -60,7 +81,7 @@ public:
     }
     bool exists(const QString& id) override
     {
-        QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+        QSqlDatabase db = connection();
         QSqlQuery query(db);
 
         QString sql = QString("SELECT 1 FROM %1 WHERE %2 = ? LIMIT 1").arg(tableName(), primaryKey());
@@ -75,7 +96,7 @@ public:
     }
     bool insert(const T& entity) override
     {
-        QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+        QSqlDatabase db = connection();
         QSqlQuery query(db);
 
         QStringList cols = columnNames();
@@ -95,7 +116,7 @@ public:
     }
     bool update(const T& entity) override
     {
-        QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+        QSqlDatabase db = connection();
         QSqlQuery query(db);
 
         QStringList cols = columnNames();
@@ -124,7 +145,7 @@ public:
     }
     bool remove(const QString& id) override
     {
-        QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+        QSqlDatabase db = connection();
         QSqlQuery query(db);
 
         QString sql = QString("DELETE FROM %1 WHERE %2 = ?").arg(tableName(), primaryKey());

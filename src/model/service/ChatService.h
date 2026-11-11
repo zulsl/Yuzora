@@ -45,6 +45,9 @@ public:
 // ========== 消息管理 ==========
     QList<ChatMessageEntity> loadMessagePage(
         const QString& sessionId, int offset = 0, int limit = 50);//加载聊天页面
+    QList<ChatMessageEntity> loadLatestMessages(const QString& sessionId, int limit = 50);
+    QList<ChatMessageEntity> loadMessagesBefore(const QString& sessionId,
+        const QDateTime& beforeTimestamp, const QString& beforeId, int limit = 50);
     void editMessage(const QString& messageId, const QString& newContent);//编辑消息
     void deleteMessage(const QString& messageId);//删除消息
 

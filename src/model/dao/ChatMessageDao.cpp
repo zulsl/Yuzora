@@ -1,4 +1,5 @@
 #include "ChatMessageDao.h"
+#include <algorithm>
 #include "DatabaseManager.h"
 #include "Utils.h"
 #include <QSqlQuery>
@@ -70,36 +71,60 @@ ChatMessageEntity ChatMessageDao::parseFromQuery(const QSqlQuery& query) const
 // ======================================
 // 业务扩展方法：分页查询会话消息
 // ======================================
-QList<ChatMessageEntity> ChatMessageDao::selectBySessionIdPaged(
-    const QString& sessionId, int offset, int limit)
+QList<ChatMessageEntity> ChatMessageDao::selectLatestBySessionId(
+    const QString& sessionId, int limit)
 {
     QList<ChatMessageEntity> result;
     if (sessionId.isEmpty()) return result;
 
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
-
-    // 按时间正序排列：旧消息在前，新消息在后，符合聊天阅读顺序
-    QString sql = QString(
-                      "SELECT * FROM %1 "
-                      "WHERE session_id = ? "
-                      "ORDER BY timestamp ASC "
-                      "LIMIT ? OFFSET ?"
-                      ).arg(tableName());
-
-    query.prepare(sql);
+    query.prepare(QString(
+        "SELECT * FROM %1 WHERE session_id = ? "
+        "ORDER BY timestamp DESC, id DESC LIMIT ?").arg(tableName()));
     query.addBindValue(sessionId);
     query.addBindValue(limit);
-    query.addBindValue(offset);
 
     if (!query.exec()) {
-        DatabaseError("selectBySessionIdPaged", query.lastError());
+        DatabaseError("selectLatestBySessionId", query.lastError());
         return result;
     }
-
-    while (query.next()) {
+    while (query.next())
         result.append(parseFromQuery(query));
+
+    std::reverse(result.begin(), result.end());
+    return result;
+}
+
+QList<ChatMessageEntity> ChatMessageDao::selectBefore(
+    const QString& sessionId, const QDateTime& beforeTimestamp,
+    const QString& beforeId, int limit)
+{
+    QList<ChatMessageEntity> result;
+    if (sessionId.isEmpty() || !beforeTimestamp.isValid())
+        return result;
+
+    QSqlDatabase db = connection();
+    QSqlQuery query(db);
+    query.prepare(QString(
+        "SELECT * FROM %1 WHERE session_id = ? "
+        "AND (timestamp < ? OR (timestamp = ? AND id < ?)) "
+        "ORDER BY timestamp DESC, id DESC LIMIT ?").arg(tableName()));
+    const QString ts = beforeTimestamp.toString(Qt::ISODate);
+    query.addBindValue(sessionId);
+    query.addBindValue(ts);
+    query.addBindValue(ts);
+    query.addBindValue(beforeId);
+    query.addBindValue(limit);
+
+    if (!query.exec()) {
+        DatabaseError("selectBefore", query.lastError());
+        return result;
     }
+    while (query.next())
+        result.append(parseFromQuery(query));
+
+    std::reverse(result.begin(), result.end());
     return result;
 }
 
@@ -110,7 +135,7 @@ bool ChatMessageDao::appendContent(const QString& messageId, const QString& chun
 {
     if (messageId.isEmpty() || chunk.isEmpty()) return false;
 
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     // 使用 SQLite 原生字符串拼接，原子更新，避免读写竞争,||为SQL字符串拼接运算符
@@ -136,7 +161,7 @@ bool ChatMessageDao::updateContent(const QString &messageId, const QString &full
         return false;
     }
 
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     // 使用 SQLite 原生字符串拼接，原子更新，避免读写竞争
@@ -163,7 +188,7 @@ bool ChatMessageDao::updateStatus(const QString& messageId,
 {
     if (messageId.isEmpty()) return false;
 
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QString("UPDATE %1 SET status = ? WHERE id = ?").arg(tableName());
@@ -186,7 +211,7 @@ bool ChatMessageDao::removeBySessionId(const QString& sessionId)
 {
     if (sessionId.isEmpty()) return false;
 
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QString("DELETE FROM %1 WHERE session_id = ?").arg(tableName());
@@ -208,7 +233,7 @@ int ChatMessageDao::countBySessionId(const QString& sessionId)
 {
     if (sessionId.isEmpty()) return 0;
 
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QString("SELECT COUNT(*) FROM %1 WHERE session_id = ?").arg(tableName());
@@ -234,7 +259,7 @@ ChatMessageEntity ChatMessageDao::selectLastBySessionId(const QString& sessionId
 {
     if (sessionId.isEmpty()) return {};
 
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QString(
@@ -260,7 +285,7 @@ ChatMessageEntity ChatMessageDao::selectLastBySessionId(const QString& sessionId
 
 bool ChatMessageDao::clearBySessionId(const QString& sessionId)
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     query.prepare("DELETE FROM chat_messages WHERE session_id = :sessionId");

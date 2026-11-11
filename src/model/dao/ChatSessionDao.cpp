@@ -14,7 +14,7 @@ ChatSessionDao::ChatSessionDao(QObject* parent)
 QList<ChatSessionEntity> ChatSessionDao::selectByCharacterId(const QString &characterId)
 {
     QList<ChatSessionEntity> result;
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QString("SELECT * FROM %1 WHERE character_id = ? ").arg(tableName());
@@ -34,7 +34,7 @@ QList<ChatSessionEntity> ChatSessionDao::selectByCharacterId(const QString &char
 
 bool ChatSessionDao::updateLastModified(const QString& id, const QDateTime& time)
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     query.prepare("UPDATE chat_sessions SET last_modified = :time WHERE id = :id");
@@ -46,7 +46,7 @@ bool ChatSessionDao::updateLastModified(const QString& id, const QDateTime& time
 
 bool ChatSessionDao::removeByCharacterId(const QString &characterId)
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QString("DELETE FROM %1 WHERE character_id = ? ").arg(tableName());

@@ -58,14 +58,12 @@ public:
                NOTIFY currentModelsIndexChanged FINAL)
 
     // ---- 异步状态 ----
-    Q_PROPERTY(bool testingConnection READ testingConnection NOTIFY testingConnectionChanged)
     Q_PROPERTY(bool fetchModelListState READ fetchModelListState NOTIFY fetchModelListStateChanged)
 
     // ---- 列表/选中 ----
     ApiConfigListModel* configListModel() const;
     QString currentConfigId() const;
     bool currentIsActive() const;
-    bool testingConnection() const;
     bool fetchModelListState() const;
 
     // ---- 表单 ----
@@ -82,9 +80,8 @@ public:
     Q_INVOKABLE void selectConfig(const QString& configId);
     Q_INVOKABLE void setCurrentConfigId(const QString& id);
     Q_INVOKABLE void refreshList();
-    Q_INVOKABLE void addCustomConfig(const QString& configName);
+    Q_INVOKABLE bool addCustomConfig(const QString& configName);
     Q_INVOKABLE void deleteCurrentConfig();
-    Q_INVOKABLE void testCurrentConnection();
     Q_INVOKABLE void fetchModelList();
     Q_INVOKABLE void applyCurrentConfig();
 
@@ -98,10 +95,8 @@ signals:
     // 列表/选中
     void currentConfigIdChanged();
     void currentIsActiveChanged();
-    void testingConnectionChanged();
     void fetchModelListStateChanged();
     void deleteSuccess();
-    void testSuccess();
 
     // 表单
     void currentConfigChanged();
@@ -117,8 +112,6 @@ signals:
     void operationTip(const QString& tipMsg);
 
 private slots:
-    void onTestSuccess(const QString& configId);
-    void onRequestFailed(const QString& configId, const QString& error);
     void onFetchModelListState(const QString& configId);
 
 private:
@@ -135,7 +128,6 @@ private:
     ApiConfigEntity m_currentSelectConfig;
     int m_currentModelsIndex = -1;
 
-    bool m_testingConnection = false;
     bool m_fetchModelListState = false;
 
     // 构造函数必须 private：QML 单例只有在"无法默认构造"时才会调用 create()。

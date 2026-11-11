@@ -22,6 +22,7 @@ public:
         InsertPositionRole,//插入位置
         InsertRoleRole,//插入角色
         InsertDepthRole,//深度
+        ScanDepthRole,//扫描深度
         SortOrderRole,//排序顺序
         UseProbabilityRole,//启用概率触发
         ProbabilityRole,//触发概率(%)
@@ -48,6 +49,8 @@ public:
     int rowById(const QString& id) const;
     WorldInfoEntryEntity entryAt(int row) const;
     WorldInfoEntryEntity entryById(const QString& id) const;
+    // ViewModel 专用：更新业务字段，不触发持久化
+    bool updateField(const QString& id, int role, const QVariant& value);
 
     // ---- 增量更新（关键：不重建整个列表） ----
     void updateEntry(const WorldInfoEntryEntity& entry);     // 替换某一行并 dataChanged
@@ -58,10 +61,6 @@ public:
     Q_INVOKABLE void toggleExpanded(const QString& id);
     Q_INVOKABLE void setExpanded(const QString& id, bool expanded);
     Q_INVOKABLE void collapseAll();
-
-signals:
-    //业务字段变了，通知外部去持久化
-    void entryChanged(const WorldInfoEntryEntity& entry);
 
 private:
     QList<WorldInfoEntryEntity> m_entries;

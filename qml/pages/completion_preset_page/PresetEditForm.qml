@@ -15,29 +15,18 @@ Item {
     implicitHeight: 600
 
     property completionPresetEntity editingPreset: CompletionPresetViewModel.currentEditingPreset
-    property string lastPresetId: ""
+
+    // 基础参数使用 VM 草稿，QML 不再直接修改实体。
+    function draftValue(field) {
+        const draft = CompletionPresetViewModel.presetDraft
+        return draft ? draft.fieldValue(field) : undefined
+    }
 
     signal exportRequested()
 
-    function syncTabForPreset() {
-        if (typeof tabBar === "undefined" || !tabBar)
-            return
-
-        const id = editingPreset ? (editingPreset.id || "") : ""
-        if (id === lastPresetId)
-            return
-
-        lastPresetId = id
-        tabBar.currentIndex = 0
-        CompletionPresetViewModel.presetDetailTab = 0
-    }
-
     Component.onCompleted: {
-        lastPresetId = editingPreset ? (editingPreset.id || "") : ""
         tabBar.currentIndex = CompletionPresetViewModel.presetDetailTab
     }
-
-    onEditingPresetChanged: syncTabForPreset()
 
     ColumnLayout {
         anchors.fill: parent
@@ -149,6 +138,13 @@ Item {
             }
         }
 
+        Connections {
+            target: CompletionPresetViewModel
+            function onPresetDetailTabChanged() {
+                tabBar.currentIndex = CompletionPresetViewModel.presetDetailTab
+            }
+        }
+
         StackLayout {
             id: contentStack
             Layout.fillWidth: true
@@ -184,10 +180,12 @@ Item {
                             TextField {
                                 Layout.fillWidth: true
                                 implicitHeight: Theme.controlMd
-                                text: root.editingPreset ? (root.editingPreset.name || "") : ""
+                                text: CompletionPresetViewModel.presetDraft
+                                      ? CompletionPresetViewModel.presetDraft.name : ""
                                 font.pixelSize: Theme.fontBody
                                 font.family: Theme.fontFamily
-                                onTextEdited: root.editingPreset.name = text
+                                onTextEdited: if (CompletionPresetViewModel.presetDraft)
+                                    CompletionPresetViewModel.presetDraft.name = text
                             }
                         }
 
@@ -200,8 +198,8 @@ Item {
                                 to: 2000000
                                 stepSize: 512
                                 editable: true
-                                value: root.editingPreset ? root.editingPreset.maxContextToken : 4096
-                                onValueModified: root.editingPreset.maxContextToken = value
+                                value: root.draftValue("maxContextToken") || 4096
+                                onValueModified: CompletionPresetViewModel.setPresetDraftField("maxContextToken", value)
                             }
                         }
 
@@ -214,8 +212,8 @@ Item {
                                 to: 128000
                                 stepSize: 64
                                 editable: true
-                                value: root.editingPreset ? root.editingPreset.maxResponseToken : 1024
-                                onValueModified: root.editingPreset.maxResponseToken = value
+                                value: root.draftValue("maxResponseToken") || 1024
+                                onValueModified: CompletionPresetViewModel.setPresetDraftField("maxResponseToken", value)
                             }
                         }
 
@@ -223,8 +221,8 @@ Item {
                             label: "流式输出"
                             Switch {
                                 Layout.alignment: Qt.AlignLeft
-                                checked: root.editingPreset ? root.editingPreset.streamEnabled : true
-                                onToggled: root.editingPreset.streamEnabled = checked
+                                checked: root.draftValue("streamEnabled") !== false
+                                onToggled: CompletionPresetViewModel.setPresetDraftField("streamEnabled", checked)
                             }
                         }
                     }
@@ -238,8 +236,9 @@ Item {
                             labelText: "温度（创造力，写作推荐 1.0）"
                             from: 0.0
                             to: 2.0
-                            value: root.editingPreset ? root.editingPreset.temperature : 0.7
-                            onEdited: root.editingPreset.temperature = value
+                            value: root.draftValue("temperature") !== undefined
+                                   ? root.draftValue("temperature") : 0.7
+                            onEdited: CompletionPresetViewModel.setPresetDraftField("temperature", value)
                         }
 
                         SliderFloatInput {
@@ -247,8 +246,9 @@ Item {
                             labelText: "频率惩罚"
                             from: -2.0
                             to: 2.0
-                            value: root.editingPreset ? root.editingPreset.frequencyPenalty : 0.0
-                            onEdited: root.editingPreset.frequencyPenalty = value
+                            value: root.draftValue("frequencyPenalty") !== undefined
+                                   ? root.draftValue("frequencyPenalty") : 0.0
+                            onEdited: CompletionPresetViewModel.setPresetDraftField("frequencyPenalty", value)
                         }
 
                         SliderFloatInput {
@@ -256,8 +256,9 @@ Item {
                             labelText: "存在惩罚"
                             from: -2.0
                             to: 2.0
-                            value: root.editingPreset ? root.editingPreset.presencePenalty : 0.0
-                            onEdited: root.editingPreset.presencePenalty = value
+                            value: root.draftValue("presencePenalty") !== undefined
+                                   ? root.draftValue("presencePenalty") : 0.0
+                            onEdited: CompletionPresetViewModel.setPresetDraftField("presencePenalty", value)
                         }
 
                         SliderFloatInput {
@@ -265,8 +266,9 @@ Item {
                             labelText: "Top-P（词汇多样性，写作推荐 0.95）"
                             from: 0.0
                             to: 1.0
-                            value: root.editingPreset ? root.editingPreset.topP : 0.9
-                            onEdited: root.editingPreset.topP = value
+                            value: root.draftValue("topP") !== undefined
+                                   ? root.draftValue("topP") : 0.9
+                            onEdited: CompletionPresetViewModel.setPresetDraftField("topP", value)
                         }
 
                         SliderFloatInput {
@@ -274,8 +276,9 @@ Item {
                             labelText: "Top-K（候选词数量，写作推荐 60）"
                             from: 0
                             to: 200
-                            value: root.editingPreset ? root.editingPreset.topK : 40
-                            onEdited: root.editingPreset.topK = value
+                            value: root.draftValue("topK") !== undefined
+                                   ? root.draftValue("topK") : 40
+                            onEdited: CompletionPresetViewModel.setPresetDraftField("topK", value)
                         }
                     }
 
@@ -299,8 +302,7 @@ Item {
                             text: "保存参数"
                             variant: "primary"
                             onClicked: {
-                                CompletionPresetViewModel.applyEditingPreset(root.editingPreset)
-                                Ui.toast("预设已保存", false)
+                                CompletionPresetViewModel.savePresetDraft()
                             }
                         }
                     }

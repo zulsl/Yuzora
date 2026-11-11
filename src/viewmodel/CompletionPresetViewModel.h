@@ -2,8 +2,11 @@
 #define COMPLETIONPRESETVIEWMODEL_H
 
 #include <QObject>
+#include <QVariantMap>
+#include <QHash>
 #include <QtQml/qqmlregistration.h>
 #include <QQmlEngine>
+#include <QTimer>
 #include "PresetListModel.h"
 #include "PresetPromptListModel.h"
 #include "CompletionPresetEntity.h"
@@ -11,6 +14,8 @@
 #include "CompletionPresetService.h"
 
 class QJSEngine;
+class QTimer;
+class CompletionPresetDraft;
 
 /**
  * @brief 对话补全预设视图模型
@@ -38,6 +43,9 @@ public:
 
     //当前预设（只读，用于列表、删除、设为默认等操作）
     Q_PROPERTY(CompletionPresetEntity currentEditingPreset READ currentEditingPreset NOTIFY currentEditingPresetChanged)
+    // 编辑草稿：强类型 QObject，QML 直接读写；ViewModel 负责 dirty 和保存
+    Q_PROPERTY(CompletionPresetDraft* presetDraft READ presetDraft NOTIFY presetDraftChanged)
+    Q_PROPERTY(bool presetDirty READ presetDirty NOTIFY presetDirtyChanged)
 
     //有选择
     Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY currentEditingPresetChanged)
@@ -52,6 +60,8 @@ public:
     PresetListModel* presetModel() const;
     PresetPromptListModel* presetPromptModel() const;
     CompletionPresetEntity currentEditingPreset() const;
+    CompletionPresetDraft* presetDraft() const;
+    bool presetDirty() const;
     bool hasSelection() const;
     int presetDetailTab() const;
     void setPresetDetailTab(int tab);
@@ -63,7 +73,9 @@ public:
     Q_INVOKABLE void deletePreset(const QString& presetId);//删除
     Q_INVOKABLE void setActivePreset(const QString& presetId);//设置激活
     Q_INVOKABLE void renamePreset(const QString& presetId, const QString& newName);//重命名
-    Q_INVOKABLE void applyEditingPreset(const CompletionPresetEntity& newPreset);// 提交编辑,保存
+    Q_INVOKABLE void setPresetDraftField(const QString& field, const QVariant& value);
+    Q_INVOKABLE bool savePresetDraft();
+    Q_INVOKABLE void discardPresetDraft();
     Q_INVOKABLE void duplicatePreset(const QString& presetId);//复制(弃用,保留)
 
 
@@ -72,6 +84,9 @@ public:
     Q_INVOKABLE void addPrompt();//追加到末尾
     Q_INVOKABLE void insertPromptBefore(const QString& beforeIdentifier);//插入到选中项之前
     Q_INVOKABLE void deletePrompt(const QString& promptId);//删除非系统提示词
+    Q_INVOKABLE void setPromptField(const QString& promptId, const QString& field,
+                                    const QVariant& value);
+    Q_INVOKABLE void flushPendingPromptEdits();
 
 
     // 导入导出
@@ -85,6 +100,8 @@ signals:
     void operationError(const QString& errorMsg);
     void operationTip(const QString& tipMsg);
     void currentEditingPresetChanged();
+    void presetDraftChanged();
+    void presetDirtyChanged();
     void presetDetailTabChanged();
 
 private:
@@ -94,11 +111,20 @@ private:
     PresetPromptListModel* m_presetPromptListModel = nullptr;
 
 
-    CompletionPresetEntity m_currentEditingPreset;//当前表单
+    CompletionPresetEntity m_currentEditingPreset;//当前已保存快照
+    CompletionPresetDraft* m_presetDraft = nullptr;
+    CompletionPresetEntity m_presetBaseline;
+    bool m_presetDirty = false;
     int m_presetDetailTab = 0;
 
     PromptEntity makeNewPrompt() const;
     void reloadCurrentPresetAndPrompts();
+    void resetPresetDraft(const CompletionPresetEntity& entity);
+    CompletionPresetEntity draftToPreset() const;
+    int roleForPromptField(const QString& field) const;
+
+    QTimer* m_promptSaveTimer = nullptr;
+    QHash<QString, QVariantMap> m_pendingPromptFields;
 
     // 构造函数必须 private：QML 单例只有在"无法默认构造"时才会调用 create()。
     // 若保持 public，引擎会自己 new 一个实例，C++ 侧的静态实例就与 QML 拿到的

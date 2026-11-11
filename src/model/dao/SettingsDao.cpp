@@ -43,7 +43,7 @@ SettingsEntity SettingsDao::parseFromQuery(const QSqlQuery& query) const {
 }
 
 SettingsEntity SettingsDao::selectByKey(const QString& key) {
-    QSqlQuery query(DatabaseManager::instance().getThreadConnection());
+    QSqlQuery query(connection());
     query.prepare(QString("SELECT * FROM %1 WHERE setting_key = :key").arg(tableName()));
     query.bindValue(":key", key);
     if (!query.exec() || !query.next()) {
@@ -53,7 +53,7 @@ SettingsEntity SettingsDao::selectByKey(const QString& key) {
 }
 
 bool SettingsDao::insertOrUpdate(const SettingsEntity& entity) {
-    QSqlQuery query(DatabaseManager::instance().getThreadConnection());
+    QSqlQuery query(connection());
     query.prepare(QString(
         "INSERT OR REPLACE INTO %1 "
         "(setting_key, setting_value, value_type, description, updated_at) "
@@ -65,7 +65,7 @@ bool SettingsDao::insertOrUpdate(const SettingsEntity& entity) {
 
 QList<SettingsEntity> SettingsDao::selectAll() {
     QList<SettingsEntity> result;
-    QSqlQuery query(DatabaseManager::instance().getThreadConnection());
+    QSqlQuery query(connection());
     query.exec(QString("SELECT * FROM %1").arg(tableName()));
     while (query.next()) {
         result.append(parseFromQuery(query));
@@ -75,10 +75,16 @@ QList<SettingsEntity> SettingsDao::selectAll() {
 
 bool SettingsDao::removeByKey(const QString &key)
 {
-    return false;
+    if (key.isEmpty()) return false;
+
+    QSqlQuery query(connection());
+    query.prepare(QString("DELETE FROM %1 WHERE setting_key = :key").arg(tableName()));
+    query.bindValue(":key", key);
+    return query.exec();
 }
 
 bool SettingsDao::clearAll()
 {
-    return false;
+    QSqlQuery query(connection());
+    return query.exec(QString("DELETE FROM %1").arg(tableName()));
 }

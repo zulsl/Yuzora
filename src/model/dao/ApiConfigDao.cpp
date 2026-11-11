@@ -18,7 +18,7 @@ ApiConfigDao::ApiConfigDao(QObject *parent)
 ApiConfigEntity ApiConfigDao::selectActive()
 {
     ApiConfigEntity result;
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QStringLiteral("SELECT * FROM api_configs WHERE is_active = 1 LIMIT 1");
@@ -36,7 +36,7 @@ ApiConfigEntity ApiConfigDao::selectActive()
 
 bool ApiConfigDao::setActive(const QString &id)
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QStringLiteral("UPDATE api_configs SET is_active = 1 WHERE id = :id");
@@ -52,7 +52,7 @@ bool ApiConfigDao::setActive(const QString &id)
 
 bool ApiConfigDao::clearAllActive()
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QStringLiteral("UPDATE api_configs SET is_active = 0");
@@ -147,7 +147,7 @@ ApiConfigEntity ApiConfigDao::parseFromQuery(const QSqlQuery &query) const
 // QList<ApiConfigEntity> ApiConfigDao::selectAll()
 // {
 //     QList<ApiConfigEntity> result;
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     //R"() C++11 原始字符串字面量（Raw String）
@@ -171,7 +171,7 @@ ApiConfigEntity ApiConfigDao::parseFromQuery(const QSqlQuery &query) const
 // ApiConfigEntity ApiConfigDao::selectById(const QString &id)
 // {
 //     ApiConfigEntity result;
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     QString sql = QStringLiteral("SELECT * FROM api_configs WHERE id = :id");
@@ -195,7 +195,7 @@ ApiConfigEntity ApiConfigDao::parseFromQuery(const QSqlQuery &query) const
 
 // QString ApiConfigDao::insert(const ApiConfigEntity &config)
 // {
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     QString sql = QStringLiteral(R"(
@@ -254,7 +254,7 @@ ApiConfigEntity ApiConfigDao::parseFromQuery(const QSqlQuery &query) const
 
 // bool ApiConfigDao::update(const ApiConfigEntity &config)
 // {
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     QString sql = QStringLiteral(R"(
@@ -311,7 +311,7 @@ ApiConfigEntity ApiConfigDao::parseFromQuery(const QSqlQuery &query) const
 
 // bool ApiConfigDao::remove(const QString &id)
 // {
-//     QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+//     QSqlDatabase db = connection();
 //     QSqlQuery query(db);
 
 //     QString sql = QStringLiteral("DELETE FROM api_configs WHERE id = :id");

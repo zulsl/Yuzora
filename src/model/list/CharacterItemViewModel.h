@@ -20,9 +20,7 @@ class CharacterItemViewModel : public QObject
     Q_PROPERTY(QString description READ description NOTIFY dataChanged)
     Q_PROPERTY(QString avatarPath READ avatarPath NOTIFY dataChanged)
     Q_PROPERTY(bool isFavorite READ isFavorite NOTIFY dataChanged)
-    Q_PROPERTY(QString lastUsedText READ lastUsedText NOTIFY dataChanged)
     Q_PROPERTY(QString updateTimeText READ updateTimeText NOTIFY dataChanged)
-    Q_PROPERTY(int useCount READ useCount NOTIFY dataChanged)
 
 public:
     explicit CharacterItemViewModel(QObject* parent = nullptr);
@@ -34,9 +32,7 @@ public:
     QString description() const;
     QString avatarPath() const;
     bool isFavorite() const;
-    QString lastUsedText() const;
     QString updateTimeText() const;
-    int useCount() const;
 
     // ========== 数据更新接口 ==========
     void updateFromEntity(const CharacterEntity& entity);
@@ -54,9 +50,7 @@ private:
     QString m_description;
     QString m_avatarRelativePath;
     bool m_isFavorite = false;
-    QDateTime m_lastUsedAt;
     QDateTime m_updatedAt;
-    int m_useCount = 0;
 };
 
 #endif // CHARACTERITEMVIEWMODEL_H

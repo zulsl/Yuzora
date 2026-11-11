@@ -1,4 +1,6 @@
 #include "VectorMemoryDao.h"
+#include "ConnectionProviderRegistry.h"
+#include "IConnectionProvider.h"
 #include "DatabaseManager.h"
 #include "Utils.h"
 #include <QSqlQuery>
@@ -10,10 +12,22 @@ VectorMemoryDao::VectorMemoryDao(QObject* parent)
 {
 }
 
+void VectorMemoryDao::setConnectionProvider(IConnectionProvider* provider)
+{
+    m_connectionProvider = provider;
+}
+
+QSqlDatabase VectorMemoryDao::connection() const
+{
+    IConnectionProvider* provider = m_connectionProvider
+        ? m_connectionProvider : ConnectionProviderRegistry::provider();
+    return provider ? provider->connection() : QSqlDatabase();
+}
+
 QList<VectorMemoryEntity> VectorMemoryDao::selectByCharacterId(const QString& characterId)
 {
     QList<VectorMemoryEntity> result;
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     const QString sql = QStringLiteral(R"(
@@ -48,7 +62,7 @@ QList<VectorMemoryEntity> VectorMemoryDao::selectByCharacterId(const QString& ch
 
 QString VectorMemoryDao::insert(const VectorMemoryEntity& memory)
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString newId = memory.id.isEmpty() ? Utils::generateUuid() : memory.id;
@@ -81,7 +95,7 @@ QString VectorMemoryDao::insert(const VectorMemoryEntity& memory)
 
 bool VectorMemoryDao::remove(const QString& id)
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     query.prepare("DELETE FROM vector_memories WHERE id = :id");
@@ -92,7 +106,7 @@ bool VectorMemoryDao::remove(const QString& id)
 
 bool VectorMemoryDao::clearByCharacterId(const QString& characterId)
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     query.prepare("DELETE FROM vector_memories WHERE character_id = :characterId");

@@ -37,10 +37,9 @@ public:
     void removeItem(const QString& id);
     void updateItem(const PromptEntity& entry);
     void clear();
-
-signals:
-    //持久化落库
-    void entryWriting(const PromptEntity& entry);
+    PromptEntity entryById(const QString& id) const;
+    // ViewModel 专用：更新业务字段，不触发持久化
+    bool updateField(const QString& id, int role, const QVariant& value);
 
 private:
     QSet<QString> m_expandedIds;

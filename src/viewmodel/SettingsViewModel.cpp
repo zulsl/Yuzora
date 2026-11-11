@@ -1,13 +1,13 @@
 #include "SettingsViewModel.h"
 #include "SettingsService.h"
+#include "StorageService.h"
 #include "GlobalConstants.h"
 #include "ExceptionHandler.h"
-#include "DeviceHelper.h"
+#include <QColor>
 
 SettingsViewModel::SettingsViewModel(QObject* parent)
     : QObject(parent)
     , m_service(&SettingsService::instance())
-    , m_deviceHelper(&DeviceHelper::instance())
     , m_exceptionHandler(&ExceptionHandler::instance())
 {
 }
@@ -17,6 +17,7 @@ int SettingsViewModel::themeMode() const {
     return m_service->getInt(GlobalConstants::THEME_MODE);
 }
 void SettingsViewModel::setThemeMode(int mode) {
+    if (mode < 0 || mode > 2) return;
     m_service->setValue(GlobalConstants::THEME_MODE, mode);
     emit themeModeChanged();
 }
@@ -25,6 +26,7 @@ int SettingsViewModel::baseFontSize() const {
     return m_service->getInt(GlobalConstants::FONT_SIZE);
 }
 void SettingsViewModel::setBaseFontSize(int size) {
+    if (size < 10 || size > 32) return;
     m_service->setValue(GlobalConstants::FONT_SIZE, size);
     emit baseFontSizeChanged();
 }
@@ -33,6 +35,7 @@ QString SettingsViewModel::themeColor() const {
     return m_service->getString(GlobalConstants::THEME_COLOR);
 }
 void SettingsViewModel::setThemeColor(QString color) {
+    if (!QColor(color).isValid()) return;
     m_service->setValue(GlobalConstants::THEME_COLOR, color);
     emit themeColorChanged();
 }
@@ -66,6 +69,7 @@ int SettingsViewModel::autoSaveInterval() const {
     return m_service->getInt(GlobalConstants::AUTO_SAVE_INTERVAL);
 }
 void SettingsViewModel::setAutoSaveInterval(int seconds) {
+    if (seconds < 0 || seconds > 3600) return;
     m_service->setValue(GlobalConstants::AUTO_SAVE_INTERVAL, seconds);
     emit autoSaveIntervalChanged();
 }
@@ -99,6 +103,7 @@ int SettingsViewModel::proxyPort() const {
     return m_service->getInt(GlobalConstants::PROXY_PORT);
 }
 void SettingsViewModel::setProxyPort(int port) {
+    if (port < 1 || port > 65535) return;
     m_service->setValue(GlobalConstants::PROXY_PORT, port);
     emit proxyPortChanged();
 }
@@ -107,6 +112,7 @@ int SettingsViewModel::requestTimeout() const {
     return m_service->getInt(GlobalConstants::REQUEST_TIMEOUT);
 }
 void SettingsViewModel::setRequestTimeout(int seconds) {
+    if (seconds < 1 || seconds > 600) return;
     m_service->setValue(GlobalConstants::REQUEST_TIMEOUT, seconds);
     emit requestTimeoutChanged();
 }
@@ -114,40 +120,29 @@ void SettingsViewModel::setRequestTimeout(int seconds) {
 // ========== 存储设置 ==========
 
 QString SettingsViewModel::dataPath() const {
-    return Utils::getAppDataPath();
-}
-
-void SettingsViewModel::selectDataPath(const QString& path) {
-    if (path.isEmpty()) return;
-    m_service->setValue(GlobalConstants::DATA_STORAGE_PATH, path);
-    emit dataPathChanged();
+    return StorageService::instance().dataPath();
 }
 
 void SettingsViewModel::customAppPath(const QUrl & fileUrl)
 {
-    QString path=fileUrl.toLocalFile();
+    const QString path = fileUrl.toLocalFile();
     if (path.isEmpty()) {
         emit m_exceptionHandler->errorOccurred("文件路径不能为空");
         return;
     }
 
-    try{
-        m_deviceHelper->reSetAppDataPath(path);
+    try {
+        StorageService::instance().changeAppDataPath(path);
         emit m_exceptionHandler->tipOccurred("路径修改成功");
     }
-    catch (const AppException& e) {m_exceptionHandler->handleException(e);}
-    catch (const std::exception& e) {m_exceptionHandler->handleException(e);}
-    catch (...) {m_exceptionHandler->handleException();}
-
+    catch (const AppException& e) { m_exceptionHandler->handleException(e); }
+    catch (const std::exception& e) { m_exceptionHandler->handleException(e); }
+    catch (...) { m_exceptionHandler->handleException(); }
 }
 
 void SettingsViewModel::clearAllData()
 {
-    m_deviceHelper->removeDataDir(m_deviceHelper->getAppDataPath());
-    m_deviceHelper->removeDataDir(QStandardPaths::writableLocation(QStandardPaths::AppDataLocation));
-    QSettings settings;
-    settings.clear();// 删除所有键
-    m_deviceHelper->restartApplication();
+    StorageService::instance().clearAllData();
 }
 
 QString SettingsViewModel::getUserName() const
@@ -160,8 +155,9 @@ QString SettingsViewModel::getUserName() const
 void SettingsViewModel::setUserName(const QString & newUserName)
 {
     try{
-        if (newUserName.isEmpty()) THROW(OperationError, "用户名不能为空");
-        m_service->setValue(GlobalConstants::USER_NAME, newUserName);
+        const QString trimmed = newUserName.trimmed();
+        if (trimmed.isEmpty()) THROW(OperationError, "用户名不能为空");
+        m_service->setValue(GlobalConstants::USER_NAME, trimmed);
         emit userNameChanged();
     }
     catch (const AppException& e) {m_exceptionHandler->handleException(e);}
@@ -178,23 +174,13 @@ QString SettingsViewModel::getUserAvatar() const
 void SettingsViewModel::setUserAvatar(const QUrl& fileUrl)
 {
     if (fileUrl.isEmpty()) return;
-    try{
-        QString filePath = fileUrl.toLocalFile();
-        QImage image(filePath);
-        if (image.isNull()) {
-            THROW(FileIOError, QString("无法读取图片：%1").arg(filePath));
-        }
-        QString fileName = Utils::generateUuid() + ".png";
-        QString fullPath = QDir(Utils::getAvatarDirPath()).filePath(fileName);
-        if (!image.save(fullPath, "PNG")) {
-            THROW(FileIOError, "头像保存失败：无法写入文件");
-        }
-        m_service->setValue(GlobalConstants::USER_AVATAR, fileName);
+    try {
+        m_service->saveUserAvatar(fileUrl.toLocalFile());
         emit userAvatarChanged();
     }
-    catch (const AppException& e) {m_exceptionHandler->handleException(e);}
-    catch (const std::exception& e) {m_exceptionHandler->handleException(e);}
-    catch (...) {m_exceptionHandler->handleException();}
+    catch (const AppException& e) { m_exceptionHandler->handleException(e); }
+    catch (const std::exception& e) { m_exceptionHandler->handleException(e); }
+    catch (...) { m_exceptionHandler->handleException(); }
 }
 
 

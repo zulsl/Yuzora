@@ -6,8 +6,9 @@
 #include <QSqlQuery>
 #include <QSqlError>
 #include <QMutex>
+#include "dao/IConnectionProvider.h"
 
-class DatabaseManager : public QObject {
+class DatabaseManager : public QObject, public IConnectionProvider {
     Q_OBJECT
 public:
     static DatabaseManager& instance();
@@ -19,6 +20,7 @@ public:
 
     // 获取当前线程专属数据库连接（每个线程首次调用自动创建）
     QSqlDatabase getThreadConnection();
+    QSqlDatabase connection() override { return getThreadConnection(); }
 
     //关闭所有连接
     void closeAllResources();
@@ -41,35 +43,13 @@ private:
     QString connectionNameForCurrentThread() const;
 
     bool m_isReady = false;//已就绪
-    const int DATABASE_VERSION = 1;
+    const int DATABASE_VERSION = 2;
     QString m_dbFilePath;
     QMutex m_mutex;
+
+    bool hasColumn(QSqlDatabase& db, const QString& table, const QString& column);
+    bool ensureColumn(QSqlDatabase& db, const QString& table,
+                      const QString& column, const QString& definition);
 };
 
 #endif
-
-//以下废弃
-// class DatabaseManager : public QObject {
-//     Q_OBJECT
-// public:
-//     static DatabaseManager& instance();
-//     ~DatabaseManager() override;
-
-//     bool initialize();
-//     bool isReady() const;
-//     QSqlDatabase getDatabase() const;
-
-//     bool beginTransaction();
-//     bool commitTransaction();
-//     bool rollbackTransaction();
-//     QSqlError executeQuery(const QString& sql, const QVariantMap& bindValues = {});
-
-// private:
-//     explicit DatabaseManager(QObject* parent = nullptr);
-//     bool createTables();
-//     bool upgradeDatabase(int oldVersion, int newVersion);
-
-//     QSqlDatabase m_db;
-//     bool m_isReady = false;
-//     const int DATABASE_VERSION = 1;
-// };

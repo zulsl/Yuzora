@@ -2,6 +2,8 @@
 #include "WorldInfoService.h"
 #include "ExceptionHandler.h"
 
+#include <QTimer>
+
 WorldInfoEntryViewModel* WorldInfoEntryViewModel::instance()
 {
     static WorldInfoEntryViewModel inst;
@@ -12,18 +14,18 @@ WorldInfoEntryViewModel::WorldInfoEntryViewModel(QObject* parent)
     : QObject(parent)
     , m_service(&WorldInfoService::instance())
     , m_entryModel(new WorldInfoEntryListModel(this))
+    , m_saveTimer(new QTimer(this))
 {
+    m_saveTimer->setSingleShot(true);
+    m_saveTimer->setInterval(300);
+    connect(m_saveTimer, &QTimer::timeout,
+            this, &WorldInfoEntryViewModel::flushPendingEntryEdits);
+
     // 当前文集下的条目发生变化时刷新列表
     connect(m_service, &WorldInfoService::entryListChanged,
             this, [this](const QString& bookId) {
                 if (bookId == m_currentBookId)
                     refreshEntryList();
-            });
-
-    // 列表项的业务字段变化 → 通知 Service 落盘
-    connect(m_entryModel, &WorldInfoEntryListModel::entryChanged,
-            this, [this](const WorldInfoEntryEntity& entry) {
-                m_service->updateEntry(entry);
             });
 
     connect(m_service, &WorldInfoService::operationError,
@@ -37,16 +39,10 @@ WorldInfoEntryListModel* WorldInfoEntryViewModel::entryModel() const
     return m_entryModel;
 }
 
-QVariantMap WorldInfoEntryViewModel::currentEntry() const
-{
-    return entryToMap(m_currentEntry);
-}
-
 void WorldInfoEntryViewModel::setCurrentBookId(const QString& bookId)
 {
+    flushPendingEntryEdits();
     m_currentBookId = bookId;
-    m_currentEntry = {}; // 切换文集时清空当前条目
-    emit currentEntryChanged();
     refreshEntryList();
 }
 
@@ -62,12 +58,6 @@ void WorldInfoEntryViewModel::refreshEntryList()
     m_entryModel->resetData(entries);
 }
 
-void WorldInfoEntryViewModel::selectEntry(const QString& entryId)
-{
-    Q_UNUSED(entryId)
-    emit currentEntryChanged();
-}
-
 void WorldInfoEntryViewModel::createEntry()
 {
     if (m_currentBookId.isEmpty()) {
@@ -75,88 +65,95 @@ void WorldInfoEntryViewModel::createEntry()
         return;
     }
 
-    QString id = m_service->createEntry(m_currentBookId);
-    if (!id.isEmpty())
-        selectEntry(id);
+    m_service->createEntry(m_currentBookId);
 }
 
-void WorldInfoEntryViewModel::saveEntry(const QVariantMap& entryData)
+int WorldInfoEntryViewModel::roleForField(const QString& field) const
 {
-    // 保持与原实现一致：QML 直接写模型角色字段即可落盘，此接口暂为占位
-    Q_UNUSED(entryData)
+    if (field == QStringLiteral("name")) return WorldInfoEntryListModel::NameRole;
+    if (field == QStringLiteral("content")) return WorldInfoEntryListModel::ContentRole;
+    if (field == QStringLiteral("triggerControl")) return WorldInfoEntryListModel::TriggerControlRole;
+    if (field == QStringLiteral("insertPosition")) return WorldInfoEntryListModel::InsertPositionRole;
+    if (field == QStringLiteral("insertDepth")) return WorldInfoEntryListModel::InsertDepthRole;
+    if (field == QStringLiteral("scanDepth")) return WorldInfoEntryListModel::ScanDepthRole;
+    if (field == QStringLiteral("sortOrder")) return WorldInfoEntryListModel::SortOrderRole;
+    if (field == QStringLiteral("isEnabled")) return WorldInfoEntryListModel::IsEnabledRole;
+    return -1;
+}
+
+void WorldInfoEntryViewModel::setEntryField(const QString& entryId, const QString& field,
+                                             const QVariant& value)
+{
+    if (entryId.isEmpty()) {
+        return;
+    }
+
+    const int role = roleForField(field);
+    if (role < 0 || !m_entryModel->updateField(entryId, role, value)) {
+        return;
+    }
+
+    m_pendingFields[entryId].insert(field, value);
+
+    // 文本编辑合并 300ms；开关/枚举/数字立即落库。
+    if (field == QStringLiteral("name") || field == QStringLiteral("content")) {
+        m_saveTimer->start();
+    } else {
+        flushPendingEntryEdits();
+    }
+}
+
+void WorldInfoEntryViewModel::flushPendingEntryEdits()
+{
+    if (m_saveTimer->isActive()) {
+        m_saveTimer->stop();
+    }
+    if (m_pendingFields.isEmpty()) {
+        return;
+    }
+
+    const auto pending = m_pendingFields;
+    m_pendingFields.clear();
+
+    for (auto it = pending.constBegin(); it != pending.constEnd(); ++it) {
+        const WorldInfoEntryEntity entry = m_entryModel->entryById(it.key());
+        if (entry.id.isEmpty()) {
+            continue;
+        }
+        if (!m_service->updateEntry(entry)) {
+            // 保存失败时用数据库内容恢复，避免界面显示未落库的假状态。
+            refreshEntryList();
+            return;
+        }
+    }
 }
 
 void WorldInfoEntryViewModel::deleteEntry(const QString& entryId)
 {
-    bool success = m_service->deleteEntry(entryId);
-    if (success && m_currentEntry.id == entryId) {
-        m_currentEntry = {};
-        emit currentEntryChanged();
-    }
+    flushPendingEntryEdits();
+    m_service->deleteEntry(entryId);
 }
 
 void WorldInfoEntryViewModel::toggleEntryEnabled(const QString& entryId)
 {
-    m_service->toggleEntryEnabled(entryId);
-
-    if (m_currentEntry.id == entryId) {
-        m_currentEntry.isEnabled = !m_currentEntry.isEnabled;
-        emit currentEntryChanged();
-    }
+    setEntryField(entryId, QStringLiteral("isEnabled"),
+                  !m_entryModel->entryById(entryId).isEnabled);
 }
 
 void WorldInfoEntryViewModel::moveEntry(const QString& entryId, const QString& targetBookId)
 {
+    flushPendingEntryEdits();
     m_service->moveEntryToBook(entryId, targetBookId);
-
-    if (m_currentEntry.id == entryId) {
-        m_currentEntry = {};
-        emit currentEntryChanged();
-    }
 }
 
 void WorldInfoEntryViewModel::batchDelete(const QStringList& entryIds)
 {
+    flushPendingEntryEdits();
     m_service->batchDeleteEntries(entryIds);
-
-    if (entryIds.contains(m_currentEntry.id)) {
-        m_currentEntry = {};
-        emit currentEntryChanged();
-    }
 }
 
 void WorldInfoEntryViewModel::batchSetEnabled(const QStringList& entryIds, bool enabled)
 {
+    flushPendingEntryEdits();
     m_service->batchToggleEntries(entryIds, enabled);
-}
-
-// ======================================
-// 私有辅助：条目实体 ↔ QVariantMap 互转
-// ======================================
-QVariantMap WorldInfoEntryViewModel::entryToMap(const WorldInfoEntryEntity& entry) const
-{
-    QVariantMap map;
-    if (entry.id.isEmpty()) return map;
-
-    map["id"] = entry.id;
-    map["bookId"] = entry.bookId;
-    map["name"] = entry.name;
-    map["keywords"] = entry.keywords;
-    map["secondaryKeywords"] = entry.secondaryKeywords;
-    map["content"] = entry.content;
-    map["extensions"] = entry.extensions;
-
-    return map;
-}
-
-WorldInfoEntryEntity WorldInfoEntryViewModel::mapToEntry(const QVariantMap& map) const
-{
-    WorldInfoEntryEntity entry;
-
-    entry.name = map.value("name", "新条目").toString().trimmed();
-    entry.content = map.value("content", "").toString();
-    entry.isEnabled = map.value("isEnabled", true).toBool();
-    entry.extensions = map.value("extensions", QVariantMap{}).toMap();
-
-    return entry;
 }

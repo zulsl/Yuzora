@@ -15,6 +15,7 @@ Dialog {
     property bool danger: false
 
     signal confirmed()
+    signal declined()
 
     title: ""
     modal: true
@@ -74,7 +75,10 @@ Dialog {
             AppButton {
                 text: root.rejectText
                 variant: "ghost"
-                onClicked: root.close()
+                onClicked: {
+                    root.close()
+                    root.declined()
+                }
             }
             AppButton {
                 text: root.acceptText

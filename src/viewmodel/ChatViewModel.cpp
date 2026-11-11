@@ -3,6 +3,7 @@
 #include "ChatMessageItemModel.h"
 #include "CharacterService.h"
 #include "CompletionPresetService.h"
+#include "SettingsService.h"
 #include "Utils.h"
 #include "GlobalConstants.h"
 
@@ -26,11 +27,16 @@ ChatViewModel::ChatViewModel(QObject* parent)
                     m_currentCharName.clear();
                     m_currentCharAvatarPath.clear();
                     m_currentSessionTitle.clear();
+                    m_currentSessionId.clear();
                     m_currentPresetName.clear();
-                    m_historyLoadOffset = 0;
+                    m_oldestMessageTime = QDateTime();
+                    m_oldestMessageId.clear();
+                    m_hasMoreHistory = false;
                     emit currentCharNameChanged();
                     emit currentSessionTitleChanged();
+                    emit currentSessionIdChanged();
                     emit currentPresetChanged();
+                    emit hasMoreHistoryChanged();
                 }
             });
 
@@ -61,9 +67,16 @@ ChatViewModel::ChatViewModel(QObject* parent)
     connect(m_chatService, &ChatService::operationError,
             this, &ChatViewModel::operationError);
 
+    connect(&SettingsService::instance(), &SettingsService::settingChanged,
+            this, [this](const QString& key, const QVariant&) {
+                if (key == GlobalConstants::SEND_WITH_ENTER)
+                    emit sendWithEnterChanged();
+            });
+
 
     //加载最后会话角色
     m_chatService->restoreLastSession();
+    m_currentSessionId = m_chatService->currentSessionId();
 
     //加载角色会话列表
     refreshSessionList();
@@ -85,6 +98,21 @@ QString ChatViewModel::currentCharName() const
 QString ChatViewModel::currentSessionTitle() const
 {
     return m_currentSessionTitle;
+}
+
+QString ChatViewModel::currentSessionId() const
+{
+    return m_currentSessionId;
+}
+
+bool ChatViewModel::hasMoreHistory() const
+{
+    return m_hasMoreHistory;
+}
+
+bool ChatViewModel::sendWithEnter() const
+{
+    return SettingsService::instance().getBool(GlobalConstants::SEND_WITH_ENTER);
 }
 
 ChatMessageListModel* ChatViewModel::messageModel() const
@@ -136,17 +164,6 @@ void ChatViewModel::deleteMessage(const QString& messageId)
     m_chatService->deleteMessage(messageId);
 }
 
-void ChatViewModel::switchCharacter(const QString& charId)
-{
-    //(待优化)
-    if (charId.isEmpty()) return;
-    // 切换角色时自动创建新会话
-    QString sessionId = m_chatService->createSession(charId);
-    if (!sessionId.isEmpty()) {
-        m_chatService->switchSession(sessionId);
-    }
-}
-
 void ChatViewModel::createNewSession()
 {
     QString charId = m_chatService->currentCharacterId();
@@ -168,19 +185,28 @@ void ChatViewModel::deleteAllSession()
 
 void ChatViewModel::loadMoreHistory()
 {
-    QString sessionId = m_chatService->currentSessionId();
-    if (sessionId.isEmpty()) return;
+    const QString sessionId = m_chatService->currentSessionId();
+    if (sessionId.isEmpty() || !m_hasMoreHistory || !m_oldestMessageTime.isValid())
+        return;
 
-    QList<ChatMessageEntity> olderMsgs = m_chatService->loadMessagePage(
-        sessionId, m_historyLoadOffset, 50);
-    if (olderMsgs.isEmpty()) return;
+    const QList<ChatMessageEntity> olderMsgs = m_chatService->loadMessagesBefore(
+        sessionId, m_oldestMessageTime, m_oldestMessageId, 50);
+    if (olderMsgs.isEmpty()) {
+        m_hasMoreHistory = false;
+        emit hasMoreHistoryChanged();
+        return;
+    }
 
     // 按时间正序插入列表头部
     for (int i = olderMsgs.size() - 1; i >= 0; --i) {
         ChatMessageItemModel* item = createItemFromEntity(olderMsgs[i]);
         m_messageModel->insertMessage(0, item);
     }
-    m_historyLoadOffset += olderMsgs.size();
+
+    m_oldestMessageTime = olderMsgs.first().timestamp;
+    m_oldestMessageId = olderMsgs.first().id;
+    m_hasMoreHistory = olderMsgs.size() == 50;
+    emit hasMoreHistoryChanged();
 }
 
 // ==================== Service 信号响应槽 ====================
@@ -189,7 +215,10 @@ void ChatViewModel::onSessionSwitched(const QString& characterId, const QString&
     //刷新会话列表
     refreshSessionList();
 
-    Q_UNUSED(sessionId)
+    if (m_currentSessionId != sessionId) {
+        m_currentSessionId = sessionId;
+        emit currentSessionIdChanged();
+    }
     // 同步角色数据
     CharacterEntity character = m_characterService->getCharacterById(characterId);
     m_currentCharName = character.name;
@@ -204,7 +233,6 @@ void ChatViewModel::onSessionSwitched(const QString& characterId, const QString&
 
     // 重置消息列表与分页
     m_messageModel->clear();
-    m_historyLoadOffset = 0;
     loadInitialMessages();
 
     emit currentPresetChanged();
@@ -282,11 +310,17 @@ void ChatViewModel::onGenerationCanceled(const QString& messageId)
 // ======================================
 void ChatViewModel::loadInitialMessages()
 {
-    QString sessionId = m_chatService->currentSessionId();
+    const QString sessionId = m_chatService->currentSessionId();
     if (sessionId.isEmpty()) return;
 
-    QList<ChatMessageEntity> messages = m_chatService->loadMessagePage(sessionId, 0, 50);
-    m_historyLoadOffset = messages.size();
+    const QList<ChatMessageEntity> messages =
+        m_chatService->loadLatestMessages(sessionId, 50);
+
+    m_oldestMessageTime = messages.isEmpty()
+        ? QDateTime() : messages.first().timestamp;
+    m_oldestMessageId = messages.isEmpty() ? QString() : messages.first().id;
+    m_hasMoreHistory = messages.size() == 50;
+    emit hasMoreHistoryChanged();
 
     QList<ChatMessageItemModel*> items;
     items.reserve(messages.size());

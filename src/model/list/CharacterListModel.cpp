@@ -34,8 +34,6 @@ QVariant CharacterListModel::data(const QModelIndex& index, int role) const
     case DescriptionRole:   return item->description();
     case AvatarPathRole:    return item->avatarPath();
     case IsFavoriteRole:    return item->isFavorite();
-    case LastUsedTextRole:  return item->lastUsedText();
-    case UseCountRole:      return item->useCount();
     case UpdateTimeRole:    return item->updateTimeText();
     default:                return QVariant();
     }
@@ -49,8 +47,6 @@ QHash<int, QByteArray> CharacterListModel::roleNames() const
     roles[DescriptionRole]   = "description";
     roles[AvatarPathRole]    = "avatarPath";
     roles[IsFavoriteRole]    = "isFavorite";
-    roles[LastUsedTextRole]  = "lastUsedText";
-    roles[UseCountRole]      = "useCount";
     roles[UpdateTimeRole]    = "updateTimeText";
     return roles;
 }
@@ -77,6 +73,16 @@ void CharacterListModel::updateItem(const QString& charId)
     int row = indexOfId(charId);
     if (row < 0) return;
     QModelIndex idx = index(row);
+    emit dataChanged(idx, idx);
+}
+
+void CharacterListModel::updateItem(const CharacterEntity& entity)
+{
+    const int row = indexOfId(entity.id);
+    if (row < 0) return;
+
+    m_items[row]->updateFromEntity(entity);
+    const QModelIndex idx = index(row);
     emit dataChanged(idx, idx);
 }
 
@@ -119,6 +125,11 @@ CharacterItemViewModel* CharacterListModel::getItemById(const QString& charId) c
 CharacterItemViewModel* CharacterListModel::lastItem() const
 {
     return m_items.isEmpty() ? nullptr : m_items.last();
+}
+
+int CharacterListModel::rowById(const QString& charId) const
+{
+    return indexOfId(charId);
 }
 
 // 内部辅助：按ID查找索引

@@ -10,7 +10,7 @@ PromptDao::PromptDao(QObject *parent)
 QList<PromptEntity> PromptDao::selectPromptsByPresetId(const QString &presetId)
 {
     QList<PromptEntity> result;
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QString("SELECT * FROM %1 WHERE preset_id = ? ").arg(tableName());
@@ -33,7 +33,7 @@ bool PromptDao::createPrompts(const QList<PromptEntity> & prompts)
     if (prompts.isEmpty())
         return true;
 
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QStringList cols = columnNames();

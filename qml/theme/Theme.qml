@@ -126,6 +126,7 @@ QtObject {
     readonly property Metrics metrics: Metrics {}
     readonly property Motion motion: Motion {}
 
+    //间距
     readonly property int spaceXs: metrics.spaceXs
     readonly property int spaceSm: metrics.spaceSm
     readonly property int spaceMd: metrics.spaceMd
@@ -133,20 +134,24 @@ QtObject {
     readonly property int spaceXl: metrics.spaceXl
     readonly property int space2xl: metrics.space2xl
 
+    //圆角
     readonly property int radiusSm: metrics.radiusSm
     readonly property int radiusMd: metrics.radiusMd
     readonly property int radiusLg: metrics.radiusLg
     readonly property int radiusPill: metrics.radiusPill
 
+    //图标
     readonly property int iconSm: metrics.iconSm
     readonly property int iconMd: metrics.iconMd
     readonly property int iconLg: metrics.iconLg
 
+    //控件高度
     readonly property int controlSm: metrics.controlSm
     readonly property int controlMd: metrics.controlMd
     readonly property int controlLg: metrics.controlLg
     readonly property int touchTarget: metrics.touchTarget
 
+    //头像
     readonly property int avatarSm: metrics.avatarSm
     readonly property int avatarMd: metrics.avatarMd
     readonly property int avatarLg: metrics.avatarLg

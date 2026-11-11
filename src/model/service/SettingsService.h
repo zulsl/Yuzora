@@ -12,6 +12,9 @@ public:
     static SettingsService& instance();
     ~SettingsService() override;
 
+    // 测试/组合根可注入 DAO；生产仍使用 instance()。
+    explicit SettingsService(SettingsDao* dao, QObject* parent = nullptr);
+
     SettingsService(const SettingsService&) = delete;
     SettingsService& operator=(const SettingsService&) = delete;
     SettingsService(SettingsService&&) = delete;
@@ -25,6 +28,9 @@ public:
 
     // ========== 通用写入接口 ==========
     Q_INVOKABLE void setValue(const QString& key, const QVariant& value);
+
+    // 读取图片、保存到头像目录并更新设置；失败抛 AppException。
+    void saveUserAvatar(const QString& sourcePath);
 
     // ========== 批量操作 ==========
     void resetToDefault(const QString& key);

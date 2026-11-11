@@ -269,8 +269,23 @@ QList<ChatSessionEntity> ChatService::getSessionListByCurrentCharacter()
 // ======================================
 QList<ChatMessageEntity> ChatService::loadMessagePage(const QString& sessionId, int offset, int limit)
 {
+    Q_UNUSED(offset)
     if (sessionId.isEmpty()) return {};
-    return m_messageDao->selectBySessionIdPaged(sessionId, offset, limit);
+    return m_messageDao->selectLatestBySessionId(sessionId, limit);
+}
+
+QList<ChatMessageEntity> ChatService::loadLatestMessages(const QString& sessionId, int limit)
+{
+    if (sessionId.isEmpty()) return {};
+    return m_messageDao->selectLatestBySessionId(sessionId, limit);
+}
+
+QList<ChatMessageEntity> ChatService::loadMessagesBefore(
+    const QString& sessionId, const QDateTime& beforeTimestamp,
+    const QString& beforeId, int limit)
+{
+    if (sessionId.isEmpty()) return {};
+    return m_messageDao->selectBefore(sessionId, beforeTimestamp, beforeId, limit);
 }
 
 void ChatService::editMessage(const QString& messageId, const QString& newContent)
@@ -372,7 +387,7 @@ void ChatService::regenerateLastMessage()
 
     // 定位最后一条助理消息
     ChatMessageEntity lastAssistantMsg;
-    QList<ChatMessageEntity> allMsgs = m_messageDao->selectBySessionIdPaged(m_currentSessionId, 0, 1000);
+    QList<ChatMessageEntity> allMsgs = m_messageDao->selectLatestBySessionId(m_currentSessionId, 1000);
     for (auto it = allMsgs.rbegin(); it != allMsgs.rend(); ++it) {
         if (it->type == GlobalConstants::MessageType::Assistant
             && it->status == GlobalConstants::MessageGenerationStatus::Normal) {
@@ -594,7 +609,7 @@ QList<ChatMessage> ChatService::buildPromptContext(const QString& userInput)
     if (character.id.isEmpty()) return {};
 
     //历史消息
-    QList<ChatMessageEntity> allMsgs = m_messageDao->selectBySessionIdPaged(m_currentSessionId, 0, 1000);
+    QList<ChatMessageEntity> allMsgs = m_messageDao->selectLatestBySessionId(m_currentSessionId, 1000);
     // 提取有效历史消息（仅正常完成、未隐藏）(可优化)
     QList<ChatMessageEntity> validHistory;
     for (const ChatMessageEntity& msg : allMsgs) {

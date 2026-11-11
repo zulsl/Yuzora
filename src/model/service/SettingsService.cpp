@@ -1,6 +1,10 @@
 #include "SettingsService.h"
 #include "Utils.h"
+#include "AppException.h"
 #include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QImage>
 
 SettingsService& SettingsService::instance()
 {
@@ -13,7 +17,13 @@ SettingsService::SettingsService(QObject* parent)
     , m_dao(new SettingsDao(this))
 {
     initDefaultValues();
-    loadAllToCache();
+}
+
+SettingsService::SettingsService(SettingsDao* dao, QObject* parent)
+    : QObject(parent)
+    , m_dao(dao ? dao : new SettingsDao(this))
+{
+    initDefaultValues();
 }
 
 SettingsService::~SettingsService() = default;
@@ -118,6 +128,32 @@ void SettingsService::setValue(const QString& key, const QVariant& value)
         emit fontSizeChanged(value.toInt());
     } else if (key.startsWith("network.proxy")) {
         emit proxySettingsChanged();
+    }
+}
+
+void SettingsService::saveUserAvatar(const QString& sourcePath)
+{
+    if (sourcePath.isEmpty()) {
+        THROW(FileIOError, "头像路径不能为空");
+    }
+
+    QImage image(sourcePath);
+    if (image.isNull()) {
+        THROW(FileIOError, QString("无法读取图片：%1").arg(sourcePath));
+    }
+
+    const QString fileName = Utils::generateUuid() + ".png";
+    const QString fullPath = QDir(Utils::getAvatarDirPath()).filePath(fileName);
+    if (!image.save(fullPath, "PNG")) {
+        THROW(FileIOError, "头像保存失败：无法写入文件");
+    }
+
+    const QString oldAvatar = getString(GlobalConstants::USER_AVATAR);
+    setValue(GlobalConstants::USER_AVATAR, fileName);
+
+    // 保存成功后再清理旧头像，避免失败时把仍在使用的文件删掉。
+    if (!oldAvatar.isEmpty() && oldAvatar != fileName) {
+        QFile::remove(QDir(Utils::getAvatarDirPath()).filePath(oldAvatar));
     }
 }
 

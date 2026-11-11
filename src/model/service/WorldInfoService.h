@@ -15,6 +15,11 @@ public:
     static WorldInfoService& instance();
     ~WorldInfoService() override;
 
+    // 测试/组合根可注入 DAO；生产仍使用 instance()。
+    explicit WorldInfoService(WorldInfoBookDao* bookDao,
+                              WorldInfoEntryDao* entryDao,
+                              QObject* parent = nullptr);
+
     // ========== 外部接口 ==========
     QList<WorldInfoEntryEntity> getEntryForEnabledBooks();
     // ========== 文集业务 ==========
@@ -50,9 +55,13 @@ public:
 
 
 signals:
+    void bookListChanged();
+    void bookUpdated(const QString& bookId);
     void entryListChanged(const QString& bookId);
     void entryUpdated(const QString& entryId);
     void entryDeleted(const QString& entryId);
+    void importSuccess(int count);
+    void exportSuccess();
     void operationError(const QString& errorMsg);
 
 private:

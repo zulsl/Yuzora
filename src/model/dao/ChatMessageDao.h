@@ -14,9 +14,13 @@ public:
     explicit ChatMessageDao(QObject* parent = nullptr);
 
     // 业务扩展方法
-    // 分页查询会话消息（按时间正序）
-    QList<ChatMessageEntity> selectBySessionIdPaged(
-        const QString& sessionId, int offset = 0, int limit = 50);
+    // 最新一页（SQL 按时间倒序取，返回时恢复正序）
+    QList<ChatMessageEntity> selectLatestBySessionId(
+        const QString& sessionId, int limit = 50);
+    // 早于指定游标的一页（游标为 timestamp + id，避免同一时间消息重复/丢失）
+    QList<ChatMessageEntity> selectBefore(
+        const QString& sessionId, const QDateTime& beforeTimestamp,
+        const QString& beforeId, int limit = 50);
     // 增量更新消息内容（流式落库用）
     bool appendContent(const QString& messageId, const QString& chunk);
     //非流式更新内容

@@ -22,6 +22,17 @@ PageScaffold {
     contentPadding: 0
     onLeftClicked: Ui.requestDrawer()
 
+    // PageHost 生命周期：切走时关闭抽屉，切回时回到消息底部。
+    function pageShown() {
+        if (messageListView.count > 0)
+            Qt.callLater(() => messageListView.positionViewAtEnd())
+    }
+
+    function pageHidden() {
+        if (historyDrawer.opened)
+            historyDrawer.close()
+    }
+
     rightItems: [
         IconButton {
             tip: "新对话"
@@ -64,7 +75,8 @@ PageScaffold {
 
                 // 上拉到顶时加载更多历史
                 onAtYBeginningChanged: {
-                    if (atYBeginning && !ChatViewModel.isGenerating)
+                    if (atYBeginning && !ChatViewModel.isGenerating
+                            && ChatViewModel.hasMoreHistory)
                         ChatViewModel.loadMoreHistory()
                 }
 
@@ -132,8 +144,11 @@ PageScaffold {
                         // 回车发送、Shift+回车换行（沿用改造前的行为；
                         // SettingsViewModel.sendWithEnter 目前仍是未接线状态，见 P5 说明）
                         Keys.onReturnPressed: (event) => {
-                            event.accepted = !(event.modifiers & Qt.ShiftModifier)
-                            if (event.accepted)
+                            const send = ChatViewModel.sendWithEnter
+                                         ? !(event.modifiers & Qt.ShiftModifier)
+                                         : (event.modifiers & Qt.ControlModifier)
+                            event.accepted = send
+                            if (send)
                                 sendButton.clicked()
                         }
                     }
@@ -202,10 +217,9 @@ PageScaffold {
                     text: model.title
                     font.pixelSize: Theme.fontBody
                     font.family: Theme.fontFamily
-                    highlighted: ListView.isCurrentItem
+                    highlighted: ChatViewModel.currentSessionId === model.id
 
                     onClicked: {
-                        sessionListView.currentIndex = index
                         ChatViewModel.switchSession(model.id)
                         historyDrawer.close()
                     }
@@ -216,16 +230,17 @@ PageScaffold {
                 Layout.fillWidth: true
                 text: "删除所有历史会话"
                 variant: "danger"
-                onClicked: ChatViewModel.deleteAllSession()
+                onClicked: deleteAllDialog.open()
             }
         }
     }
 
-    // 聊天相关错误统一走全局吐司
-    Connections {
-        target: ChatViewModel
-        function onOperationError(message) { Ui.toast(message, true) }
-        function onOperationTip(message) { Ui.toast(message, false) }
-        function onGenerationError(message) { Ui.toast(message, true) }
+    ConfirmDialog {
+        id: deleteAllDialog
+        title: "确认删除"
+        text: "确定删除当前角色的所有历史会话吗？此操作不可撤销。"
+        acceptText: "删除"
+        danger: true
+        onConfirmed: ChatViewModel.deleteAllSession()
     }
 }

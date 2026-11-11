@@ -51,26 +51,29 @@ bool DatabaseManager::initialize()
     QSqlQuery pragmaQuery(db);
 // pragmaQuery.exec("PRAGMA foreign_keys = ON;");
 
+    // 先确保表存在。新库直接按当前版本建表；旧库由后续迁移补列。
+    if (!createTables(db)) {
+        qCritical() << "[数据库] 创建表格失败：" << db.lastError().text();
+        return false;
+    }
+
     // 读取当前数据库版本
     int currentVersion = 0;
     if (pragmaQuery.exec("PRAGMA user_version;") && pragmaQuery.next()) {
         currentVersion = pragmaQuery.value(0).toInt();
     }
 
-// 版本增量升级(预留)
+    // 版本增量升级（迁移内部按列存在性判断，可重复执行）
     if (currentVersion < DATABASE_VERSION) {
         if (!upgradeDatabase(db, currentVersion, DATABASE_VERSION)) {
             qCritical() << "[数据库]版本升级失败" << currentVersion;
             return false;
         }
-        // 更新数据库版本号
-        pragmaQuery.exec(QString("PRAGMA user_version = %1;").arg(DATABASE_VERSION));
-    }
-
-// 初始化所有数据表（幂等操作，已存在则跳过）
-    if (!createTables(db)) {
-        qCritical() << "[数据库] 创建表格失败：" << db.lastError().text();
-        return false;
+        // 迁移成功后再更新版本号，失败时保留旧版本
+        if (!pragmaQuery.exec(QString("PRAGMA user_version = %1;").arg(DATABASE_VERSION))) {
+            qCritical() << "[数据库]写入版本号失败：" << pragmaQuery.lastError().text();
+            return false;
+        }
     }
 
     m_isReady = true;
@@ -205,6 +208,7 @@ bool DatabaseManager::createTables(QSqlDatabase& db)
             scenario TEXT DEFAULT '',
             example_dialogue TEXT DEFAULT '',
             system_prompt TEXT DEFAULT '',
+            post_history_instructions TEXT DEFAULT '',
             character_version TEXT DEFAULT '1.0.0',
             tags TEXT DEFAULT '[]',                 -- JSON 数组格式
             card_format_version INTEGER DEFAULT 2,
@@ -277,11 +281,18 @@ bool DatabaseManager::createTables(QSqlDatabase& db)
             keywords TEXT,                   -- 主关键词 JSON数组
             secondary_keywords TEXT,         -- 二级关键词 JSON数组
             content TEXT,                    -- 注入的正文内容
+            is_enabled INTEGER NOT NULL DEFAULT 1, -- 是否启用
             constant INTEGER NOT NULL,       -- 触发策略
             vectorized INTEGER NOT NULL,     -- 向量化
             position INTEGER NOT NULL,       -- 插入位置
             role INTEGER,                    -- 在什么角色插入
+            insert_depth INTEGER NOT NULL DEFAULT 4, -- 插入深度
             sort_order INTEGER NOT NULL,     -- 顺序
+            use_probability INTEGER NOT NULL DEFAULT 0, -- 启用概率触发
+            probability INTEGER NOT NULL DEFAULT 100,   -- 触发概率
+            selective INTEGER NOT NULL DEFAULT 1,       -- 选择性逻辑开关
+            selective_logic INTEGER NOT NULL DEFAULT 0, -- 选择性逻辑
+            scan_depth INTEGER NOT NULL DEFAULT -1,     -- 扫描深度
             extensions TEXT,                 -- 扩展字段 JSON
             FOREIGN KEY (book_id) REFERENCES world_info_books(id) ON DELETE CASCADE
         );
@@ -415,13 +426,66 @@ bool DatabaseManager::createTables(QSqlDatabase& db)
 
 bool DatabaseManager::upgradeDatabase(QSqlDatabase& db, int oldVersion, int newVersion)
 {
-    Q_UNUSED(db);
-    Q_UNUSED(oldVersion);
-    Q_UNUSED(newVersion);
+    if (oldVersion >= newVersion) {
+        return true;
+    }
 
-    // 当前为初始版本1，无需增量升级
-    // 后续版本迭代时，在此处按版本号依次执行 ALTER TABLE 等迁移语句
-    // 示例：if (oldVersion < 2) { 执行v1→v2升级SQL }
+    if (!db.transaction()) {
+        qCritical() << "[数据库] 开启迁移事务失败：" << db.lastError().text();
+        return false;
+    }
+
+    // v1 → v2：补齐实体/DAO 已经在使用、但旧表缺失的字段。
+    // ensureColumn 按 PRAGMA table_info 判断，新库建表后执行也是 no-op。
+    const bool migrated =
+        ensureColumn(db, "characters", "post_history_instructions", "TEXT DEFAULT ''")
+        && ensureColumn(db, "world_info_entries", "is_enabled", "INTEGER NOT NULL DEFAULT 1")
+        && ensureColumn(db, "world_info_entries", "insert_depth", "INTEGER NOT NULL DEFAULT 4")
+        && ensureColumn(db, "world_info_entries", "use_probability", "INTEGER NOT NULL DEFAULT 0")
+        && ensureColumn(db, "world_info_entries", "probability", "INTEGER NOT NULL DEFAULT 100")
+        && ensureColumn(db, "world_info_entries", "selective", "INTEGER NOT NULL DEFAULT 1")
+        && ensureColumn(db, "world_info_entries", "selective_logic", "INTEGER NOT NULL DEFAULT 0")
+        && ensureColumn(db, "world_info_entries", "scan_depth", "INTEGER NOT NULL DEFAULT -1");
+
+    if (!migrated || !db.commit()) {
+        qCritical() << "[数据库] 迁移 v2 失败：" << db.lastError().text();
+        db.rollback();
+        return false;
+    }
+
+    return true;
+}
+
+bool DatabaseManager::hasColumn(QSqlDatabase& db, const QString& table, const QString& column)
+{
+    QSqlQuery query(db);
+    if (!query.exec(QString("PRAGMA table_info(%1)").arg(table))) {
+        qWarning() << "[数据库] 读取表结构失败：" << table << query.lastError().text();
+        return false;
+    }
+
+    while (query.next()) {
+        if (query.value(1).toString() == column) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool DatabaseManager::ensureColumn(QSqlDatabase& db, const QString& table,
+                                   const QString& column, const QString& definition)
+{
+    if (hasColumn(db, table, column)) {
+        return true;
+    }
+
+    QSqlQuery query(db);
+    const QString sql = QString("ALTER TABLE %1 ADD COLUMN %2 %3")
+                            .arg(table, column, definition);
+    if (!query.exec(sql)) {
+        qCritical() << "[数据库] 添加字段失败：" << sql << query.lastError().text();
+        return false;
+    }
     return true;
 }
 

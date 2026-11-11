@@ -10,7 +10,7 @@ CompletionPresetDao::CompletionPresetDao(QObject* parent)
 bool CompletionPresetDao::setDefault(const QString &id)
 {
     if (id.isEmpty()) return false;
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     if (!db.transaction()) return false;
 
     QSqlQuery clearQuery(db);
@@ -32,7 +32,7 @@ bool CompletionPresetDao::setDefault(const QString &id)
 
 bool CompletionPresetDao::clearAllDefault()
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
     return query.exec("UPDATE completion_presets SET is_default = 0");
 }
@@ -40,7 +40,7 @@ bool CompletionPresetDao::clearAllDefault()
 CompletionPresetEntity CompletionPresetDao::selectDefault()
 {
     CompletionPresetEntity entity;
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
     query.exec("SELECT * FROM completion_presets WHERE is_default = 1 LIMIT 1");
     if (query.next()) {
@@ -53,7 +53,7 @@ CompletionPresetEntity CompletionPresetDao::selectDefault()
 bool CompletionPresetDao::rename(const QString &id, const QString &newName)
 {
     if (id.isEmpty() || newName.isEmpty()) return false;
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
     query.prepare("UPDATE completion_presets SET name = ?, updated_at = ? WHERE id = ?");
     query.addBindValue(newName);

@@ -8,27 +8,22 @@ import Yuzora 1.0
 // 响应式策略：差异大 → Loader
 //   宽窗口：AdaptiveSplit 1:3（文集 | 条目）
 //   窄窗口：MasterDetailStack（文集 → 条目）
-PageScaffold {
+MasterDetailPage {
     id: root
 
     readonly property bool compactDetailVisible: layoutLoader.item
                                                 ? layoutLoader.item.detailShown === true
                                                 : false
 
-    title: compactDetailVisible
-           ? (WorldInfoViewModel.currentBookName.length > 0
-              ? WorldInfoViewModel.currentBookName : "条目列表")
-           : "世界书 / 知识书"
-    leftIconSource: compactDetailVisible
-                    ? "qrc:/icons/res/arrow-narrow-left.svg"
-                    : "qrc:/icons/res/menu.svg"
-    contentPadding: Theme.spaceSm
-    onLeftClicked: {
-        if (compactDetailVisible && layoutLoader.item)
+    listTitle: "世界书 / 知识书"
+    detailTitle: WorldInfoViewModel.currentBookName.length > 0
+                 ? WorldInfoViewModel.currentBookName : "条目列表"
+    detailVisible: compactDetailVisible
+    onBackRequested: {
+        if (layoutLoader.item)
             layoutLoader.item.hideDetail()
-        else
-            Ui.requestDrawer()
     }
+    contentPadding: Theme.spaceSm
 
     function localPath(url) {
         const s = String(url)
@@ -146,12 +141,5 @@ PageScaffold {
             font.pixelSize: Theme.fontBody
             font.family: Theme.fontFamily
         }
-    }
-
-    Connections {
-        target: WorldInfoViewModel
-        function onOperationError(message) { Ui.toast(message, true) }
-        function onImportSuccess(count) { Ui.toast("已导入 " + count + " 个条目", false) }
-        function onExportSuccess() { Ui.toast("导出成功", false) }
     }
 }

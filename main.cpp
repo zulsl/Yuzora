@@ -8,6 +8,7 @@
 #include "GlobalConstants.h"
 #include "Utils.h"
 #include "DatabaseManager.h"
+#include "ApplicationBootstrap.h"
 #include "DeviceHelper.h"
 
 // ======================================
@@ -46,8 +47,8 @@ int main(int argc, char *argv[])
     Utils::getAppDataPath();
     Utils::getAvatarDirPath();
 
-//初始化数据库（主线程建表、创建连接池基础配置）
-    if (!DatabaseManager::instance().initialize()) {
+//初始化数据库，并在加载 QML 前写入种子数据
+    if (!ApplicationBootstrap::initialize()) {
         qFatal("数据库初始化失败，程序退出。");
         return -1;
     }

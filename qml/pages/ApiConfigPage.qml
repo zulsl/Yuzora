@@ -265,18 +265,12 @@ PageScaffold {
         anchors.centerIn: Overlay.overlay
         width: Math.min(parent ? parent.width - Theme.spaceXl * 2 : 360, 420)
         padding: Theme.spaceLg
-        standardButtons: Dialog.Ok | Dialog.Cancel
 
         background: Rectangle {
             color: Theme.bgElevated
             radius: Theme.radiusMd
             border.width: 1
             border.color: Theme.borderDefault
-        }
-
-        onAccepted: {
-            ApiConfigViewModel.addCustomConfig(nameInput.text)
-            nameInput.text = ""
         }
 
         contentItem: ColumnLayout {
@@ -300,6 +294,33 @@ PageScaffold {
                 font.family: Theme.fontFamily
             }
         }
+
+        footer: Item {
+            implicitHeight: Theme.touchTarget + Theme.spaceSm
+            Row {
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.spaceLg
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.spaceSm
+
+                AppButton {
+                    text: "取消"
+                    variant: "ghost"
+                    onClicked: addModelDialog.close()
+                }
+                AppButton {
+                    text: "添加"
+                    variant: "primary"
+                    enabled: nameInput.text.trim().length > 0
+                    onClicked: {
+                        if (ApiConfigViewModel.addCustomConfig(nameInput.text)) {
+                            nameInput.text = ""
+                            addModelDialog.close()
+                        }
+                    }
+                }
+            }
+        }
     }
 
     ConfirmDialog {
@@ -309,13 +330,5 @@ PageScaffold {
         acceptText: "删除"
         danger: true
         onConfirmed: ApiConfigViewModel.deleteCurrentConfig()
-    }
-
-    Connections {// 兼容旧接口
-        target: ApiConfigViewModel
-        function onOperationError(message) { Ui.toast(message, true) }
-        function onOperationTip(message) { Ui.toast(message, false) }
-        function onDeleteSuccess() { Ui.toast("配置已删除", false) }
-        function onTestSuccess() { Ui.toast("连接正常", false) }
     }
 }

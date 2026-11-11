@@ -10,8 +10,6 @@ ApiConfigViewModel::ApiConfigViewModel(QObject *parent)
             this, &ApiConfigViewModel::operationError);
     connect(m_service, &ApiConfigService::operationTip,
             this, &ApiConfigViewModel::operationTip);
-    connect(m_service, &ApiConfigService::testSuccess,
-            this, &ApiConfigViewModel::onTestSuccess);
     connect(m_service, &ApiConfigService::fetchModelListEnd,
             this, &ApiConfigViewModel::onFetchModelListState);
 
@@ -35,11 +33,6 @@ QString ApiConfigViewModel::currentConfigId() const
 bool ApiConfigViewModel::currentIsActive() const
 {
     return m_currentSelectConfig.isActive;
-}
-
-bool ApiConfigViewModel::testingConnection() const
-{
-    return m_testingConnection;
 }
 
 bool ApiConfigViewModel::fetchModelListState() const
@@ -119,24 +112,25 @@ void ApiConfigViewModel::refreshList()
     loadCurrentConfigDetail();
 }
 
-void ApiConfigViewModel::addCustomConfig(const QString &configName)
+bool ApiConfigViewModel::addCustomConfig(const QString &configName)
 {
     QString trimmedName = configName.trimmed();
     if (trimmedName.isEmpty()) {
         emit operationError(QStringLiteral("配置名称不能为空"));
-        return;
+        return false;
     }
 
     QString newId = m_service->createCustomConfig(trimmedName);
     if (newId.isEmpty()) {
         emit operationError(QStringLiteral("创建自定义配置失败"));
-        return;
+        return false;
     }
 
     // 刷新列表并自动选中新建的配置
     refreshList();
     setCurrentConfigId(newId);
     loadCurrentConfigDetail();
+    return true;
 }
 
 void ApiConfigViewModel::deleteCurrentConfig()
@@ -154,16 +148,6 @@ void ApiConfigViewModel::deleteCurrentConfig()
     } else {
         emit operationError(QStringLiteral("删除配置失败"));
     }
-}
-
-void ApiConfigViewModel::testCurrentConnection()
-{
-    if (m_currentConfigId.isEmpty() || m_testingConnection) return;
-
-    m_testingConnection = true;
-    emit testingConnectionChanged();
-
-    m_service->testConnection(m_currentConfigId);
 }
 
 void ApiConfigViewModel::fetchModelList()
@@ -279,23 +263,6 @@ int ApiConfigViewModel::getModelsIndex()
 }
 
 // ==================== Service 回调槽 ====================
-void ApiConfigViewModel::onTestSuccess(const QString &configId)
-{
-    // 只响应当前选中配置的测试结果
-    if (configId != m_currentConfigId) return;
-
-    m_testingConnection = false;
-    emit testingConnectionChanged();
-    emit testSuccess();
-}
-
-void ApiConfigViewModel::onRequestFailed(const QString &configId, const QString &error)
-{
-    if (configId != m_currentConfigId) return;
-
-    emit operationError(error);
-}
-
 void ApiConfigViewModel::onFetchModelListState(const QString &configId)
 {
     // 只处理当前配置的结束信号，避免旧请求把新请求的转圈状态关掉

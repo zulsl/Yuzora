@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QVariantMap>
 #include <QStringList>
+#include <QHash>
 #include <QtQml/qqmlregistration.h>
 #include <QQmlEngine>
 
@@ -11,6 +12,7 @@
 #include "WorldInfoEntryEntity.h"
 
 class QJSEngine;
+class QTimer;
 class WorldInfoService;
 
 /**
@@ -48,11 +50,8 @@ public:
 
     // 条目列表数据源（供 QML 使用）
     Q_PROPERTY(WorldInfoEntryListModel* entryModel READ entryModel CONSTANT)
-    // 当前条目编辑快照（供 QML 使用）
-    Q_PROPERTY(QVariantMap currentEntry READ currentEntry NOTIFY currentEntryChanged)
 
     WorldInfoEntryListModel* entryModel() const;
-    QVariantMap currentEntry() const;
 
     // ---- 供 C++（WorldInfoViewModel）使用，不是 QML 接口 ----
     void setCurrentBookId(const QString& bookId);
@@ -60,9 +59,10 @@ public:
 
     // ---- 供 QML 使用 ----
     Q_INVOKABLE void refreshEntryList();
-    Q_INVOKABLE void selectEntry(const QString& entryId);
     Q_INVOKABLE void createEntry();
-    Q_INVOKABLE void saveEntry(const QVariantMap& entryData);
+    Q_INVOKABLE void setEntryField(const QString& entryId, const QString& field,
+                                   const QVariant& value);
+    Q_INVOKABLE void flushPendingEntryEdits();
     Q_INVOKABLE void deleteEntry(const QString& entryId);
     Q_INVOKABLE void toggleEntryEnabled(const QString& entryId);
     Q_INVOKABLE void moveEntry(const QString& entryId, const QString& targetBookId);
@@ -71,7 +71,6 @@ public:
 
 signals:
     // 供 QML 使用
-    void currentEntryChanged();
     void operationError(const QString& errorMsg);
 
 private:
@@ -80,13 +79,13 @@ private:
     // QML 侧拿到的不是同一个对象（表现为"选中世界书后条目列表始终为空"）。
     explicit WorldInfoEntryViewModel(QObject* parent = nullptr);
 
-    QVariantMap entryToMap(const WorldInfoEntryEntity& entry) const;
-    WorldInfoEntryEntity mapToEntry(const QVariantMap& map) const;
+    int roleForField(const QString& field) const;
 
     WorldInfoService* m_service = nullptr;
     WorldInfoEntryListModel* m_entryModel = nullptr;
-    WorldInfoEntryEntity m_currentEntry;
     QString m_currentBookId;
+    QTimer* m_saveTimer = nullptr;
+    QHash<QString, QVariantMap> m_pendingFields;
 };
 
 #endif // WORLDINFOENTRYVIEWMODEL_H

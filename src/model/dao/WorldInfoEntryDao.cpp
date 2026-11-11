@@ -9,7 +9,7 @@ WorldInfoEntryDao::WorldInfoEntryDao(QObject *parent)
 QList<WorldInfoEntryEntity> WorldInfoEntryDao::selectEntriesByBookId(const QString & bookId)
 {
     QList<WorldInfoEntryEntity> result;
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
+    QSqlDatabase db = connection();
     QSqlQuery query(db);
 
     QString sql = QString("SELECT * FROM %1 WHERE book_id = ? ").arg(tableName());
@@ -42,7 +42,9 @@ QStringList WorldInfoEntryDao::columnNames() const
 {
     return {
         "id", "book_id", "name", "keywords", "secondary_keywords", "content",
-        "constant", "vectorized", "position", "role", "sort_order","extensions"
+        "is_enabled", "constant", "vectorized", "position", "role", "insert_depth",
+        "sort_order", "use_probability", "probability", "selective", "selective_logic",
+        "scan_depth", "extensions"
     };
 }
 
@@ -55,11 +57,18 @@ void WorldInfoEntryDao::bindValues(QSqlQuery &query, const WorldInfoEntryEntity 
     query.addBindValue(Utils::stringListToJson(entity.keywords));
     query.addBindValue(Utils::stringListToJson(entity.secondaryKeywords));
     query.addBindValue(entity.content);
+    query.addBindValue(entity.isEnabled ? 1 : 0);
     query.addBindValue(entity.constant?1:0);
     query.addBindValue(entity.vectorized?1:0);
     query.addBindValue(entity.position);
     query.addBindValue(entity.insertRole);
+    query.addBindValue(entity.insertDepth);
     query.addBindValue(entity.sortOrder);
+    query.addBindValue(entity.useProbability ? 1 : 0);
+    query.addBindValue(entity.probability);
+    query.addBindValue(entity.selective ? 1 : 0);
+    query.addBindValue(entity.selectiveLogic);
+    query.addBindValue(entity.scanDepth);
     query.addBindValue(Utils::variantMapToJson(entity.extensions));
 }
 
@@ -73,11 +82,19 @@ WorldInfoEntryEntity WorldInfoEntryDao::parseFromQuery(const QSqlQuery &query) c
     entity.keywords = Utils::jsonToStringList(query.value("keywords"));
     entity.secondaryKeywords = Utils::jsonToStringList(query.value("secondary_keywords"));
     entity.content = query.value("content").toString();
+    entity.isEnabled = query.value("is_enabled").toBool();
     entity.constant = query.value("constant").toBool();
     entity.vectorized = query.value("vectorized").toBool();
     entity.position = static_cast<WorldInfoEntryEntity::Position>(query.value("position").toInt());
     entity.insertRole = static_cast<GlobalConstants::MessageType>(query.value("role").toInt());
+    entity.insertDepth = query.value("insert_depth").toInt();
     entity.sortOrder = query.value("sort_order").toInt();
+    entity.useProbability = query.value("use_probability").toBool();
+    entity.probability = query.value("probability").toInt();
+    entity.selective = query.value("selective").toBool();
+    entity.selectiveLogic = static_cast<WorldInfoEntryEntity::SelectiveLogic>(
+        query.value("selective_logic").toInt());
+    entity.scanDepth = query.value("scan_depth").toInt();
     entity.extensions = Utils::jsonToVariantMap(query.value("extensions"));
     return entity;
 }

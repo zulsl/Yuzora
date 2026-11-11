@@ -13,7 +13,7 @@ ColumnLayout {
     // 父级传入的当前草稿，仅用于切换角色时重建列表
     property var greetings: []
     property string recordId: ""
-    property int maxLines: 4
+    property int maxLines: 10
 
     signal greetingsEdited(var values)
 
@@ -119,9 +119,12 @@ ColumnLayout {
             // Qt 仍然会先完成整段文本的排版，10 条长开场白会白付一次成本。
             readonly property string previewText: text.length > 160
                                                   ? text.substring(0, 160) : text
-            readonly property real minHeight: Theme.controlMd
-            readonly property real maxHeight: Math.max(minHeight,
-                itemFontMetrics.height * root.maxLines + Theme.spaceSm * 2)
+            readonly property real lineHeight:
+                Math.max(1, Math.ceil(itemFontMetrics.lineSpacing))
+            readonly property real minHeight: lineHeight
+            readonly property real maxHeight:
+                lineHeight * Math.max(1, Math.min(root.maxLines, 10))
+                + Theme.spaceSm * 2
 
             // addGreeting() 可能在编辑器 Loader 完成前请求聚焦，先记下来
             property bool focusPending: false
@@ -214,8 +217,7 @@ ColumnLayout {
                             return 0
 
                         return Math.min(delegateRoot.maxHeight,
-                            Math.max(delegateRoot.minHeight,
-                                     item.naturalHeight))
+                                Math.max(delegateRoot.minHeight,item.naturalHeight))
                     }
                     sourceComponent: editorComponent
 

@@ -2,6 +2,8 @@
 #include "Utils.h"
 #include "ScopeTimer.h"
 #include "DatabaseManager.h"
+#include "ConnectionProviderRegistry.h"
+#include "IConnectionProvider.h"
 
 #include <QSet>
 #include <QSqlDatabase>
@@ -17,11 +19,24 @@ CompletionPresetService::CompletionPresetService(QObject* parent)
     , m_completionPresetDao(new CompletionPresetDao(this))
     , m_promptDao(new PromptDao(this))
 {
-    initBuiltinPresets();
-    m_currentActivePreset=m_completionPresetDao->selectDefault();
+}
+
+CompletionPresetService::CompletionPresetService(CompletionPresetDao* presetDao,
+                                                 PromptDao* promptDao,
+                                                 QObject* parent)
+    : QObject(parent)
+    , m_completionPresetDao(presetDao ? presetDao : new CompletionPresetDao(this))
+    , m_promptDao(promptDao ? promptDao : new PromptDao(this))
+{
 }
 
 CompletionPresetService::~CompletionPresetService() = default;
+
+void CompletionPresetService::ensureSeedData()
+{
+    initBuiltinPresets();
+    m_currentActivePreset = m_completionPresetDao->selectDefault();
+}
 
 void CompletionPresetService::initBuiltinPresets()
 {
@@ -292,8 +307,9 @@ bool CompletionPresetService::writePromptChange(
     bool insertPrompt,
     const QString& deletePromptId)
 {
-    QSqlDatabase db = DatabaseManager::instance().getThreadConnection();
-    if (!db.transaction()) {
+    IConnectionProvider* provider = ConnectionProviderRegistry::provider();
+    QSqlDatabase db = provider ? provider->connection() : QSqlDatabase();
+    if (!db.isOpen() || !db.transaction()) {
         emit operationError("开启提示词事务失败");
         return false;
     }

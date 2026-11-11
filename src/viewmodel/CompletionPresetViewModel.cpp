@@ -1,4 +1,5 @@
 #include "CompletionPresetViewModel.h"
+#include "CompletionPresetDraft.h"
 #include "PresetItemModel.h"
 #include "GlobalConstants.h"
 #include "ScopeTimer.h"
@@ -11,7 +12,16 @@ CompletionPresetViewModel::CompletionPresetViewModel(QObject* parent)
     , m_service(&CompletionPresetService::instance())
     , m_presetModel(new PresetListModel(this))
     , m_presetPromptListModel(new PresetPromptListModel(this))
+    , m_presetDraft(new CompletionPresetDraft(this))
 {
+    connect(m_presetDraft, &CompletionPresetDraft::changed, this, [this]() {
+        const bool dirty = !m_presetDraft->equals(m_presetBaseline);
+        if (m_presetDirty != dirty) {
+            m_presetDirty = dirty;
+            emit presetDirtyChanged();
+        }
+        emit presetDraftChanged();
+    });
 
     // 绑定 Service 层信号
     // connect(m_service, &CompletionPresetService::presetListChanged,
@@ -21,11 +31,12 @@ CompletionPresetViewModel::CompletionPresetViewModel(QObject* parent)
     connect(m_service, &CompletionPresetService::exportSuccess,
             this, &CompletionPresetViewModel::exportSuccess);
 
-    // Model 的业务字段变化 → 通知 Service 落盘
-    connect(m_presetPromptListModel, &PresetPromptListModel::entryWriting,
-            this, [this](const PromptEntity & entry) {
-                m_service->updatePrompt(entry);
-            });
+    // Model 的业务字段变化不再直接落盘；由 setPromptField + 定时器统一提交。
+    m_promptSaveTimer = new QTimer(this);
+    m_promptSaveTimer->setSingleShot(true);
+    m_promptSaveTimer->setInterval(300);
+    connect(m_promptSaveTimer, &QTimer::timeout,
+            this, &CompletionPresetViewModel::flushPendingPromptEdits);
 
     // 初始化加载列表
     refreshList();
@@ -49,6 +60,16 @@ PresetPromptListModel *CompletionPresetViewModel::presetPromptModel() const
 CompletionPresetEntity CompletionPresetViewModel::currentEditingPreset() const
 {
     return m_currentEditingPreset;
+}
+
+CompletionPresetDraft* CompletionPresetViewModel::presetDraft() const
+{
+    return m_presetDraft;
+}
+
+bool CompletionPresetViewModel::presetDirty() const
+{
+    return m_presetDirty;
 }
 
 bool CompletionPresetViewModel::hasSelection() const
@@ -85,6 +106,7 @@ void CompletionPresetViewModel::selectPreset(const QString& presetId)
 {
     if (m_currentEditingPreset.id == presetId) return;
 
+    flushPendingPromptEdits();
     m_currentEditingPreset = m_service->getPresetById(presetId);
 
     // 切换预设时回到“基础参数”Tab
@@ -96,7 +118,7 @@ void CompletionPresetViewModel::selectPreset(const QString& presetId)
     emit currentEditingPresetChanged();
 
     refreshPromptList();
-
+    resetPresetDraft(m_currentEditingPreset);
 }
 
 // ======================================
@@ -106,8 +128,13 @@ void CompletionPresetViewModel::createPreset()
 {
     CompletionPresetEntity newEntity;
     newEntity.name="新预设";
-    m_service->createPreset(newEntity);
+    const QString newId = m_service->createPreset(newEntity);
+    if (newId.isEmpty()) {
+        return;
+    }
+
     refreshList();
+    selectPreset(newId);
 }
 
 void CompletionPresetViewModel::deletePreset(const QString& presetId)
@@ -120,6 +147,7 @@ void CompletionPresetViewModel::deletePreset(const QString& presetId)
             emit presetDetailTabChanged();
         }
         emit currentEditingPresetChanged();
+        resetPresetDraft(CompletionPresetEntity{});
     }
     refreshList();
 }
@@ -152,21 +180,62 @@ void CompletionPresetViewModel::renamePreset(const QString& presetId, const QStr
     refreshList();
 }
 
-void CompletionPresetViewModel::applyEditingPreset(const CompletionPresetEntity& newPreset)
+void CompletionPresetViewModel::resetPresetDraft(const CompletionPresetEntity& entity)
 {
-    if (!hasSelection()) return;
+    m_presetBaseline = entity;
+    m_presetDraft->setEntity(entity);
+    m_presetDirty = false;
+    emit presetDraftChanged();
+    emit presetDirtyChanged();
+}
 
+CompletionPresetEntity CompletionPresetViewModel::draftToPreset() const
+{
+    return m_presetDraft->toEntity(m_currentEditingPreset);
+}
 
-    m_service->updatePreset(newPreset);
-    m_currentEditingPreset = newPreset;
-    emit currentEditingPresetChanged();
+void CompletionPresetViewModel::setPresetDraftField(const QString& field, const QVariant& value)
+{
+    static const QStringList editableFields = {
+        QStringLiteral("name"),
+        QStringLiteral("maxContextToken"),
+        QStringLiteral("maxResponseToken"),
+        QStringLiteral("streamEnabled"),
+        QStringLiteral("temperature"),
+        QStringLiteral("topP"),
+        QStringLiteral("topK"),
+        QStringLiteral("frequencyPenalty"),
+        QStringLiteral("presencePenalty")
+    };
 
+    if (!editableFields.contains(field)) {
+        return;
+    }
 
-    // 3. 持久化保存（写入文件/数据库，原有 updatePreset 的持久化逻辑移到此处）
-    // ... 原有持久化代码 ...
+    m_presetDraft->setField(field, value);
+}
 
+bool CompletionPresetViewModel::savePresetDraft()
+{
+    if (!hasSelection()) {
+        return false;
+    }
+
+    const CompletionPresetEntity entity = draftToPreset();
+    if (!m_service->updatePreset(entity)) {
+        return false;
+    }
+
+    m_currentEditingPreset = entity;
+    resetPresetDraft(entity);
     refreshList();
-    emit operationTip("预设已保存");
+    emit operationTip(QStringLiteral("预设已保存"));
+    return true;
+}
+
+void CompletionPresetViewModel::discardPresetDraft()
+{
+    resetPresetDraft(m_currentEditingPreset);
 }
 
 void CompletionPresetViewModel::refreshPromptList()
@@ -238,6 +307,7 @@ void CompletionPresetViewModel::addPrompt()
         return;
     }
 
+    flushPendingPromptEdits();
     if (m_service->addPrompt(m_currentEditingPreset.id, makeNewPrompt()))
         reloadCurrentPresetAndPrompts();
 }
@@ -253,6 +323,7 @@ void CompletionPresetViewModel::insertPromptBefore(const QString& beforeIdentifi
         return;
     }
 
+    flushPendingPromptEdits();
     if (m_service->insertPromptBefore(m_currentEditingPreset.id, beforeIdentifier, makeNewPrompt()))
         reloadCurrentPresetAndPrompts();
 }
@@ -261,8 +332,63 @@ void CompletionPresetViewModel::deletePrompt(const QString& promptId)
 {
     if (m_currentEditingPreset.id.isEmpty() || promptId.isEmpty()) return;
 
+    flushPendingPromptEdits();
     if (m_service->deletePrompt(m_currentEditingPreset.id, promptId))
         reloadCurrentPresetAndPrompts();
+}
+
+int CompletionPresetViewModel::roleForPromptField(const QString& field) const
+{
+    if (field == QStringLiteral("name")) return PresetPromptListModel::NameRole;
+    if (field == QStringLiteral("content")) return PresetPromptListModel::ContentRole;
+    if (field == QStringLiteral("role")) return PresetPromptListModel::MessageTypeRole;
+    if (field == QStringLiteral("position")) return PresetPromptListModel::PositionRole;
+    if (field == QStringLiteral("isActive")) return PresetPromptListModel::IsActiveRole;
+    return -1;
+}
+
+void CompletionPresetViewModel::setPromptField(const QString& promptId, const QString& field,
+                                                const QVariant& value)
+{
+    if (promptId.isEmpty()) {
+        return;
+    }
+
+    const int role = roleForPromptField(field);
+    if (role < 0 || !m_presetPromptListModel->updateField(promptId, role, value)) {
+        return;
+    }
+
+    m_pendingPromptFields[promptId].insert(field, value);
+    if (field == QStringLiteral("name") || field == QStringLiteral("content")) {
+        m_promptSaveTimer->start();
+    } else {
+        flushPendingPromptEdits();
+    }
+}
+
+void CompletionPresetViewModel::flushPendingPromptEdits()
+{
+    if (m_promptSaveTimer && m_promptSaveTimer->isActive()) {
+        m_promptSaveTimer->stop();
+    }
+    if (m_pendingPromptFields.isEmpty()) {
+        return;
+    }
+
+    const auto pending = m_pendingPromptFields;
+    m_pendingPromptFields.clear();
+
+    for (auto it = pending.constBegin(); it != pending.constEnd(); ++it) {
+        const PromptEntity prompt = m_presetPromptListModel->entryById(it.key());
+        if (prompt.id.isEmpty()) {
+            continue;
+        }
+        if (!m_service->updatePrompt(prompt)) {
+            refreshPromptList();
+            return;
+        }
+    }
 }
 
 

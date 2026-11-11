@@ -36,25 +36,12 @@ bool CharacterItemViewModel::isFavorite() const
     return m_isFavorite;
 }
 
-QString CharacterItemViewModel::lastUsedText() const
-{
-    if (!m_lastUsedAt.isValid()) {
-        return "从未使用";
-    }
-    return formatFriendlyTime(m_lastUsedAt);
-}
-
 QString CharacterItemViewModel::updateTimeText() const
 {
     if (!m_updatedAt.isValid()) {
         return "";
     }
     return formatFriendlyTime(m_updatedAt);
-}
-
-int CharacterItemViewModel::useCount() const
-{
-    return m_useCount;
 }
 
 void CharacterItemViewModel::updateFromEntity(const CharacterEntity& entity)

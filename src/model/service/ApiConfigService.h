@@ -14,6 +14,12 @@ public:
     static ApiConfigService& instance();
     ~ApiConfigService() override;
 
+    // 测试/组合根可注入 DAO；生产仍使用 instance()。
+    explicit ApiConfigService(ApiConfigDao* dao, QObject* parent = nullptr);
+
+    // 由 ApplicationBootstrap 在数据库初始化后调用；构造函数不再写库。
+    void ensureSeedData();
+
 // 列表与查询(DAO)
     QList<ApiConfigEntity> getAllConfigs();
     ApiConfigEntity getConfigById(const QString& id);//按id选择
@@ -28,17 +34,12 @@ public:
     // 子模型管理(待优化)
     bool updateModelList(const QString& configId,const QStringList& modelNames);
 
-    // 连接测试
-    void testConnection(const QString& configId);
-    //获取模型列表
+    // 获取模型列表
     void fetchModelList(const QString& configId);
 
 signals:
     void configUpdated(const QString& configId);//配置更新
     void configDeleted(const QString& configId);//配置删除
-
-    //网络操作信号
-    void testSuccess(const QString& configId);
 
     void fetchModelListEnd(const QString& configId);
 

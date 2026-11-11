@@ -78,63 +78,73 @@ bool PresetPromptListModel::setData(const QModelIndex &index, const QVariant &va
     if (!index.isValid() || index.row() < 0 || index.row() >= m_items.size())
         return false;
 
-    PromptEntity& e = m_items[index.row()];
-    switch (role)
-    {
-    // ========== 业务字段：改内存 + 通知外部落盘 ==========
-        case NameRole: {
-            const QString v = value.toString().trimmed();
-            if (e.name == v) return false;
-            e.name = v;
-            emit dataChanged(index, index, { NameRole});
-            break;
-        }
-        case ContentRole: {
-            const QString v = value.toString();
-            if (e.content == v) return false;
-            e.content = v;
-            emit dataChanged(index, index, { ContentRole });
-            break;
-        }
-        case MessageTypeRole: {
-            const GlobalConstants::MessageType v =
-                static_cast<GlobalConstants::MessageType>(value.toInt());
-            if (e.role == v) return false;
-            e.role = v;
-            emit dataChanged(index, index, { MessageTypeRole });
-            break;
-        }
-        case PositionRole: {
-            const int v = value.toInt();
-            if (e.injection_position == v) return false;
-            e.injection_position = v;
-            emit dataChanged(index, index, { PositionRole });
-            break;
-        }
-        case IsActiveRole: {
-            const bool v = value.toBool();
-            if (e.isActive == v) return false;
-            e.isActive = v;
-            emit dataChanged(index, index, { IsActiveRole });
-            break;
-        }
-        // ========== UI 状态：改内存，不落盘 ==========
-        case ExpandedStateRole: {
-            const bool v = value.toBool();
-            const bool current = m_expandedIds.contains(e.id);
-            if (current == v) return false;
-            if (v) m_expandedIds.insert(e.id);
-            else   m_expandedIds.remove(e.id);
-            emit dataChanged(index, index, { ExpandedStateRole });
-            return true;
-            break;
-        }
-        default:
-            return false;
+    // 业务字段只能通过 CompletionPresetViewModel 的命令更新；
+    // 模型自身仅保存展开态这类 UI 状态。
+    if (role != ExpandedStateRole) {
+        return false;
     }
 
-    updateItem(e);
-    emit entryWriting(e);
+    PromptEntity& e = m_items[index.row()];
+    const bool v = value.toBool();
+    const bool current = m_expandedIds.contains(e.id);
+    if (current == v) {
+        return false;
+    }
+
+    if (v) {
+        m_expandedIds.insert(e.id);
+    } else {
+        m_expandedIds.remove(e.id);
+    }
+    emit dataChanged(index, index, { ExpandedStateRole });
+    return true;
+}
+
+bool PresetPromptListModel::updateField(const QString& id, int role, const QVariant& value)
+{
+    const int row = indexOfId(id);
+    if (row < 0) {
+        return false;
+    }
+
+    PromptEntity& e = m_items[row];
+    switch (role) {
+    case NameRole: {
+        const QString v = value.toString().trimmed();
+        if (e.name == v) return false;
+        e.name = v;
+        break;
+    }
+    case ContentRole: {
+        const QString v = value.toString();
+        if (e.content == v) return false;
+        e.content = v;
+        break;
+    }
+    case MessageTypeRole: {
+        const auto v = static_cast<GlobalConstants::MessageType>(value.toInt());
+        if (e.role == v) return false;
+        e.role = v;
+        break;
+    }
+    case PositionRole: {
+        const int v = value.toInt();
+        if (e.injection_position == v) return false;
+        e.injection_position = v;
+        break;
+    }
+    case IsActiveRole: {
+        const bool v = value.toBool();
+        if (e.isActive == v) return false;
+        e.isActive = v;
+        break;
+    }
+    default:
+        return false;
+    }
+
+    const QModelIndex idx = index(row, 0);
+    emit dataChanged(idx, idx, { role });
     return true;
 }
 
@@ -177,14 +187,22 @@ void PresetPromptListModel::updateItem(const PromptEntity& entry)
     emit dataChanged(idx, idx);
 }
 
+PromptEntity PresetPromptListModel::entryById(const QString& id) const
+{
+    const int row = indexOfId(id);
+    return row < 0 ? PromptEntity{} : m_items.at(row);
+}
+
 void PresetPromptListModel::clear()
 {
-    // if (m_items.isEmpty()) return;
+    if (m_items.isEmpty() && m_expandedIds.isEmpty()) {
+        return;
+    }
 
-    // beginResetModel();
-    // qDeleteAll(m_items);
-    // m_items.clear();
-    // endResetModel();
+    beginResetModel();
+    m_items.clear();
+    m_expandedIds.clear();
+    endResetModel();
 }
 
 int PresetPromptListModel::indexOfId(const QString& id) const

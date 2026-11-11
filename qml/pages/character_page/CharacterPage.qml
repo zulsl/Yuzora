@@ -8,27 +8,23 @@ import Yuzora 1.0
 // 响应式策略：差异大 → Loader
 //   宽窗口：AdaptiveSplit 1:3 并排（LayoutItemProxy，切换断点不重建子项）
 //   窄窗口：MasterDetailStack 列表 → 推入详情
-PageScaffold {
+MasterDetailPage {
     id: root
 
     readonly property bool compactDetailVisible: layoutLoader.item
                                                 ? layoutLoader.item.detailShown === true
                                                 : false
 
-    title: compactDetailVisible
-           ? (CharacterViewModel.currentCharacter && CharacterViewModel.currentCharacter.name
-              ? CharacterViewModel.currentCharacter.name : "角色详情")
-           : "角色管理"
-    leftIconSource: compactDetailVisible
-                    ? "qrc:/icons/res/arrow-narrow-left.svg"
-                    : "qrc:/icons/res/menu.svg"
-    contentPadding: Theme.spaceSm
-    onLeftClicked: {
-        if (compactDetailVisible && layoutLoader.item)
+    listTitle: "角色管理"
+    detailTitle: CharacterViewModel.currentCharacter
+                 && CharacterViewModel.currentCharacter.name
+                 ? CharacterViewModel.currentCharacter.name : "角色详情"
+    detailVisible: compactDetailVisible
+    onBackRequested: {
+        if (layoutLoader.item)
             layoutLoader.item.hideDetail()
-        else
-            Ui.requestDrawer()
     }
+    contentPadding: Theme.spaceSm
 
     // ========== 首次构建详情表单时的加载态 ==========
     // 为什么要它：从"未选中"切到"有选中"时，右侧要一次性创建整个表单
@@ -202,14 +198,5 @@ PageScaffold {
         fileMode: FileDialog.SaveFile
         defaultSuffix: "png"
         onAccepted: CharacterViewModel.exportCurrentCharacter(selectedFile)
-    }
-
-    // 页面级错误统一走全局吐司
-    Connections {
-        target: CharacterViewModel
-        function onOperationError(message) { Ui.toast(message, true) }
-        function onOperationTip(message) { Ui.toast(message, false) }
-        function onImportSuccess(count) { Ui.toast("已导入 " + count + " 个角色", false) }
-        function onExportSuccess() { Ui.toast("导出成功", false) }
     }
 }

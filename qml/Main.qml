@@ -56,9 +56,6 @@ ApplicationWindow {
 
     // 当前页索引（导航高亮用）
     property int currentPage: 0
-    // 顶层页面只创建一次，首次访问后保活；避免每次切页都重建重表单。
-    // 数组长度与 pageComponents 一致，首项同 initialItem。
-    property var pageLoaded: [true, false, false, false, false, false]
 
     // ========== 窗口根 Item ==========
     // ApplicationWindow 不是 Item：Keys 只能挂在 Item 上，
@@ -93,30 +90,17 @@ ApplicationWindow {
 
         // ========== 页面宿主 ==========
         // 与 NavigationHost 是兄弟关系：用左外边距让开侧栏。
-        // 不用 StackView.replace：它会在离开时销毁页面，切回来要重建整个角色详情
-        // （多个长文本 + 备选开场白），再快的机器也会闪一下。
-        // 这里每个页面只创建一次，之后仅切换 visible；保活成本是六个页面实例，
-        // 换来的是切页零重建、输入焦点/滚动位置/展开状态都不丢。
-        Item {
+        // 保活、懒加载、pageShown/pageHidden 生命周期都由 PageHost 封装。
+        PageHost {
             id: pageHost
             anchors.fill: parent
             anchors.leftMargin: navHost.wide ? navHost.railWidth : 0
-
-            Repeater {
-                model: pageComponents
-
-                delegate: Loader {
-                    id: pageLoader
-                    required property int index
-                    required property var modelData
-
-                    anchors.fill: parent
-                    active: mainWindow.pageLoaded[index]
-                    visible: index === mainWindow.currentPage
-                    sourceComponent: pageLoader.modelData
-                }
-            }
+            pageComponents: mainWindow.pageComponents
+            currentIndex: mainWindow.currentPage
         }
+
+        // 所有 ViewModel 的操作结果统一在这里转成 toast
+        NotificationBridge {}
     }
 
     property var pageComponents: [
@@ -125,14 +109,6 @@ ApplicationWindow {
 
     function switchPage(index) {
         if (index < 0 || index >= pageComponents.length) return
-
-        // 先确保目标页已加载，再切 currentPage：首次访问仍有构建成本，
-        // 但之后的来回切换只改 visible，不再销毁/重建页面。
-        if (!pageLoaded[index]) {
-            const next = pageLoaded.slice()
-            next[index] = true
-            pageLoaded = next
-        }
         mainWindow.currentPage = index
     }
 

@@ -85,16 +85,6 @@ ColumnLayout {
 
                     spacing: Theme.spaceSm
 
-                    Timer {
-                        id: debounceTimer
-                        interval: 300
-                        repeat: false
-                        onTriggered: {
-                            if (detailRoot.bodyData)
-                                detailRoot.bodyData.content = contentArea.text
-                        }
-                    }
-
                     LabeledField {
                         label: "角色"
                         ComboBox {
@@ -104,7 +94,8 @@ ColumnLayout {
                             currentIndex: detailRoot.bodyData ? detailRoot.bodyData.role : 0
                             onActivated: (index) => {
                                 if (detailRoot.bodyData)
-                                    detailRoot.bodyData.role = index
+                                    CompletionPresetViewModel.setPromptField(
+                                        detailRoot.bodyData.id, "role", index)
                             }
                         }
                     }
@@ -118,7 +109,8 @@ ColumnLayout {
                             currentIndex: detailRoot.bodyData ? detailRoot.bodyData.position : 0
                             onActivated: (index) => {
                                 if (detailRoot.bodyData)
-                                    detailRoot.bodyData.position = index
+                                    CompletionPresetViewModel.setPromptField(
+                                        detailRoot.bodyData.id, "position", index)
                             }
                         }
                     }
@@ -143,8 +135,9 @@ ColumnLayout {
                         color: Theme.textPrimary
                         text: detailRoot.bodyData ? (detailRoot.bodyData.content || "") : ""
                         onTextChanged: {
-                            if (activeFocus)
-                                debounceTimer.restart()
+                            if (activeFocus && detailRoot.bodyData)
+                                CompletionPresetViewModel.setPromptField(detailRoot.bodyData.id,
+                                                                         "content", text)
                         }
                     }
                 }
@@ -204,7 +197,8 @@ ColumnLayout {
                         placeholderText: "提示词名称"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
-                        onTextEdited: model.name = text
+                        onTextEdited: CompletionPresetViewModel.setPromptField(
+                                          model.id, "name", text)
                         onActiveFocusChanged: {
                             if (activeFocus)
                                 promptList.currentIndex = index
@@ -230,7 +224,7 @@ ColumnLayout {
                         checked: model.isActive
                         onToggled: {
                             promptList.currentIndex = index
-                            model.isActive = checked
+                            CompletionPresetViewModel.setPromptField(model.id, "isActive", checked)
                         }
                     }
                 }

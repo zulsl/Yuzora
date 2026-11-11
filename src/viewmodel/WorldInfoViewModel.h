@@ -57,9 +57,7 @@ public:
     Q_INVOKABLE void selectBook(const QString& bookId);
     Q_INVOKABLE void createBook();
     Q_INVOKABLE void deleteBook();
-    Q_INVOKABLE void duplicateBook(const QString& bookId);
     Q_INVOKABLE void toggleBookEnabled(const QString& bookId);
-    Q_INVOKABLE void toggleBookGlobal(const QString& bookId);
     Q_INVOKABLE void renameBook(const QString& bookId, const QString& newName);
     Q_INVOKABLE void importBook(const QUrl& fileUrl);
     Q_INVOKABLE void exportCurrentBook(const QString& savePath);

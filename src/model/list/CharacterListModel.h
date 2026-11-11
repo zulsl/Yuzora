@@ -19,8 +19,6 @@ public:
         DescriptionRole,
         AvatarPathRole,
         IsFavoriteRole,
-        LastUsedTextRole,
-        UseCountRole,
         UpdateTimeRole
     };
 
@@ -32,10 +30,11 @@ public:
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    // ========== 列表增量操作 ==========
+    // ========== 增量操作 ==========
     void appendItem(CharacterItemViewModel* item);
     void insertItem(int row, CharacterItemViewModel* item);
     void updateItem(const QString& charId);
+    void updateItem(const CharacterEntity& entity);
     void removeItem(const QString& charId);
     void clear();
 
@@ -45,6 +44,7 @@ public:
     // ========== 辅助查询 ==========
     CharacterItemViewModel* getItemById(const QString& charId) const;
     CharacterItemViewModel* lastItem() const;
+    int rowById(const QString& charId) const;
 
 private:
     int indexOfId(const QString& charId) const;

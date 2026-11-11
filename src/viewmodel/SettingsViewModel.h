@@ -8,7 +8,6 @@
 
 class QJSEngine;
 class SettingsService;
-class DeviceHelper;
 class ExceptionHandler;
 
 /**
@@ -100,7 +99,6 @@ public:
 
     // QML可调用操作
     Q_INVOKABLE void resetAllSettings();
-    Q_INVOKABLE void selectDataPath(const QString& path);
     Q_INVOKABLE void customAppPath(const QUrl& fileUrl);
     Q_INVOKABLE void clearAllData();
 
@@ -124,7 +122,6 @@ signals:
 
 private:
     SettingsService* m_service = nullptr;
-    DeviceHelper* m_deviceHelper = nullptr;
     ExceptionHandler* m_exceptionHandler = nullptr;
 
     // 构造函数必须 private：QML 单例只有在"无法默认构造"时才会调用 create()。

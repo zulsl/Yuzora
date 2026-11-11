@@ -17,6 +17,12 @@ WorldInfoViewModel::WorldInfoViewModel(QObject* parent)
 {
     connect(m_service, &WorldInfoService::operationError,
             this, &WorldInfoViewModel::operationError);
+    connect(m_service, &WorldInfoService::bookListChanged,
+            this, &WorldInfoViewModel::refreshBookList);
+    connect(m_service, &WorldInfoService::importSuccess,
+            this, &WorldInfoViewModel::importSuccess);
+    connect(m_service, &WorldInfoService::exportSuccess,
+            this, &WorldInfoViewModel::exportSuccess);
 
     // 初始化加载文集列表
     refreshBookList();
@@ -94,22 +100,10 @@ void WorldInfoViewModel::deleteBook()
     catch (...) { m_exceptionHandler->handleException(); }
 }
 
-void WorldInfoViewModel::duplicateBook(const QString& bookId)
-{
-    QString newId = m_service->duplicateBook(bookId);
-    if (!newId.isEmpty())
-        selectBook(newId);
-}
-
 void WorldInfoViewModel::toggleBookEnabled(const QString& bookId)
 {
     m_service->toggleBookEnabled(bookId);
     refreshBookList();
-}
-
-void WorldInfoViewModel::toggleBookGlobal(const QString& bookId)
-{
-    Q_UNUSED(bookId)
 }
 
 void WorldInfoViewModel::renameBook(const QString& bookId, const QString& newName)
@@ -124,7 +118,10 @@ void WorldInfoViewModel::renameBook(const QString& bookId, const QString& newNam
     if (book.id.isEmpty()) return;
 
     book.name = trimmedName;
-    m_service->updateBook(book);
+    if (!m_service->updateBook(book)) {
+        return;
+    }
+    emit currentBookNameChanged();
 }
 
 // ======================================
@@ -170,7 +167,9 @@ void WorldInfoViewModel::setCurrentBookName(const QString &newCurrentBookName)
 
         WorldInfoBookEntity entity = m_service->getBookById(m_currentBookId);
         entity.name = newCurrentBookName;
-        m_service->updateBook(entity);
+        if (!m_service->updateBook(entity)) {
+            return;
+        }
         emit currentBookNameChanged();
     }
     catch (const AppException& e) { m_exceptionHandler->handleException(e); }

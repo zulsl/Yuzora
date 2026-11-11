@@ -33,17 +33,6 @@ ListView {
 
             spacing: Theme.spaceSm
 
-            // 正文内容：防抖 300ms 后再写回，避免每次按键都落库
-            Timer {
-                id: debounceTimer
-                interval: 300
-                repeat: false
-                onTriggered: {
-                    if (entryRoot.bodyData)
-                        entryRoot.bodyData.content = contentArea.text
-                }
-            }
-
             Label {
                 text: "内容"
                 font.pixelSize: Theme.fontBodySm
@@ -66,8 +55,9 @@ ListView {
                     color: Theme.textPrimary
                     text: entryRoot.bodyData ? (entryRoot.bodyData.content || "") : ""
                     onTextChanged: {
-                        if (activeFocus)
-                            debounceTimer.restart()
+                        if (activeFocus && entryRoot.bodyData)
+                            WorldInfoEntryViewModel.setEntryField(entryRoot.bodyData.id,
+                                                                  "content", text)
                     }
                 }
             }
@@ -91,7 +81,8 @@ ListView {
                     value: entryRoot.bodyData ? entryRoot.bodyData.scanDepth : -1
                     onValueModified: {
                         if (entryRoot.bodyData)
-                            entryRoot.bodyData.scanDepth = value
+                            WorldInfoEntryViewModel.setEntryField(entryRoot.bodyData.id,
+                                                                  "scanDepth", value)
                     }
                 }
 
@@ -126,7 +117,7 @@ ListView {
 
         Switch {
             checked: model.isEnabled
-            onToggled: model.isEnabled = checked
+            onToggled: WorldInfoEntryViewModel.setEntryField(model.id, "isEnabled", checked)
         }
 
         TextField {
@@ -136,7 +127,7 @@ ListView {
             placeholderText: "关键字（逗号分隔）"
             font.pixelSize: Theme.fontBody
             font.family: Theme.fontFamily
-            onTextEdited: model.name = text
+            onTextEdited: WorldInfoEntryViewModel.setEntryField(model.id, "name", text)
         }
 
         ComboBox {
@@ -144,7 +135,7 @@ ListView {
             implicitHeight: Theme.controlSm
             model: ["始终", "关键词", "向量化"]
             currentIndex: entryRow.row.triggerControl
-            onActivated: (index) => { entryRow.row.triggerControl = index }
+            onActivated: (index) => WorldInfoEntryViewModel.setEntryField(model.id, "triggerControl", index)
         }
 
         // 窄窗口下这两个下拉/数字太长，隐藏后仍可在详情里查看
@@ -157,18 +148,19 @@ ListView {
                 "作者注释之前", "作者注释之后", "@D[系统]在深度", "@D[用户]在深度", "@D[AI]在深度"
             ]
             currentIndex: entryRow.row.insertPosition
-            onActivated: (index) => { entryRow.row.insertPosition = index }
+            onActivated: (index) => WorldInfoEntryViewModel.setEntryField(model.id, "insertPosition", index)
         }
 
         SpinBox {
             visible: !Theme.isCompact && entryRow.expanded === false
-                    && entryRow.row.insertPosition === 4
+                    && entryRow.row.insertPosition >= 6
+                    && entryRow.row.insertPosition <= 8
             implicitHeight: Theme.controlSm
             from: 0
             to: 1000000
             editable: true
             value: entryRow.row.insertDepth
-            onValueModified: entryRow.row.insertDepth = value
+            onValueModified: WorldInfoEntryViewModel.setEntryField(model.id, "insertDepth", value)
         }
 
         SpinBox {
@@ -178,7 +170,7 @@ ListView {
             to: 1000000
             editable: true
             value: model.sortOrder
-            onValueModified: model.sortOrder = value
+            onValueModified: WorldInfoEntryViewModel.setEntryField(model.id, "sortOrder", value)
         }
 
         IconButton {
