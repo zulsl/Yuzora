@@ -42,6 +42,10 @@
         <file>res/circle-chevron-down.svg</file>
         <file>res/switch-3.svg</file>
         <file>res/camera.svg</file>
+        <file>res/icons8-Blue.png</file>
+        <file>res/icons8-Green.png</file>
+        <file>res/icons8-vector.png</file>
+        <file>res/icons8-vector-light.png</file>
     </qresource>
     <qresource prefix="/default">
         <file>res/default/user.png</file>

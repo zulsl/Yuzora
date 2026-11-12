@@ -11,6 +11,9 @@ Button {
     // "primary" 主操作用主色；"secondary" 常规；"ghost" 无边框；"danger" 破坏性操作
     property string variant: "secondary"
     property string iconSource: ""
+    // 覆盖图标颜色。默认透明＝不覆盖，用下面按 variant 推导的语义色。
+    // 用途：世界书触发策略要保留蓝/绿点自身的颜色，不能被统一染成前景色。
+    property color iconColorOverride: "transparent"
 
     readonly property bool _primary: variant === "primary"
     readonly property bool _danger: variant === "danger"
@@ -28,7 +31,8 @@ Button {
     icon.source: iconSource
     icon.width: iconSource.length > 0 ? Theme.iconSm : 0
     icon.height: iconSource.length > 0 ? Theme.iconSm : 0
-    icon.color: _primary ? Theme.textOnAccent
+    icon.color: iconColorOverride.a > 0 ? iconColorOverride
+              : _primary ? Theme.textOnAccent
               : _danger ? Theme.danger
               : Theme.textPrimary
 

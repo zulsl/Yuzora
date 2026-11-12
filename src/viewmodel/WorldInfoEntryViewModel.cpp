@@ -78,6 +78,10 @@ int WorldInfoEntryViewModel::roleForField(const QString& field) const
     if (field == QStringLiteral("scanDepth")) return WorldInfoEntryListModel::ScanDepthRole;
     if (field == QStringLiteral("sortOrder")) return WorldInfoEntryListModel::SortOrderRole;
     if (field == QStringLiteral("isEnabled")) return WorldInfoEntryListModel::IsEnabledRole;
+    if (field == QStringLiteral("keywords")) return WorldInfoEntryListModel::KeywordsRole;
+    if (field == QStringLiteral("secondaryKeywords")) return WorldInfoEntryListModel::SecondaryKeywordsRole;
+    if (field == QStringLiteral("selective")) return WorldInfoEntryListModel::SelectiveRole;
+    if (field == QStringLiteral("selectiveLogic")) return WorldInfoEntryListModel::SelectiveLogicRole;
     return -1;
 }
 

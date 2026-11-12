@@ -60,7 +60,7 @@ public:
     Q_INVOKABLE void toggleBookEnabled(const QString& bookId);
     Q_INVOKABLE void renameBook(const QString& bookId, const QString& newName);
     Q_INVOKABLE void importBook(const QUrl& fileUrl);
-    Q_INVOKABLE void exportCurrentBook(const QString& savePath);
+    Q_INVOKABLE void exportCurrentBook(const QUrl& fileUrl);
     Q_INVOKABLE void exportAllBooks(const QString& savePath);
 
     QString getCurrentBookName() const;

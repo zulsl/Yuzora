@@ -131,6 +131,18 @@ bool WorldInfoEntryListModel::updateField(const QString& id, int role, const QVa
         e.sortOrder = v;
         break;
     }
+    case SelectiveRole: {
+        const bool v = value.toBool();
+        if (e.selective == v) return false;
+        e.selective = v;
+        break;
+    }
+    case SelectiveLogicRole: {
+        const int v = qBound(0, value.toInt(), 3);
+        if (static_cast<int>(e.selectiveLogic) == v) return false;
+        e.selectiveLogic = static_cast<WorldInfoEntryEntity::SelectiveLogic>(v);
+        break;
+    }
     default:
         return false;
     }

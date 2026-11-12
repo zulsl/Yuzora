@@ -146,6 +146,11 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/layouts/NavigationHost.qml
         qml/layouts/NavigationPanel.qml
         qml/pages/worldInfo_page/BookEntryListView.qml
+        qml/pages/worldInfo_page/TriggerStrategyComboBox.qml
+        qml/pages/worldInfo_page/InsertPositionComboBox.qml
+        qml/pages/worldInfo_page/EntryNumberField.qml
+        qml/pages/worldInfo_page/EntryKeywordList.qml
+        qml/pages/worldInfo_page/EntrySelectiveLogicComboBox.qml
 
 )
 

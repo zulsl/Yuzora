@@ -36,19 +36,19 @@ Item {
                 font.family: Theme.fontFamily
                 color: Theme.textPrimary
             }
-
-            IconButton {
-                tip: "新建文集"
-                compact: true
-                icon.source: "qrc:/icons/res/file-plus.svg"
-                onClicked: WorldInfoViewModel.createBook()
-            }
             IconButton {
                 tip: "导入"
                 compact: true
                 icon.source: "qrc:/icons/res/file-import.svg"
                 onClicked: root.importRequested()
             }
+            IconButton {
+                tip: "新建文集"
+                compact: true
+                icon.source: "qrc:/icons/res/file-plus.svg"
+                onClicked: WorldInfoViewModel.createBook()
+            }
+
         }
 
         RowLayout {
@@ -56,18 +56,18 @@ Item {
             spacing: Theme.spaceXs
 
             IconButton {
-                tip: "导出"
-                compact: true
-                icon.source: "qrc:/icons/res/file-export.svg"
-                enabled: WorldInfoViewModel.currentBookId.length > 0
-                onClicked: root.exportRequested()
-            }
-            IconButton {
                 tip: "重命名"
                 compact: true
                 icon.source: "qrc:/icons/res/edit.svg"
                 enabled: WorldInfoViewModel.currentBookId.length > 0
                 onClicked: root.renameRequested()
+            }
+            IconButton {
+                tip: "导出"
+                compact: true
+                icon.source: "qrc:/icons/res/file-export.svg"
+                enabled: WorldInfoViewModel.currentBookId.length > 0
+                onClicked: root.exportRequested()
             }
             IconButton {
                 tip: "删除"
@@ -97,6 +97,12 @@ Item {
                 width: ListView.view.width
                 height: Theme.touchTarget
                 highlighted: WorldInfoViewModel.currentBookId === bookDelegate.modelData.id
+
+                // 上下内边距归零：ItemDelegate 默认上下各 8px，会把内容区压到 32px，
+                // 而 Material CheckBox 的 implicitHeight 是 48，塞不进去就整体向下溢出 8px，
+                // 表现就是文字和勾选框"偏下"。归零后内容区 = 行高 = 48，三者中心对齐。
+                topPadding: 0
+                bottomPadding: 0
 
                 onClicked: {
                     bookListView.currentIndex = index

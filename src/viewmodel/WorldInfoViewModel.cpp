@@ -133,13 +133,14 @@ void WorldInfoViewModel::importBook(const QUrl& fileUrl)
     m_service->importBookFromSillyTavern(filePath);
 }
 
-void WorldInfoViewModel::exportCurrentBook(const QString& savePath)
+void WorldInfoViewModel::exportCurrentBook(const QUrl& fileUrl)
 {
+    QString filePath = fileUrl.toLocalFile();
     if (m_currentBookId.isEmpty()) {
         emit operationError(QStringLiteral("请先选择要导出的文集"));
         return;
     }
-    m_service->exportBookToSillyTavern(m_currentBookId, savePath);
+    m_service->exportBookToSillyTavern(m_currentBookId, filePath);
 }
 
 void WorldInfoViewModel::exportAllBooks(const QString& savePath)

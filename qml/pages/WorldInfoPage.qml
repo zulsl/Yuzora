@@ -11,9 +11,8 @@ import Yuzora 1.0
 MasterDetailPage {
     id: root
 
-    readonly property bool compactDetailVisible: layoutLoader.item
-                                                ? layoutLoader.item.detailShown === true
-                                                : false
+    readonly property bool compactDetailVisible:
+        layoutLoader.item ? layoutLoader.item.detailShown === true : false
 
     listTitle: "世界书 / 知识书"
     detailTitle: WorldInfoViewModel.currentBookName.length > 0
@@ -24,15 +23,6 @@ MasterDetailPage {
             layoutLoader.item.hideDetail()
     }
     contentPadding: Theme.spaceSm
-
-    function localPath(url) {
-        const s = String(url)
-        if (s.indexOf("file:///") === 0)
-            return decodeURIComponent(s.substring(8))
-        if (s.indexOf("file://") === 0)
-            return decodeURIComponent(s.substring(7))
-        return s
-    }
 
     Loader {
         id: layoutLoader
@@ -103,7 +93,7 @@ MasterDetailPage {
         title: "导出世界书"
         nameFilters: ["JSON 文件 (*.json)"]
         fileMode: FileDialog.SaveFile
-        onAccepted: WorldInfoViewModel.exportCurrentBook(root.localPath(selectedFile))
+        onAccepted: WorldInfoViewModel.exportCurrentBook(selectedFile)
     }
 
     ConfirmDialog {
