@@ -30,6 +30,8 @@ public:
     QString createSession(const QString& characterId);//新建会话
     void switchSession(const QString& sessionId);//切换会话
     void deleteSession(const QString& sessionId);//删除会话
+    // 重命名会话：trim 后为空直接拒绝；超长按 40 字符截断
+    bool renameSession(const QString& sessionId, const QString& title);
     void deleteAllSession();
     ChatSessionEntity currentSession() const;//当前会话
     QString currentSessionId() const;//当前会话id
@@ -51,6 +53,15 @@ public:
     void editMessage(const QString& messageId, const QString& newContent);//编辑消息
     void deleteMessage(const QString& messageId);//删除消息
 
+    // ========== 开场白切换 ==========
+    // 开场白集合 = [角色首条消息] + 备选开场白（各自过滤掉空串）。
+    // 会话的第一条 assistant 消息用 metadata.greetingIndex 记住自己用的是第几条，
+    // 切换就是替换这条消息的内容，不新增消息。
+    QString greetingMessageId() const { return m_greetingMessageId; }
+    int greetingIndex() const { return m_greetingIndex; }
+    int greetingCount() const { return m_greetingCount; }
+    void switchGreeting(int delta);//delta = +1 / -1，循环取模
+
     // ========== AI生成核心 ==========
     void sendMessage(const QString& userInput);//发送消息
     void regenerateLastMessage();//重新生成上一条消息
@@ -71,6 +82,9 @@ signals:
     void messageStatusChanged(const QString& messageId, int status);//生成状态变更
     void messageDeleted(const QString& messageId);
     void messageCleared(const QString& sessionId);
+
+    // 开场白状态变更（切换会话、新建会话、切换开场白后都会发）
+    void greetingStateChanged();
 
     // 生成生命周期
     void generationStarted(const QString& messageId);//生成已开始
@@ -105,6 +119,11 @@ private:
     void updateSessionTitle();//更新会话标题
     QString getCharacterLastSessionId(const QString& charId);//读取角色上次会话ID
 
+    // 开场白：拼集合、刷新当前会话的开场白状态、把第 index 条写进某条消息
+    QStringList greetingTextsFor(const QString& characterId) const;
+    void refreshGreetingState();
+    void applyGreetingIndex(const QString& messageId, int index);
+
 // DAO依赖
     CharacterDao* m_characterDao = nullptr;
     ChatSessionDao* m_sessionDao = nullptr;
@@ -116,6 +135,11 @@ private:
     QString m_generatingMessageId;//回复消息id
     QString m_fullResponse;//完整回复内容()
     bool m_isGenerating = false;//正在生成
+
+    // 开场白状态（-1 / 空串 = 当前会话没有可切换的开场白）
+    QString m_greetingMessageId;
+    int m_greetingIndex = -1;
+    int m_greetingCount = 0;
 
     // 配置与网络
     BaseApiClient* m_currentClient = nullptr;

@@ -161,7 +161,7 @@ Qt::ItemFlags WorldInfoEntryListModel::flags(const QModelIndex &index) const
 QHash<int, QByteArray> WorldInfoEntryListModel::roleNames() const
 {
     QHash<int, QByteArray> roles;
-    roles[EntryIdRole]           = "id";
+    roles[EntryIdRole]           = "entryId";
     roles[BookIdRole]            = "bookId";
     roles[NameRole]              = "name";
     roles[ContentRole]           = "content";

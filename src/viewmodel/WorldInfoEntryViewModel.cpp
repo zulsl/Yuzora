@@ -161,3 +161,15 @@ void WorldInfoEntryViewModel::batchSetEnabled(const QStringList& entryIds, bool 
     flushPendingEntryEdits();
     m_service->batchToggleEntries(entryIds, enabled);
 }
+
+void WorldInfoEntryViewModel::setEntryExpanded(const QString& entryId, bool expanded)
+{
+    const int row = m_entryModel->rowById(entryId);
+    if (row < 0) {
+        return;
+    }
+
+    // setData 只认 ExpandedStateRole（业务字段必须走 setEntryField），不写库
+    m_entryModel->setData(m_entryModel->index(row, 0), expanded,
+                          WorldInfoEntryListModel::ExpandedStateRole);
+}

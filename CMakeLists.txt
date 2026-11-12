@@ -104,6 +104,7 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/pages/ChatPage.qml
         qml/pages/CompletionPresetPage.qml
         qml/components/IconButton.qml
+        qml/components/AppCheckBox.qml
         qml/components/AppButton.qml
         qml/components/AppToolBar.qml
         qml/components/AppToast.qml

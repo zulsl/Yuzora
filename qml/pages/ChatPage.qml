@@ -10,6 +10,11 @@ import Yuzora 1.0
 PageScaffold {
     id: root
 
+    // 历史会话抽屉里"当前要操作哪一条"：重命名/删除都先记下目标再弹窗
+    property string renameSessionId: ""
+    property string deleteSessionId: ""
+    property string deleteSessionTitle: ""
+
     title: ChatViewModel.currentCharName.length > 0 ? ChatViewModel.currentCharName : "未选择角色"
     subtitle: {// 次级标题
         const parts = []
@@ -22,10 +27,23 @@ PageScaffold {
     contentPadding: 0
     onLeftClicked: Ui.requestDrawer()
 
-    // PageHost 生命周期：切走时关闭抽屉，切回时回到消息底部。
+    // 会话里只有一条消息时它就是开场白：定位到顶部，让开场白从头显示；
+    // 否则（已经在聊了）定位到最新消息。开场白可能很长，一条就撑满视口，
+    // 这种情况下"定位到末尾"会把人直接甩到开场白底部。
+    function positionForSessionStart() {
+        Qt.callLater(function() {
+            if (messageListView.count === 0)
+                return
+            if (messageListView.count <= 1)
+                messageListView.positionViewAtBeginning()
+            else
+                messageListView.positionViewAtEnd()
+        })
+    }
+
+    // PageHost 生命周期：切走时关闭抽屉，切回时按上面规则定位。
     function pageShown() {
-        if (messageListView.count > 0)
-            Qt.callLater(() => messageListView.positionViewAtEnd())
+        positionForSessionStart()
     }
 
     function pageHidden() {
@@ -66,9 +84,11 @@ PageScaffold {
                 model: ChatViewModel.messageModel
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-                // 只在用户本来就在底部时跟随滚动
+                // 消息数变化时跟随：只有开场白一条就停在顶部，否则沿用"在底部才跟随"
                 onCountChanged: {
-                    if (atYEnd) {
+                    if (messageListView.count <= 1) {
+                        root.positionForSessionStart()
+                    } else if (atYEnd) {
                         Qt.callLater(() => messageListView.positionViewAtEnd())
                     }
                 }
@@ -92,6 +112,23 @@ PageScaffold {
                     avatarSource: model.messageType === GlobalConstants.User
                                   ? SettingsViewModel.userAvatar
                                   : ChatViewModel.currentCharAvatarPath
+
+                    // 开场白切换：只有承载开场白的那条消息、且总数 > 1 时才显示
+                    isGreeting: model.id === ChatViewModel.greetingMessageId
+                    greetingText: isGreeting && ChatViewModel.greetingCount > 1
+                                  ? (ChatViewModel.greetingIndex + 1) + "/"
+                                    + ChatViewModel.greetingCount
+                                  : ""
+                    onGreetingPrev: {
+                        ChatViewModel.switchGreeting(-1)
+                        // 用 ListView.view 而不是 messageListView：委托是嵌套组件，
+                        // 引用外层 id 会触发 qmllint 的 unqualified 告警
+                        ListView.view.positionViewAtBeginning()
+                    }
+                    onGreetingNext: {
+                        ChatViewModel.switchGreeting(1)
+                        ListView.view.positionViewAtBeginning()
+                    }
                 }
             }
 
@@ -214,14 +251,50 @@ PageScaffold {
                 delegate: ItemDelegate {
                     width: ListView.view.width
                     height: Theme.touchTarget
-                    text: model.title
-                    font.pixelSize: Theme.fontBody
-                    font.family: Theme.fontFamily
+                    // 上下内边距归零：48 的内容区才装得下 40 的图标按钮
+                    topPadding: 0
+                    bottomPadding: 0
                     highlighted: ChatViewModel.currentSessionId === model.id
 
                     onClicked: {
                         ChatViewModel.switchSession(model.id)
                         historyDrawer.close()
+                    }
+
+                    contentItem: RowLayout {
+                        spacing: Theme.spaceXs
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: model.title
+                            elide: Text.ElideRight
+                            font.pixelSize: Theme.fontBody
+                            font.family: Theme.fontFamily
+                            color: Theme.textPrimary
+                        }
+
+                        IconButton {
+                            compact: true
+                            tip: "重命名会话"
+                            icon.source: "qrc:/icons/res/edit.svg"
+                            onClicked: {
+                                root.renameSessionId = model.id
+                                renameSessionDialog.text = model.title || ""
+                                renameSessionDialog.open()
+                            }
+                        }
+
+                        IconButton {
+                            compact: true
+                            danger: true
+                            tip: "删除会话"
+                            icon.source: "qrc:/icons/res/trash.svg"
+                            onClicked: {
+                                root.deleteSessionId = model.id
+                                root.deleteSessionTitle = model.title || ""
+                                deleteSessionDialog.open()
+                            }
+                        }
                     }
                 }
             }
@@ -242,5 +315,23 @@ PageScaffold {
         acceptText: "删除"
         danger: true
         onConfirmed: ChatViewModel.deleteAllSession()
+    }
+
+    TextInputDialog {
+        id: renameSessionDialog
+        title: "重命名会话"
+        label: "会话标题"
+        acceptText: "保存"
+        onSubmitted: (value) => ChatViewModel.renameSession(root.renameSessionId, value)
+    }
+
+    ConfirmDialog {
+        id: deleteSessionDialog
+        title: "删除会话"
+        text: "确定删除「" + root.deleteSessionTitle + "」吗？"
+        detail: "会话里的消息会一并删除，且不可撤销。"
+        acceptText: "删除"
+        danger: true
+        onConfirmed: ChatViewModel.deleteSession(root.deleteSessionId)
     }
 }

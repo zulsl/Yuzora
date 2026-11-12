@@ -113,7 +113,7 @@ Item {
                 contentItem: RowLayout {
                     spacing: Theme.spaceSm
 
-                    CheckBox {
+                    AppCheckBox {
                         checked: bookDelegate.modelData.isEnabled
                         onToggled: WorldInfoViewModel.toggleBookEnabled(bookDelegate.modelData.id)
                     }

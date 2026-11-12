@@ -18,6 +18,13 @@ Item {
     property bool isEdited: false
     property url avatarSource
 
+    // 开场白切换：只有承载开场白的那条消息会打开它（greetingText 形如 "1/3"）
+    property bool isGreeting: false
+    property string greetingText: ""
+
+    signal greetingPrev()
+    signal greetingNext()
+
     implicitHeight: Math.max(Theme.avatarMd + Theme.spaceSm, column.implicitHeight + Theme.spaceSm)
 
     RowLayout {
@@ -98,6 +105,38 @@ Item {
                     font.pixelSize: Theme.fontCaption
                     font.family: Theme.fontFamily
                     color: Theme.textDisabled
+                }
+            }
+
+            // ---------- 开场白切换（仅承载开场白的那条消息显示）----------
+            // 用一个朝上的细箭头图标旋转 ±90°，避免为左右箭头再引一套资产。
+            // 按钮本身是圆角方块，旋转 90° 外观不变，只有图标方向变。
+            RowLayout {
+                Layout.alignment: root.isUser ? Qt.AlignRight : Qt.AlignLeft
+                spacing: Theme.spaceXs
+                visible: root.isGreeting && root.greetingText.length > 0
+
+                IconButton {
+                    compact: true
+                    tip: "上一条开场白"
+                    icon.source: "qrc:/icons/res/arrow-narrow-up.svg"
+                    rotation: -90
+                    onClicked: root.greetingPrev()
+                }
+
+                Label {
+                    text: root.greetingText
+                    font.pixelSize: Theme.fontCaption
+                    font.family: Theme.fontFamily
+                    color: Theme.textSecondary
+                }
+
+                IconButton {
+                    compact: true
+                    tip: "下一条开场白"
+                    icon.source: "qrc:/icons/res/arrow-narrow-up.svg"
+                    rotation: 90
+                    onClicked: root.greetingNext()
                 }
             }
         }

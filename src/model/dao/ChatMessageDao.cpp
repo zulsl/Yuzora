@@ -283,6 +283,37 @@ ChatMessageEntity ChatMessageDao::selectLastBySessionId(const QString& sessionId
     return {};
 }
 
+// ======================================
+// 业务扩展方法：获取会话第一条消息
+// ======================================
+ChatMessageEntity ChatMessageDao::selectFirstBySessionId(const QString& sessionId)
+{
+    if (sessionId.isEmpty()) return {};
+
+    QSqlDatabase db = connection();
+    QSqlQuery query(db);
+
+    QString sql = QString(
+                      "SELECT * FROM %1 "
+                      "WHERE session_id = ? "
+                      "ORDER BY timestamp ASC, id ASC "
+                      "LIMIT 1"
+                      ).arg(tableName());
+
+    query.prepare(sql);
+    query.addBindValue(sessionId);
+
+    if (!query.exec()) {
+        DatabaseError("selectFirstBySessionId", query.lastError());
+        return {};
+    }
+
+    if (query.next()) {
+        return parseFromQuery(query);
+    }
+    return {};
+}
+
 bool ChatMessageDao::clearBySessionId(const QString& sessionId)
 {
     QSqlDatabase db = connection();

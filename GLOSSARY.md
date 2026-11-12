@@ -54,6 +54,20 @@ _Avoid_: Max length, character limit
 A variant opening message that can be selected instead of the character's first message; one character may have several.
 _Avoid_: Backup greeting, extra first message
 
+**Greeting Set** (开场白集合):
+The ordered list of opening messages a character can start a chat with: the character's first message, followed by its Alternate Greetings. A chat starts with one member of this set and may be switched to another afterwards.
+_Avoid_: greeting list, opening options, starters
+
+## Chat
+
+**Chat Session** (会话):
+One continuous conversation between the user and a character; it owns its message history and a title.
+_Avoid_: 聊天记录, chat, thread
+
+**Session Title** (会话标题):
+The display name of a Chat Session, shown in the history list and the page subtitle. It starts as a placeholder, may be generated automatically from the first reply, and is not overwritten by that automatic naming once the user has set it.
+_Avoid_: 会话名, chat name
+
 ## World Info
 
 **World Info Book** (世界书文集):

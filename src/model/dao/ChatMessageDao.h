@@ -34,6 +34,8 @@ public:
     int countBySessionId(const QString& sessionId);
     // 获取会话最后一条消息
     ChatMessageEntity selectLastBySessionId(const QString& sessionId);
+    // 获取会话第一条消息（识别开场白用）
+    ChatMessageEntity selectFirstBySessionId(const QString& sessionId);
 
     //按会话ID清除
     bool clearBySessionId(const QString& sessionId);

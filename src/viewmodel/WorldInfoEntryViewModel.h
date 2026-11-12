@@ -68,6 +68,10 @@ public:
     Q_INVOKABLE void moveEntry(const QString& entryId, const QString& targetBookId);
     Q_INVOKABLE void batchDelete(const QStringList& entryIds);
     Q_INVOKABLE void batchSetEnabled(const QStringList& entryIds, bool enabled);
+    // 展开/收起是"UI 状态"，不走 setEntryField 的落库路径，只写列表模型
+    // （模型用 ExpandedStateRole 单独保存，见 WorldInfoEntryListModel::setData）。
+    // QML 侧的 Repeater 委托拿不到 model 对象，写不回 role，所以单独开这个入口。
+    Q_INVOKABLE void setEntryExpanded(const QString& entryId, bool expanded);
 
 signals:
     // 供 QML 使用

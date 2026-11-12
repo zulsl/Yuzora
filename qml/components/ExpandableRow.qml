@@ -19,6 +19,10 @@ Item {
 
     default property alias headerItems: headerRow.data
 
+    // 详情已经创建出来后，bodyData 若换成新对象（例如 Repeater 委托每轮都重建快照），
+    // 必须同步给它，否则详情会一直显示第一次赋进来的旧值。
+    onBodyDataChanged: if (loader.item) loader.item.bodyData = root.bodyData
+
     implicitHeight: headerHeight + (root.expanded ? loader.implicitHeight : 0)
     clip: true
 

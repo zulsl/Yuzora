@@ -140,17 +140,18 @@ QString ChatService::createSession(const QString& characterId)
 
 
 
-    // 自动插入角色开场白
-    CharacterEntity character = CharacterService::instance().getCharacterById(characterId);
-    if (!character.firstMessage.isEmpty()) {
+    // 自动插入角色开场白（默认第 1 条；metadata 记住索引，供会话内切换）
+    const QStringList greetings = greetingTextsFor(characterId);
+    if (!greetings.isEmpty()) {
         ChatMessageEntity firstMsg;
         firstMsg.id = Utils::generateUuid();
         firstMsg.sessionId = session.id;
         firstMsg.type = GlobalConstants::MessageType::Assistant;
         firstMsg.status = GlobalConstants::MessageGenerationStatus::Normal;
-        firstMsg.content = character.firstMessage;
+        firstMsg.content = greetings.first();
         firstMsg.senderName = "第一条消息";
         firstMsg.timestamp = QDateTime::currentDateTime();
+        firstMsg.metadata.insert(QStringLiteral("greetingIndex"), 0);
         ChatMessageDao msgDao;
         msgDao.insert(firstMsg);
     }
@@ -178,6 +179,9 @@ void ChatService::switchSession(const QString& sessionId)
 
     m_currentSessionId = sessionId;
     m_currentCharacterId = session.characterId;
+
+    // 刷新开场白状态：新会话直接读 metadata，旧会话按内容反推并补写
+    refreshGreetingState();
 
     // 绑定会话对应预设（预留：可从会话settings中读取预设ID）()
     // CompletionPresetEntity defaultPreset = CompletionPresetService::instance().getDefaultPreset();
@@ -212,11 +216,54 @@ void ChatService::deleteSession(const QString& sessionId)
         emit sessionListChanged(session.characterId);
     }
 
-    // 删除当前会话则清空状态
+    // 删除当前会话则先把状态清空，再落到别的会话上
     if (isCurrent) {
         m_currentSessionId.clear();
         m_currentCharacterId.clear();
+
+        // 落到同角色"最近修改"的剩余会话；一条不剩就新建一个（会带开场白），
+        // 否则界面会停在"有消息列表但没有会话"的悬空状态
+        const QList<ChatSessionEntity> remaining = getSessionListByCharacter(session.characterId);
+        QString nextSessionId;
+        QDateTime newest;
+        for (const ChatSessionEntity& candidate : remaining) {
+            if (nextSessionId.isEmpty() || candidate.lastModified > newest) {
+                nextSessionId = candidate.id;
+                newest = candidate.lastModified;
+            }
+        }
+
+        if (!nextSessionId.isEmpty()) {
+            switchSession(nextSessionId);
+        } else if (!session.characterId.isEmpty()) {
+            const QString newSessionId = createSession(session.characterId);
+            if (!newSessionId.isEmpty()) {
+                switchSession(newSessionId);
+            }
+        }
     }
+}
+
+bool ChatService::renameSession(const QString& sessionId, const QString& title)
+{
+    if (sessionId.isEmpty()) return false;
+
+    const QString trimmed = title.trimmed();
+    if (trimmed.isEmpty()) return false;
+
+    ChatSessionEntity session = m_sessionDao->selectById(sessionId);
+    if (session.id.isEmpty()) return false;
+
+    // 标题会进抽屉行和页面副标题，限长避免把布局挤爆。
+    // 注意：不改 lastModified —— 改名不该让会话在列表里跳到最前。
+    session.title = trimmed.left(40);
+    if (!m_sessionDao->update(session)) {
+        Utils::writeLog("ERROR", "ChatService", "重命名会话失败: " + sessionId);
+        return false;
+    }
+
+    emit sessionListChanged(session.characterId);
+    return true;
 }
 
 void ChatService::deleteAllSession()
@@ -319,8 +366,107 @@ void ChatService::deleteMessage(const QString& messageId)
         return;
     }
 
+    // 删掉的如果正好是开场白，状态要跟着失效
+    if (messageId == m_greetingMessageId) {
+        refreshGreetingState();
+    }
+
     updateSessionLastModified(msg.sessionId);
     emit messageDeleted(messageId);
+}
+
+// ======================================
+// 开场白切换
+// ======================================
+QStringList ChatService::greetingTextsFor(const QString& characterId) const
+{
+    QStringList texts;
+    if (characterId.isEmpty()) return texts;
+
+    const CharacterEntity character =
+        CharacterService::instance().getCharacterById(characterId);
+
+    // 首条消息就是第 1 条开场白；备选依次排后。空串没有切换价值，直接过滤。
+    if (!character.firstMessage.trimmed().isEmpty())
+        texts.append(character.firstMessage);
+    for (const QString& greeting : character.alternateGreetings) {
+        if (!greeting.trimmed().isEmpty())
+            texts.append(greeting);
+    }
+    return texts;
+}
+
+void ChatService::refreshGreetingState()
+{
+    m_greetingMessageId.clear();
+    m_greetingIndex = -1;
+    m_greetingCount = 0;
+
+    if (!m_currentSessionId.isEmpty()) {
+        const ChatSessionEntity session = m_sessionDao->selectById(m_currentSessionId);
+        const QStringList texts = greetingTextsFor(session.characterId);
+        m_greetingCount = texts.size();
+
+        ChatMessageEntity first = m_messageDao->selectFirstBySessionId(m_currentSessionId);
+        if (!first.id.isEmpty() && !texts.isEmpty()
+            && first.type == GlobalConstants::MessageType::Assistant) {
+
+            int index = first.metadata.value(QStringLiteral("greetingIndex"), -1).toInt();
+
+            // 旧会话没有 metadata：按内容反推一条，命中就补写回去，
+            // 这样升级前就存在的对话也能直接用上切换
+            if (index < 0) {
+                index = texts.indexOf(first.content);
+                if (index >= 0) {
+                    first.metadata.insert(QStringLiteral("greetingIndex"), index);
+                    m_messageDao->update(first);
+                }
+            }
+
+            if (index >= 0 && index < texts.size()) {
+                m_greetingMessageId = first.id;
+                m_greetingIndex = index;
+            }
+        }
+    }
+
+    emit greetingStateChanged();
+}
+
+void ChatService::applyGreetingIndex(const QString& messageId, int index)
+{
+    ChatMessageEntity message = m_messageDao->selectById(messageId);
+    if (message.id.isEmpty()) return;
+
+    const ChatSessionEntity session = m_sessionDao->selectById(message.sessionId);
+    const QStringList texts = greetingTextsFor(session.characterId);
+    if (index < 0 || index >= texts.size()) return;
+
+    message.content = texts.at(index);
+    message.metadata.insert(QStringLiteral("greetingIndex"), index);
+    // 切换开场白不是"用户编辑内容"，不要动 isEdited
+
+    if (!m_messageDao->update(message)) {
+        Utils::writeLog("ERROR", "ChatService", "切换开场白失败: " + messageId);
+        return;
+    }
+
+    m_greetingIndex = index;
+    emit messageUpdated(message.id, message.content);
+    emit greetingStateChanged();
+    updateSessionLastModified(message.sessionId);
+}
+
+void ChatService::switchGreeting(int delta)
+{
+    if (m_greetingMessageId.isEmpty() || m_greetingCount <= 1 || delta == 0) return;
+
+    // 循环取模；负数也要落到合法区间
+    const int next = ((m_greetingIndex + delta) % m_greetingCount + m_greetingCount)
+                     % m_greetingCount;
+    if (next == m_greetingIndex) return;
+
+    applyGreetingIndex(m_greetingMessageId, next);
 }
 
 // ======================================

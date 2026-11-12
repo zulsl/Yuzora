@@ -8,14 +8,19 @@ import Yuzora 1.0
 // 职责：条目行的开关/名称/触发策略/插入位置/排序，以及展开后的详情编辑。
 // 展开行与详情懒加载统一用 ExpandableRow（原先这套"标题行 + Loader 详情"在
 // BookEntryListView 与 PromptsListView 里各复制了一遍）。
-// 注意：原先用 Layout.preferredHeight: contentHeight + interactive: false 嵌在外层滚动里，
-//      两层滚动互相打架；这里改为自身 fillHeight 独立滚动。
-ListView {
+//
+// 为什么不是 ListView：ListView 的 contentHeight 是"已创建委托平均高度 × 条目数"的
+// 估算值，不是真实总和。展开行可以高到一两千 px，估算会随委托增删反复修正 ——
+// 表现就是滚动条长度抖动（看着像忽粗忽细）、拖动手柄位置错乱、滚动范围失真。
+// 这里改成 Flickable + Column + Repeater：所有行真实存在，contentHeight 精确。
+// 代价是放弃虚拟化，条目很多时首次加载要创建全部标题行（展开体仍由 Loader 懒加载）。
+Flickable {
     id: root
 
+    contentWidth: width
+    contentHeight: column.implicitHeight
     clip: true
-    spacing: Theme.spaceXs
-    model: WorldInfoEntryViewModel.entryModel
+    boundsBehavior: Flickable.StopAtBounds
     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
     // ---------- 展开后的详情 ----------
@@ -138,25 +143,30 @@ ListView {
                 wrapMode: Text.WordWrap
             }
 
-            ScrollView {
+            // 内容区不内嵌滚动，高度随内容增长（最小约 4 行）。
+            // 原因：嵌套 Flickable 会独占滚轮 —— 实测光标落在内层时，
+            // 连续 45 格滚轮外层 ListView 一次都没收到（内层到底也不让），
+            // 表现就是"在内容区滚动时整个列表滚不动"。
+            // 去掉内层滚动后全页只剩列表这一条滚动条，行为就正常了。
+            TextArea {
+                id: contentArea
                 Layout.fillWidth: true
-                Layout.preferredHeight: Theme.controlLg * 7
-                clip: true
+                // TextArea 的 implicitHeight 已经等于 contentHeight + 上下内边距（实测 65 / 407），
+                // 直接取它即可，不用手算
+                Layout.preferredHeight: Math.max(contentArea.implicitHeight,
+                                                 Theme.controlLg * 2)
 
-                TextArea {
-                    id: contentArea
-                    textFormat: TextEdit.PlainText
-                    wrapMode: TextArea.Wrap
-                    placeholderText: "内容"
-                    font.pixelSize: Theme.fontBody
-                    font.family: Theme.fontFamily
-                    color: Theme.textPrimary
-                    text: entryRoot.bodyData ? (entryRoot.bodyData.content || "") : ""
-                    onTextChanged: {
-                        if (activeFocus && entryRoot.bodyData)
-                            WorldInfoEntryViewModel.setEntryField(entryRoot.bodyData.id,
-                                                                  "content", text)
-                    }
+                textFormat: TextEdit.PlainText
+                wrapMode: TextArea.Wrap
+                placeholderText: "内容"
+                font.pixelSize: Theme.fontBody
+                font.family: Theme.fontFamily
+                color: Theme.textPrimary
+                text: entryRoot.bodyData ? (entryRoot.bodyData.content || "") : ""
+                onTextChanged: {
+                    if (activeFocus && entryRoot.bodyData)
+                        WorldInfoEntryViewModel.setEntryField(entryRoot.bodyData.id,
+                                                              "content", text)
                 }
             }
 
@@ -175,76 +185,120 @@ ListView {
     }
 
     // ---------- 条目行 ----------
-    delegate: ExpandableRow {
-        id: entryRow
-        // 行宽让出 16px 给列表滚动条（Material 下 ScrollBar.implicitWidth 实测 = 16，
-        // 且它浮在内容之上、不占布局）。不让的话它会压住行尾的删除按钮，
-        // 展开后还会和内容框自己的滚动条叠在同一条右边缘上。
-        width: ListView.view.width - Theme.spaceLg
-        headerHeight: Theme.touchTarget
-        expanded: model.expandedState
-        bodyComponent: entryDetail
-        bodyData: model
+    Column {
+        id: column
+        width: root.width
+        spacing: Theme.spaceXs
 
-        // 数据行对象单独存一份。
-        // 原因：下面那些字段的根节点是 ComboBox，而 ComboBox 自己就有 model 属性。
-        // 在 ComboBox 上写 `entryId: model.id` 时，这个 model 会解析到 ComboBox
-        // 自己的 model（选项数组）而不是委托上下文的数据行，取到 undefined，
-        // 于是刷出 "Unable to assign [undefined] to QString / int"。
-        // 走 row.xxx 才能拿到真正的条目数据。
-        readonly property var row: model
-
-        IconButton {
-            compact: true
-            tip: model.expandedState ? "收起" : "展开"
-            icon.source: model.expandedState
-                         ? "qrc:/icons/res/circle-chevron-up.svg"
-                         : "qrc:/icons/res/circle-chevron-down.svg"
-            onClicked: model.expandedState = !model.expandedState
+        Repeater {
+            model: WorldInfoEntryViewModel.entryModel
+            delegate: rowComponent
         }
+    }
 
-        Switch {
-            checked: model.isEnabled
-            onToggled: WorldInfoEntryViewModel.setEntryField(model.id, "isEnabled", checked)
-        }
+    Component {
+        id: rowComponent
 
-        TextField {
-            Layout.fillWidth: true
-            implicitHeight: Theme.controlSm
-            text: model.name || ""
-            placeholderText: "标题"
-            font.pixelSize: Theme.fontBody
-            font.family: Theme.fontFamily
-            onTextEdited: WorldInfoEntryViewModel.setEntryField(model.id, "name", text)
-        }
+        ExpandableRow {
+            id: entryRow
 
-        RowLayout {
-            visible: !Theme.isCompact
-            Item { Layout.preferredWidth: 5 }
-            Label{
-                text: "触发策略"
+            // Repeater 的委托上下文里**没有** model 对象（实测 model / modelData 都取不到），
+            // 用到的 role 只能逐个声明成 required property。
+            // 注意 entryId 这个 role 名是为此改的（原先是 "id"，与 QML 的对象 id 概念太容易混）。
+            required property string entryId
+            required property string name
+            required property bool isEnabled
+            required property bool expandedState
+            required property int triggerControl
+            required property int insertPosition
+            required property int insertDepth
+            required property int sortOrder
+            required property int scanDepth
+            required property string content
+            required property var keywords
+            required property var secondaryKeywords
+            required property bool selective
+            required property int selectiveLogic
+
+            // 行宽让出 16px 给滚动条（Material 下 ScrollBar.implicitWidth 实测 = 16，
+            // 且它浮在内容之上、不占布局）。不让的话它会压住行尾的删除按钮。
+            width: column.width - Theme.spaceLg
+            // Column 按 height 排布、不认 implicitHeight，所以这里必须显式接上；
+            // 展开动画仍由 ExpandableRow 内部对 implicitHeight 的 Behavior 驱动。
+            height: implicitHeight
+            headerHeight: Theme.touchTarget
+            expanded: expandedState
+            bodyComponent: entryDetail
+            // 详情区按字段读取，这里给一份快照；任一 required property 变化都会重建。
+            // 只放详情真正用到的字段，避免改标题时也白重建一次。
+            bodyData: ({
+                id: entryRow.entryId,
+                triggerControl: entryRow.triggerControl,
+                insertPosition: entryRow.insertPosition,
+                insertDepth: entryRow.insertDepth,
+                sortOrder: entryRow.sortOrder,
+                scanDepth: entryRow.scanDepth,
+                content: entryRow.content,
+                keywords: entryRow.keywords,
+                secondaryKeywords: entryRow.secondaryKeywords,
+                selective: entryRow.selective,
+                selectiveLogic: entryRow.selectiveLogic
+            })
+
+            IconButton {
+                compact: true
+                tip: entryRow.expanded ? "收起" : "展开"
+                icon.source: entryRow.expanded
+                             ? "qrc:/icons/res/circle-chevron-up.svg"
+                             : "qrc:/icons/res/circle-chevron-down.svg"
+                // 展开状态存在列表模型里，走 ViewModel 的命令接口写回
+                onClicked: WorldInfoEntryViewModel.setEntryExpanded(entryRow.entryId,
+                                                                    !entryRow.expanded)
+            }
+
+            Switch {
+                checked: entryRow.isEnabled
+                onToggled: WorldInfoEntryViewModel.setEntryField(entryRow.entryId, "isEnabled", checked)
+            }
+
+            TextField {
+                Layout.fillWidth: true
+                implicitHeight: Theme.controlSm
+                text: entryRow.name || ""
+                placeholderText: "标题"
                 font.pixelSize: Theme.fontBody
                 font.family: Theme.fontFamily
-                color: Theme.textSecondary
-                wrapMode: Text.WordWrap
-                Layout.preferredWidth: 60
+                onTextEdited: WorldInfoEntryViewModel.setEntryField(entryRow.entryId, "name", text)
             }
-            TriggerStrategyComboBox {// 触发策略（窄态搬进详情）
-                // 内容区 = 宽度 - leftPadding(16) - 箭头区(40)。
-                // 「向量化」的自然需求是 16+图标20+间距4+文字42+箭头40 ≈ 122，
-                // 132 留一点余量，避免三字选项被省略号截断。
-                Layout.preferredWidth: Theme.controlLg * 2.75
-                entryId: entryRow.row ? entryRow.row.id : ""
-                entryValue: entryRow.row ? entryRow.row.triggerControl : 0
-            }
-        }
 
-        IconButton {
-            compact: true
-            danger: true
-            tip: "删除条目"
-            icon.source: "qrc:/icons/res/trash.svg"
-            onClicked: WorldInfoEntryViewModel.deleteEntry(model.id)
+            RowLayout {
+                visible: !Theme.isCompact
+                Item { Layout.preferredWidth: 5 }
+                Label{
+                    text: "触发策略"
+                    font.pixelSize: Theme.fontBody
+                    font.family: Theme.fontFamily
+                    color: Theme.textSecondary
+                    wrapMode: Text.WordWrap
+                    Layout.preferredWidth: 60
+                }
+                TriggerStrategyComboBox {// 触发策略（窄态搬进详情）
+                    // 内容区 = 宽度 - leftPadding(16) - 箭头区(40)。
+                    // 「向量化」的自然需求是 16+图标20+间距4+文字42+箭头40 ≈ 122，
+                    // 132 留一点余量，避免三字选项被省略号截断。
+                    Layout.preferredWidth: Theme.controlLg * 2.75
+                    entryId: entryRow.entryId
+                    entryValue: entryRow.triggerControl
+                }
+            }
+
+            IconButton {
+                compact: true
+                danger: true
+                tip: "删除条目"
+                icon.source: "qrc:/icons/res/trash.svg"
+                onClicked: WorldInfoEntryViewModel.deleteEntry(entryRow.entryId)
+            }
         }
     }
 }

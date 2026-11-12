@@ -20,6 +20,20 @@ ChatViewModel::ChatViewModel(QObject* parent)
     // 会话状态信号连接
     connect(m_chatService, &ChatService::sessionSwitched,
             this, &ChatViewModel::onSessionSwitched);
+
+    // 会话列表变更（新建/删除/重命名）后刷新抽屉。
+    // 原先这里没连，列表只在"切换会话"时顺手刷新，所以单条删除/改名后界面不会变。
+    connect(m_chatService, &ChatService::sessionListChanged,
+            this, [this](const QString&) {
+                refreshSessionList();
+
+                // 改名的可能正是当前会话，页面副标题要跟着变
+                const ChatSessionEntity current = m_chatService->currentSession();
+                if (!current.id.isEmpty() && current.title != m_currentSessionTitle) {
+                    m_currentSessionTitle = current.title;
+                    emit currentSessionTitleChanged();
+                }
+            });
     connect(m_chatService, &ChatService::sessionDeleted,
             this, [this](const QString& sessionId) {
                 if (sessionId == m_chatService->currentSessionId()) {
@@ -49,6 +63,10 @@ ChatViewModel::ChatViewModel(QObject* parent)
             this, &ChatViewModel::onMessageStatusChanged);
     connect(m_chatService, &ChatService::messageDeleted,
             this, &ChatViewModel::onMessageDeleted);
+
+    // 开场白状态直接透传（承载消息、序号、总数都由 Service 维护）
+    connect(m_chatService, &ChatService::greetingStateChanged,
+            this, &ChatViewModel::greetingStateChanged);
 
     // 生成生命周期信号连接
     connect(m_chatService, &ChatService::generationStarted,
@@ -181,6 +199,16 @@ void ChatViewModel::switchSession(const QString& sessionId)
 void ChatViewModel::deleteAllSession()
 {
     m_chatService->deleteAllSession();
+}
+
+void ChatViewModel::deleteSession(const QString& sessionId)
+{
+    m_chatService->deleteSession(sessionId);
+}
+
+void ChatViewModel::renameSession(const QString& sessionId, const QString& title)
+{
+    m_chatService->renameSession(sessionId, title);
 }
 
 void ChatViewModel::loadMoreHistory()
@@ -359,6 +387,27 @@ QString ChatViewModel::currentCharAvatarPath()
 ChatSessionListModel* ChatViewModel::sessionModel() const
 {
     return m_sessionModel;
+}
+
+// ==================== 开场白 ====================
+QString ChatViewModel::greetingMessageId() const
+{
+    return m_chatService->greetingMessageId();
+}
+
+int ChatViewModel::greetingIndex() const
+{
+    return m_chatService->greetingIndex();
+}
+
+int ChatViewModel::greetingCount() const
+{
+    return m_chatService->greetingCount();
+}
+
+void ChatViewModel::switchGreeting(int delta)
+{
+    m_chatService->switchGreeting(delta);
 }
 
 

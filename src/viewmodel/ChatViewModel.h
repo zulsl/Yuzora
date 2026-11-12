@@ -53,6 +53,12 @@ public:
     Q_PROPERTY(ChatMessageListModel* messageModel READ messageModel CONSTANT)
     //历史会话数据源
     Q_PROPERTY(ChatSessionListModel* sessionModel READ sessionModel CONSTANT)
+    //开场白：承载开场白的那条消息 id（空 = 当前会话没有可切换的开场白）
+    Q_PROPERTY(QString greetingMessageId READ greetingMessageId NOTIFY greetingStateChanged FINAL)
+    //当前用的是第几条（从 0 开始）
+    Q_PROPERTY(int greetingIndex READ greetingIndex NOTIFY greetingStateChanged FINAL)
+    //开场白总数（首条消息 + 备选）；≤1 时不显示切换控件
+    Q_PROPERTY(int greetingCount READ greetingCount NOTIFY greetingStateChanged FINAL)
 
 
 public:
@@ -70,6 +76,10 @@ public:
     ChatMessageListModel* messageModel() const;
     ChatSessionListModel* sessionModel() const;
 
+    QString greetingMessageId() const;
+    int greetingIndex() const;
+    int greetingCount() const;
+
 
 
     // UI操作接口（全部转发至ChatService）
@@ -82,7 +92,10 @@ public:
     Q_INVOKABLE void createNewSession();//新建会话()
     Q_INVOKABLE void switchSession(const QString& sessionId);//切换会话
     Q_INVOKABLE void deleteAllSession();//删除当前角色全部会话
+    Q_INVOKABLE void deleteSession(const QString& sessionId);//删除单条会话
+    Q_INVOKABLE void renameSession(const QString& sessionId, const QString& title);//重命名会话
     Q_INVOKABLE void loadMoreHistory();//加载更多历史记录
+    Q_INVOKABLE void switchGreeting(int delta);//切换开场白（+1 下一条 / -1 上一条，循环）
 
 
 
@@ -100,6 +113,7 @@ signals:
     void operationTip(const QString& tipMsg);//提示信息
 
     void currentCharAvatarPathChanged();
+    void greetingStateChanged();//开场白状态（承载消息/序号/总数）变更
 
 private slots:
     // 监听ChatService信号，更新视图模型
