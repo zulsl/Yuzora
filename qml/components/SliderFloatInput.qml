@@ -61,6 +61,8 @@ Item {
                 font.pixelSize: Theme.fontBody
                 font.family: Theme.fontFamily
 
+                TextContextMenu {}
+
                 onEditingFinished: {
                     let num = parseFloat(text)
                     if (isNaN(num)) num = root.value

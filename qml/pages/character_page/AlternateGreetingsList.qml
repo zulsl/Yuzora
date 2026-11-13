@@ -264,6 +264,7 @@ ColumnLayout {
 
             TextArea {
                 id: area
+                TextContextMenu {}
                 width: Math.max(0, editorScroll.availableWidth - Theme.spaceMd)
                 placeholderText: "输入备选开场白"
                 wrapMode: Text.WordWrap

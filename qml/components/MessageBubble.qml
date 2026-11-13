@@ -86,6 +86,8 @@ Item {
                     font.family: Theme.fontFamily
                     color: root.isUser ? Theme.bubbleUserText : Theme.textPrimary
                     selectionColor: Theme.accentSubtle
+
+                    TextContextMenu {}
                 }
             }
 

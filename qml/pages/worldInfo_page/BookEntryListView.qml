@@ -150,6 +150,7 @@ Flickable {
             // 去掉内层滚动后全页只剩列表这一条滚动条，行为就正常了。
             TextArea {
                 id: contentArea
+                TextContextMenu {}
                 Layout.fillWidth: true
                 // TextArea 的 implicitHeight 已经等于 contentHeight + 上下内边距（实测 65 / 407），
                 // 直接取它即可，不用手算
@@ -265,6 +266,7 @@ Flickable {
                 Layout.fillWidth: true
                 implicitHeight: Theme.controlSm
                 text: entryRow.name || ""
+                TextContextMenu {}
                 placeholderText: "标题"
                 font.pixelSize: Theme.fontBody
                 font.family: Theme.fontFamily

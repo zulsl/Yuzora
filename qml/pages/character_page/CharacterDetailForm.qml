@@ -119,6 +119,7 @@ Item {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
                         placeholderText: "角色名称"
+                        TextContextMenu {}
                         // 强类型草稿：QML 直接读写 typed property，setter 负责发通知
                         text: CharacterViewModel.characterDraft
                               ? CharacterViewModel.characterDraft.name : ""
@@ -165,6 +166,7 @@ Item {
                     Layout.fillWidth: true
                     implicitHeight: Theme.controlMd
                     placeholderText: "作者"
+                    TextContextMenu {}
                     text: root.fieldValue("creator")
                     onTextChanged: if (activeFocus) CharacterViewModel.setCharacterDraftField("creator", text)
                 }
@@ -172,6 +174,7 @@ Item {
                     Layout.preferredWidth: Theme.controlMd * 3
                     implicitHeight: Theme.controlMd
                     placeholderText: "版本号"
+                    TextContextMenu {}
                     text: root.fieldValue("characterVersion")
                     onTextChanged: if (activeFocus) CharacterViewModel.setCharacterDraftField("characterVersion", text)
                 }
@@ -183,6 +186,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 60
                     placeholderText: "作者备注(不进提示词)"
+                    TextContextMenu {}
                     text: root.fieldValue("creatorNotes")
                     onTextChanged: if (activeFocus) CharacterViewModel.setCharacterDraftField("creatorNotes", text)
                     wrapMode: Text.WordWrap
@@ -282,6 +286,7 @@ Item {
                     Layout.fillWidth: true
                     implicitHeight: Theme.controlMd
                     placeholderText: "英文逗号分隔"
+                    TextContextMenu {}
                     text: (root.fieldValue("tags") || []).join(", ")
                     onTextChanged: {
                         if (!activeFocus) return

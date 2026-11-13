@@ -159,6 +159,8 @@ Item {
                 // 等于把整段文本排版了一遍 —— 实测这一项单独就是 8ms/千字。
                 // 文本由 syncEditorText() 单向同步，不能直接绑定 content。
                 onTextChanged: if (activeFocus) root.edited(text)
+
+                TextContextMenu {}
             }
         }
 

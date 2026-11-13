@@ -170,6 +170,7 @@ PageScaffold {
 
                     TextArea {
                         id: inputArea
+                        TextContextMenu {}
                         placeholderText: "输入消息，回车发送，Shift+回车换行"
                         wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                         selectByMouse: true

@@ -124,6 +124,7 @@ ColumnLayout {
 
                     TextArea {
                         id: contentArea
+                        TextContextMenu {}
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.max(Theme.controlLg * 5,
                                                          contentHeight + topPadding + bottomPadding)
@@ -194,6 +195,7 @@ ColumnLayout {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlSm
                         text: model.name || ""
+                        TextContextMenu {}
                         placeholderText: "提示词名称"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily

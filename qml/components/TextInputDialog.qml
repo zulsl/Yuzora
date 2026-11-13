@@ -63,6 +63,8 @@ Dialog {
             placeholderText: root.placeholderText
             selectByMouse: true
             onAccepted: root.submit()
+
+            TextContextMenu {}
         }
     }
 

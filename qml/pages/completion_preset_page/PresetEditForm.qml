@@ -182,6 +182,7 @@ Item {
                                 implicitHeight: Theme.controlMd
                                 text: CompletionPresetViewModel.presetDraft
                                       ? CompletionPresetViewModel.presetDraft.name : ""
+                                TextContextMenu {}
                                 font.pixelSize: Theme.fontBody
                                 font.family: Theme.fontFamily
                                 onTextEdited: if (CompletionPresetViewModel.presetDraft)

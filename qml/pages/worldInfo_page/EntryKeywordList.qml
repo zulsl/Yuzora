@@ -126,6 +126,7 @@ ColumnLayout {
         Layout.fillWidth: true
         implicitHeight: Theme.controlSm
         placeholderText: root.placeholder
+        TextContextMenu {}
         font.pixelSize: Theme.fontBodySm
         font.family: Theme.fontFamily
         // 回车与失焦都提交（onEditingFinished 覆盖两者）；

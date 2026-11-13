@@ -155,6 +155,7 @@ PageScaffold {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
                         text: ApiConfigViewModel.configName
+                        TextContextMenu {}
                         placeholderText: "给这个 API 配置起个名字"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
@@ -167,6 +168,7 @@ PageScaffold {
 
                     TextField {
                         id: keyField
+                        TextContextMenu {}
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
                         text: ApiConfigViewModel.apiKey
@@ -197,6 +199,7 @@ PageScaffold {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
                         text: ApiConfigViewModel.baseDomain
+                        TextContextMenu {}
                         placeholderText: "https://api.openai.com"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
@@ -211,6 +214,7 @@ PageScaffold {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
                         text: ApiConfigViewModel.apiPath
+                        TextContextMenu {}
                         placeholderText: "/chat/completions"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
@@ -286,6 +290,7 @@ PageScaffold {
 
             TextField {
                 id: nameInput
+                TextContextMenu {}
                 Layout.fillWidth: true
                 implicitHeight: Theme.controlMd
                 placeholderText: "配置名称"
