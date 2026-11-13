@@ -79,9 +79,12 @@ QList<ChatMessageEntity> ChatMessageDao::selectLatestBySessionId(
 
     QSqlDatabase db = connection();
     QSqlQuery query(db);
+    // 时间戳只有秒精度：同一条 user 消息和它的 assistant 占位消息是同一个事务里插入的，
+    // 秒值完全相同。再用随机的 uuid 做次级排序等于抛硬币——重启后"AI 回复跑到用户上面"
+    // 就是这个原因。rowid 是插入顺序，正好等于对话顺序，用它当第二排序键。
     query.prepare(QString(
         "SELECT * FROM %1 WHERE session_id = ? "
-        "ORDER BY timestamp DESC, id DESC LIMIT ?").arg(tableName()));
+        "ORDER BY timestamp DESC, rowid DESC LIMIT ?").arg(tableName()));
     query.addBindValue(sessionId);
     query.addBindValue(limit);
 
@@ -106,10 +109,16 @@ QList<ChatMessageEntity> ChatMessageDao::selectBefore(
 
     QSqlDatabase db = connection();
     QSqlQuery query(db);
-    query.prepare(QString(
-        "SELECT * FROM %1 WHERE session_id = ? "
-        "AND (timestamp < ? OR (timestamp = ? AND id < ?)) "
-        "ORDER BY timestamp DESC, id DESC LIMIT ?").arg(tableName()));
+    // 分页游标同样按 (timestamp, rowid) 排序；rowid 由 beforeId 反查，接口保持只传 id。
+    // 表名出现两次，用拼接而不是同一个 %1，避免占位符重复替换的歧义。
+    const QString table = tableName();
+    query.prepare(QStringLiteral(
+        "SELECT * FROM ") + table
+        + QStringLiteral(" WHERE session_id = ? "
+                         "AND (timestamp < ? OR (timestamp = ? "
+                         "AND rowid < (SELECT rowid FROM ") + table
+        + QStringLiteral(" WHERE id = ?))) "
+                         "ORDER BY timestamp DESC, rowid DESC LIMIT ?"));
     const QString ts = beforeTimestamp.toString(Qt::ISODate);
     query.addBindValue(sessionId);
     query.addBindValue(ts);
@@ -265,7 +274,7 @@ ChatMessageEntity ChatMessageDao::selectLastBySessionId(const QString& sessionId
     QString sql = QString(
                       "SELECT * FROM %1 "
                       "WHERE session_id = ? "
-                      "ORDER BY timestamp DESC "
+                      "ORDER BY timestamp DESC, rowid DESC "
                       "LIMIT 1"
                       ).arg(tableName());
 
@@ -296,7 +305,8 @@ ChatMessageEntity ChatMessageDao::selectFirstBySessionId(const QString& sessionI
     QString sql = QString(
                       "SELECT * FROM %1 "
                       "WHERE session_id = ? "
-                      "ORDER BY timestamp ASC, id ASC "
+                      // 同一秒内多条消息按插入顺序判定谁在前（uuid 是随机的，不能用）
+                      "ORDER BY timestamp ASC, rowid ASC "
                       "LIMIT 1"
                       ).arg(tableName());
 

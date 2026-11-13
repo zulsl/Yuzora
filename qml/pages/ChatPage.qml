@@ -68,6 +68,55 @@ PageScaffold {
         anchors.fill: parent
         spacing: 0
 
+        // ========== 开场白切换条 ==========
+        // 放在 ListView 外面：不随消息滚动（长开场白看到一半也能切），
+        // 也不占用气泡的排版空间。
+        // 只在"会话里只剩开场白这一条"时出现——发过消息就定下来了。
+        Item {
+            id: greetingBar
+            Layout.fillWidth: true
+            Layout.preferredHeight: Theme.controlMd
+            visible: ChatViewModel.greetingMessageId.length > 0
+                     && ChatViewModel.greetingCount > 1
+                     && ChatViewModel.messageCount === 1
+
+            RowLayout {
+                anchors.centerIn: parent
+                spacing: Theme.spaceXs
+
+                // 朝上的细箭头旋转 ±90° 当作左右箭头，不为两个方向再引一套资产
+                IconButton {
+                    compact: true
+                    tip: "上一条开场白"
+                    icon.source: "qrc:/icons/res/arrow-narrow-up.svg"
+                    rotation: -90
+                    onClicked: {
+                        ChatViewModel.switchGreeting(-1)
+                        messageListView.positionViewAtBeginning()
+                    }
+                }
+
+                Label {
+                    text: (ChatViewModel.greetingIndex + 1) + "/"
+                          + ChatViewModel.greetingCount
+                    font.pixelSize: Theme.fontCaption
+                    font.family: Theme.fontFamily
+                    color: Theme.textSecondary
+                }
+
+                IconButton {
+                    compact: true
+                    tip: "下一条开场白"
+                    icon.source: "qrc:/icons/res/arrow-narrow-up.svg"
+                    rotation: 90
+                    onClicked: {
+                        ChatViewModel.switchGreeting(1)
+                        messageListView.positionViewAtBeginning()
+                    }
+                }
+            }
+        }
+
         // ========== 消息列表 ==========
         Item {
             Layout.fillWidth: true
@@ -112,30 +161,13 @@ PageScaffold {
                     avatarSource: model.messageType === GlobalConstants.User
                                   ? SettingsViewModel.userAvatar
                                   : ChatViewModel.currentCharAvatarPath
-
-                    // 开场白切换：只有承载开场白的那条消息、且总数 > 1 时才显示
-                    isGreeting: model.id === ChatViewModel.greetingMessageId
-                    greetingText: isGreeting && ChatViewModel.greetingCount > 1
-                                  ? (ChatViewModel.greetingIndex + 1) + "/"
-                                    + ChatViewModel.greetingCount
-                                  : ""
-                    onGreetingPrev: {
-                        ChatViewModel.switchGreeting(-1)
-                        // 用 ListView.view 而不是 messageListView：委托是嵌套组件，
-                        // 引用外层 id 会触发 qmllint 的 unqualified 告警
-                        ListView.view.positionViewAtBeginning()
-                    }
-                    onGreetingNext: {
-                        ChatViewModel.switchGreeting(1)
-                        ListView.view.positionViewAtBeginning()
-                    }
                 }
             }
 
             EmptyState {
                 anchors.centerIn: parent
-                // 用 ListView.count 判断：QAbstractListModel 的 rowCount() 不可从 QML 直接调用
-                visible: messageListView.count === 0
+                // 用 ViewModel 的行数：QAbstractListModel 的 rowCount() 不能从 QML 直接调用
+                visible: ChatViewModel.messageCount === 0
                 text: "还没有消息"
                 detail: ChatViewModel.currentCharName.length > 0
                         ? "和 " + ChatViewModel.currentCharName + " 打个招呼吧"

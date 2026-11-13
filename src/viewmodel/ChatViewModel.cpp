@@ -68,6 +68,16 @@ ChatViewModel::ChatViewModel(QObject* parent)
     connect(m_chatService, &ChatService::greetingStateChanged,
             this, &ChatViewModel::greetingStateChanged);
 
+    // 消息条数：页面上"是否只有开场白这一条"要读它。
+    // 不直接读 ListView.count——QML 同文件内对后声明的 id 做绑定引用不会生效，
+    // 而切换条又必须排在 ListView 前面（否则不在顶部）。
+    connect(m_messageModel, &QAbstractItemModel::rowsInserted,
+            this, [this] { emit messageCountChanged(); });
+    connect(m_messageModel, &QAbstractItemModel::rowsRemoved,
+            this, [this] { emit messageCountChanged(); });
+    connect(m_messageModel, &QAbstractItemModel::modelReset,
+            this, [this] { emit messageCountChanged(); });
+
     // 生成生命周期信号连接
     connect(m_chatService, &ChatService::generationStarted,
             this, &ChatViewModel::onGenerationStarted);
@@ -403,6 +413,11 @@ int ChatViewModel::greetingIndex() const
 int ChatViewModel::greetingCount() const
 {
     return m_chatService->greetingCount();
+}
+
+int ChatViewModel::messageCount() const
+{
+    return m_messageModel->rowCount();
 }
 
 void ChatViewModel::switchGreeting(int delta)

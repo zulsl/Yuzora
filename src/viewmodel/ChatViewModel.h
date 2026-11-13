@@ -59,6 +59,8 @@ public:
     Q_PROPERTY(int greetingIndex READ greetingIndex NOTIFY greetingStateChanged FINAL)
     //开场白总数（首条消息 + 备选）；≤1 时不显示切换控件
     Q_PROPERTY(int greetingCount READ greetingCount NOTIFY greetingStateChanged FINAL)
+    //当前会话已经加载的消息条数（开场白切换只在"只剩开场白一条"时开放）
+    Q_PROPERTY(int messageCount READ messageCount NOTIFY messageCountChanged FINAL)
 
 
 public:
@@ -79,6 +81,7 @@ public:
     QString greetingMessageId() const;
     int greetingIndex() const;
     int greetingCount() const;
+    int messageCount() const;
 
 
 
@@ -114,6 +117,7 @@ signals:
 
     void currentCharAvatarPathChanged();
     void greetingStateChanged();//开场白状态（承载消息/序号/总数）变更
+    void messageCountChanged();//消息条数变更
 
 private slots:
     // 监听ChatService信号，更新视图模型
