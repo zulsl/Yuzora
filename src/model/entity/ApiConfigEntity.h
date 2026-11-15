@@ -14,8 +14,8 @@ struct ApiConfigEntity {
     GlobalConstants::ModelType modelType = GlobalConstants::ModelType::OpenAI;
     bool isBuiltin = false;         // 是否为内置预设
     bool isOpenAICompatible = true; // 是否兼容OpenAI接口规范
-    QString baseDomain;             // API域名（如 https://api.openai.com）
-    QString apiPath;                // 接口路径（如 /v1/chat/completions）
+    QString baseDomain;             // API域名（如 https://api.openai.com/v1）
+    QString apiPath;                // 接口路径（如 /chat/completions）
     QString apiKey;                 // API密钥
     QStringList availableModels;    // 该配置下可用的子模型列表
     QString currentModel;           // 当前选中的子模型

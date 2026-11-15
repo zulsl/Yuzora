@@ -57,9 +57,9 @@ PresetPromptListModel *CompletionPresetViewModel::presetPromptModel() const
     return m_presetPromptListModel;
 }
 
-CompletionPresetEntity CompletionPresetViewModel::currentEditingPreset() const
+CompletionPresetEntity CompletionPresetViewModel::currentPreset() const
 {
-    return m_currentEditingPreset;
+    return m_currentPreset;
 }
 
 CompletionPresetDraft* CompletionPresetViewModel::presetDraft() const
@@ -74,7 +74,7 @@ bool CompletionPresetViewModel::presetDirty() const
 
 bool CompletionPresetViewModel::hasSelection() const
 {
-    return !m_currentEditingPreset.id.isEmpty();
+    return !m_currentPreset.id.isEmpty();
 }
 
 int CompletionPresetViewModel::presetDetailTab() const
@@ -104,10 +104,10 @@ void CompletionPresetViewModel::refreshList()
 
 void CompletionPresetViewModel::selectPreset(const QString& presetId)
 {
-    if (m_currentEditingPreset.id == presetId) return;
+    if (m_currentPreset.id == presetId) return;
 
     flushPendingPromptEdits();
-    m_currentEditingPreset = m_service->getPresetById(presetId);
+    m_currentPreset = m_service->getPresetById(presetId);
 
     // 切换预设时回到“基础参数”Tab
     if (m_presetDetailTab != 0) {
@@ -115,10 +115,13 @@ void CompletionPresetViewModel::selectPreset(const QString& presetId)
         emit presetDetailTabChanged();
     }
 
-    emit currentEditingPresetChanged();
+    emit currentPresetChanged();
 
     refreshPromptList();
-    resetPresetDraft(m_currentEditingPreset);
+
+    // 选中预设后必须把草稿载入：否则采样参数显示的是草稿默认值，
+    // 而且草稿里没有 id，"保存参数"会直接校验失败（表现为点了没反应）。
+    resetPresetDraft(m_currentPreset);
 }
 
 // ======================================
@@ -140,13 +143,13 @@ void CompletionPresetViewModel::createPreset()
 void CompletionPresetViewModel::deletePreset(const QString& presetId)
 {
     bool success = m_service->deletePreset(presetId);
-    if (success && m_currentEditingPreset.id == presetId) {
-        m_currentEditingPreset = {};
+    if (success && m_currentPreset.id == presetId) {
+        m_currentPreset = {};
         if (m_presetDetailTab != 0) {
             m_presetDetailTab = 0;
             emit presetDetailTabChanged();
         }
-        emit currentEditingPresetChanged();
+        emit currentPresetChanged();
         resetPresetDraft(CompletionPresetEntity{});
     }
     refreshList();
@@ -163,9 +166,9 @@ void CompletionPresetViewModel::duplicatePreset(const QString& presetId)
 void CompletionPresetViewModel::setActivePreset(const QString& presetId)
 {
     bool success = m_service->setActivePreset(presetId);
-    if (success && m_currentEditingPreset.id == presetId) {
-        m_currentEditingPreset.isDefault = true;
-        emit currentEditingPresetChanged();
+    if (success && m_currentPreset.id == presetId) {
+        m_currentPreset.isActive = true;
+        emit currentPresetChanged();
     }
     refreshList();
 }
@@ -173,11 +176,64 @@ void CompletionPresetViewModel::setActivePreset(const QString& presetId)
 void CompletionPresetViewModel::renamePreset(const QString& presetId, const QString& newName)
 {
     bool success = m_service->renamePreset(presetId, newName);
-    if (success && m_currentEditingPreset.id == presetId) {
-        m_currentEditingPreset.name = newName.trimmed();
-        emit currentEditingPresetChanged();
+    if (success && m_currentPreset.id == presetId) {
+        m_currentPreset.name = newName.trimmed();
+        syncDraftWithSavedField(QStringLiteral("name"), m_currentPreset.name);
+        emit currentPresetChanged();
     }
     refreshList();
+}
+
+void CompletionPresetViewModel::setMaxContextToken(const QVariant &value)
+{
+    if(m_currentPreset.maxContextToken == value.toInt()) return;
+    CompletionPresetEntity newPreset = m_currentPreset;
+    newPreset.maxContextToken = value.toInt();
+    if (!m_service->updatePreset(newPreset)) return;
+
+    m_currentPreset = newPreset;
+    emit currentPresetChanged();
+}
+
+void CompletionPresetViewModel::setMaxResponseToken(const QVariant &value)
+{
+    if(m_currentPreset.maxResponseToken == value.toInt()) return;
+    CompletionPresetEntity newPreset = m_currentPreset;
+    newPreset.maxResponseToken = value.toInt();
+    if (!m_service->updatePreset(newPreset)) return;
+
+    m_currentPreset = newPreset;
+    emit currentPresetChanged();
+}
+
+void CompletionPresetViewModel::setStreamEnabled(const QVariant &value)
+{
+    if(m_currentPreset.streamEnabled==value.toBool()) return;
+    CompletionPresetEntity newPreset = m_currentPreset;
+    newPreset.streamEnabled = value.toBool();
+    if (!m_service->updatePreset(newPreset)) return;
+    m_currentPreset = newPreset;
+    emit currentPresetChanged();
+}
+
+void CompletionPresetViewModel::setTopP(const QVariant &value)
+{
+    if(m_currentPreset.topP==value.toDouble()) return;
+    CompletionPresetEntity newPreset=m_currentPreset;
+    newPreset.topP=value.toDouble();
+    m_service->updatePreset(newPreset);
+    m_currentPreset = newPreset;
+    emit currentPresetChanged();
+}
+
+void CompletionPresetViewModel::setTopK(const QVariant &value)
+{
+    if(m_currentPreset.topK==value.toDouble()) return;
+    CompletionPresetEntity newPreset=m_currentPreset;
+    newPreset.topK=value.toDouble();
+    m_service->updatePreset(newPreset);
+    m_currentPreset = newPreset;
+    emit currentPresetChanged();
 }
 
 void CompletionPresetViewModel::resetPresetDraft(const CompletionPresetEntity& entity)
@@ -189,13 +245,33 @@ void CompletionPresetViewModel::resetPresetDraft(const CompletionPresetEntity& e
     emit presetDirtyChanged();
 }
 
+void CompletionPresetViewModel::syncDraftWithSavedField(const QString& field, const QVariant& value)
+{
+    if (!m_presetDraft) return;
+
+    // 草稿里也写一份：否则之后点"保存参数"会用草稿里的旧值把刚保存的字段覆盖回去
+    m_presetDraft->setField(field, value);
+
+    // 刚保存的字段不该算"未保存改动"：基线前移到当前已保存实体
+    m_presetBaseline = m_currentPreset;
+    const bool dirty = !m_presetDraft->equals(m_presetBaseline);
+    if (m_presetDirty != dirty) {
+        m_presetDirty = dirty;
+        emit presetDirtyChanged();
+    }
+    emit presetDraftChanged();
+}
+
 CompletionPresetEntity CompletionPresetViewModel::draftToPreset() const
 {
-    return m_presetDraft->toEntity(m_currentEditingPreset);
+    return m_presetDraft->toEntity(m_currentPreset);
 }
 
 void CompletionPresetViewModel::setPresetDraftField(const QString& field, const QVariant& value)
 {
+    // 与 QML 表单的字段一一对应：采样参数 + 基础参数都走草稿。
+    // 之前白名单被收窄成只有两个惩罚项，导致温度 / Top-P / Top-K 的滑杆
+    // 改了也不进草稿、点保存也不会写库（表现为"滑杆没反应"）。
     static const QStringList editableFields = {
         QStringLiteral("name"),
         QStringLiteral("maxContextToken"),
@@ -226,7 +302,7 @@ bool CompletionPresetViewModel::savePresetDraft()
         return false;
     }
 
-    m_currentEditingPreset = entity;
+    m_currentPreset = entity;
     resetPresetDraft(entity);
     refreshList();
     emit operationTip(QStringLiteral("预设已保存"));
@@ -235,15 +311,15 @@ bool CompletionPresetViewModel::savePresetDraft()
 
 void CompletionPresetViewModel::discardPresetDraft()
 {
-    resetPresetDraft(m_currentEditingPreset);
+    resetPresetDraft(m_currentPreset);
 }
 
 void CompletionPresetViewModel::refreshPromptList()
 {
-    if (m_currentEditingPreset.id.isEmpty()) return;
+    if (m_currentPreset.id.isEmpty()) return;
 
-    QList<PromptEntity> prompts = m_service->getPromptsByPresetId(m_currentEditingPreset.id);
-    QStringList promptOrder=m_currentEditingPreset.promptOrder;
+    QList<PromptEntity> prompts = m_service->getPromptsByPresetId(m_currentPreset.id);
+    QStringList promptOrder=m_currentPreset.promptOrder;
 
 
     //建立 id -> PromptEntity 的哈希索引
@@ -273,7 +349,7 @@ PromptEntity CompletionPresetViewModel::makeNewPrompt() const
     PromptEntity prompt;
     prompt.id = Utils::generateUuid();
     prompt.identifier = prompt.id;
-    prompt.presetId = m_currentEditingPreset.id;
+    prompt.presetId = m_currentPreset.id;
     prompt.name = QStringLiteral("新提示词");
     prompt.role = GlobalConstants::MessageType::System;
     prompt.content.clear();
@@ -289,32 +365,32 @@ PromptEntity CompletionPresetViewModel::makeNewPrompt() const
 
 void CompletionPresetViewModel::reloadCurrentPresetAndPrompts()
 {
-    if (m_currentEditingPreset.id.isEmpty()) return;
+    if (m_currentPreset.id.isEmpty()) return;
 
     // 提示词增删只改变 promptOrder；不要用数据库实体覆盖基础参数草稿。
-    const CompletionPresetEntity fresh = m_service->getPresetById(m_currentEditingPreset.id);
+    const CompletionPresetEntity fresh = m_service->getPresetById(m_currentPreset.id);
     if (fresh.id.isEmpty()) return;
 
-    m_currentEditingPreset.promptOrder = fresh.promptOrder;
-    emit currentEditingPresetChanged();
+    m_currentPreset.promptOrder = fresh.promptOrder;
+    emit currentPresetChanged();
     refreshPromptList();
 }
 
 void CompletionPresetViewModel::addPrompt()
 {
-    if (m_currentEditingPreset.id.isEmpty()) {
+    if (m_currentPreset.id.isEmpty()) {
         emit operationError(QStringLiteral("请先选择预设"));
         return;
     }
 
     flushPendingPromptEdits();
-    if (m_service->addPrompt(m_currentEditingPreset.id, makeNewPrompt()))
+    if (m_service->addPrompt(m_currentPreset.id, makeNewPrompt()))
         reloadCurrentPresetAndPrompts();
 }
 
 void CompletionPresetViewModel::insertPromptBefore(const QString& beforeIdentifier)
 {
-    if (m_currentEditingPreset.id.isEmpty()) {
+    if (m_currentPreset.id.isEmpty()) {
         emit operationError(QStringLiteral("请先选择预设"));
         return;
     }
@@ -324,16 +400,16 @@ void CompletionPresetViewModel::insertPromptBefore(const QString& beforeIdentifi
     }
 
     flushPendingPromptEdits();
-    if (m_service->insertPromptBefore(m_currentEditingPreset.id, beforeIdentifier, makeNewPrompt()))
+    if (m_service->insertPromptBefore(m_currentPreset.id, beforeIdentifier, makeNewPrompt()))
         reloadCurrentPresetAndPrompts();
 }
 
 void CompletionPresetViewModel::deletePrompt(const QString& promptId)
 {
-    if (m_currentEditingPreset.id.isEmpty() || promptId.isEmpty()) return;
+    if (m_currentPreset.id.isEmpty() || promptId.isEmpty()) return;
 
     flushPendingPromptEdits();
-    if (m_service->deletePrompt(m_currentEditingPreset.id, promptId))
+    if (m_service->deletePrompt(m_currentPreset.id, promptId))
         reloadCurrentPresetAndPrompts();
 }
 

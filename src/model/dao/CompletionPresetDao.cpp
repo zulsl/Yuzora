@@ -91,7 +91,7 @@ void CompletionPresetDao::bindValues(QSqlQuery &query, const CompletionPresetEnt
     //严格顺序
     query.addBindValue(entity.id);
     query.addBindValue(entity.name);
-    query.addBindValue(entity.isDefault ? 1 : 0);
+    query.addBindValue(entity.isActive ? 1 : 0);
     query.addBindValue(entity.maxContextToken);
     query.addBindValue(entity.maxResponseToken);
     query.addBindValue(entity.streamEnabled ? 1 : 0);
@@ -134,7 +134,7 @@ CompletionPresetEntity CompletionPresetDao::parseFromQuery(const QSqlQuery &quer
     CompletionPresetEntity entity;
     entity.id = query.value("id").toString();
     entity.name = query.value("name").toString();
-    entity.isDefault = query.value("is_default").toBool();
+    entity.isActive = query.value("is_default").toBool();
     entity.maxContextToken = query.value("max_context_token").toInt();
     entity.maxResponseToken = query.value("max_response_token").toInt();
     entity.streamEnabled = query.value("stream_enabled").toBool();

@@ -35,7 +35,6 @@ CompletionPresetService::~CompletionPresetService() = default;
 void CompletionPresetService::ensureSeedData()
 {
     initBuiltinPresets();
-    m_currentActivePreset = m_completionPresetDao->selectDefault();
 }
 
 void CompletionPresetService::initBuiltinPresets()
@@ -46,7 +45,7 @@ void CompletionPresetService::initBuiltinPresets()
     CompletionPresetEntity balanced;
     balanced.id = Utils::generateUuid();
     balanced.name = "平衡模式 (默认)";
-    balanced.isDefault = true;
+    balanced.isActive = true;
     balanced.maxContextToken = 4096;
     balanced.maxResponseToken = 1024;
     balanced.streamEnabled = true;
@@ -145,8 +144,7 @@ CompletionPresetEntity CompletionPresetService::getPresetById(const QString& id)
 
 CompletionPresetEntity CompletionPresetService::getActivePreset()const
 {
-    return m_currentActivePreset;
-    // return m_completionPresetDao->selectDefault();
+    return m_completionPresetDao->selectDefault();
 }
 
 QString CompletionPresetService::createPreset(const CompletionPresetEntity& preset)
@@ -191,7 +189,7 @@ bool CompletionPresetService::deletePreset(const QString& id)
         emit operationError("预设不存在");
         return false;
     }
-    if (preset.isDefault) {
+    if (preset.isActive) {
         emit operationError("无法删除默认预设");
         return false;
     }
@@ -212,7 +210,7 @@ QString CompletionPresetService::duplicatePreset(const QString& sourceId)
     CompletionPresetEntity newPreset = source;
     newPreset.id = Utils::generateUuid();
     newPreset.name = source.name + " (副本)";
-    newPreset.isDefault = false;
+    newPreset.isActive = false;
     bool success = m_completionPresetDao->insert(newPreset);
     if (!success) {
         emit operationError("复制预设失败");
@@ -224,8 +222,7 @@ QString CompletionPresetService::duplicatePreset(const QString& sourceId)
 bool CompletionPresetService::setActivePreset(const QString& id)
 {
     bool success = m_completionPresetDao->setDefault(id);
-    if (success) m_currentActivePreset=m_completionPresetDao->selectDefault();
-    else emit operationError("设置默认预设失败");
+    if (!success) emit operationError("设置默认预设失败");
     return success;
 }
 
@@ -428,7 +425,7 @@ CompletionPresetEntity CompletionPresetService::parsePresetDataToEntity(const QJ
     CompletionPresetEntity preset;
     preset.id = Utils::generateUuid();
     preset.name = fileName;
-    preset.isDefault = false;
+    preset.isActive = false;
 
     // 基础生成
     preset.maxContextToken = stJson.value("openai_max_context").toInt();

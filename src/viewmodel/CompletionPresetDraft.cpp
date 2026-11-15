@@ -87,7 +87,7 @@ void CompletionPresetDraft::setEntity(const CompletionPresetEntity& entity)
     m_updating = true;
     setId(entity.id);
     setName(entity.name);
-    setIsDefault(entity.isDefault);
+    setIsDefault(entity.isActive);
     setMaxContextToken(entity.maxContextToken);
     setMaxResponseToken(entity.maxResponseToken);
     setStreamEnabled(entity.streamEnabled);
@@ -106,7 +106,7 @@ CompletionPresetEntity CompletionPresetDraft::toEntity(
     CompletionPresetEntity entity = base;
     entity.id = m_id;
     entity.name = m_name;
-    entity.isDefault = m_isDefault;
+    entity.isActive = m_isDefault;
     entity.maxContextToken = m_maxContextToken;
     entity.maxResponseToken = m_maxResponseToken;
     entity.streamEnabled = m_streamEnabled;
@@ -122,7 +122,7 @@ bool CompletionPresetDraft::equals(const CompletionPresetEntity& entity) const
 {
     return m_id == entity.id
         && m_name == entity.name
-        && m_isDefault == entity.isDefault
+        && m_isDefault == entity.isActive
         && m_maxContextToken == entity.maxContextToken
         && m_maxResponseToken == entity.maxResponseToken
         && m_streamEnabled == entity.streamEnabled

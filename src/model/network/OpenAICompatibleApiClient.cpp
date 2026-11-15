@@ -30,12 +30,14 @@ QNetworkRequest OpenAICompatibleApiClient::buildRequestHeader() const
     QNetworkRequest request;
     //设置url
     request.setUrl(QUrl(url));
+    qDebug()<<"当前请求地址:"<<url;
     //设置请求体格式
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
         // 注入 API 密钥鉴权头
     if (!m_apiConfig.apiKey.isEmpty()) {
-        request.setRawHeader("Authorization", QString("Bearer %1").arg(m_apiConfig.apiKey).toUtf8());
+        request.setRawHeader(
+            "Authorization", QString("Bearer %1").arg(m_apiConfig.apiKey).toUtf8());
     }
 
     // 注入自定义额外请求头(未完成)
@@ -52,53 +54,22 @@ QJsonObject OpenAICompatibleApiClient::buildRequestBody(const QList<ChatMessage>
 {
     QJsonObject body;
     body["model"] = m_apiConfig.currentModel;
+    body["stream"] = m_preset.streamEnabled;
+    // body["stream_options"] = m_preset.stream_options;
+    // body["thinking"] = m_preset.thinking;
+    // body["reasoning_effort"] = m_preset.reasoning_effort;
+    body["max_tokens"] = m_preset.maxResponseToken;
+    // body["response_format"] = m_preset.response_format;
+    // body["stop"] = m_preset.stop;
     body["temperature"] = m_preset.temperature;
     body["top_p"] = m_preset.topP;
-    body["max_tokens"] = m_preset.maxResponseToken;
-    body["stream"] = m_preset.streamEnabled;
-    body["frequency_penalty"] = m_preset.repetitionPenalty;
+
 
     // 消息数组转换
     QJsonArray msgArray;
     for (const ChatMessage& msg : messages) {
         QJsonObject obj;
-
-        // 角色映射
-        switch (msg.role) {
-        case GlobalConstants::MessageType::System:    obj["role"] = "system"; break;
-        case GlobalConstants::MessageType::User:      obj["role"] = "user"; break;
-        case GlobalConstants::MessageType::Assistant: obj["role"] = "assistant"; break;
-        case GlobalConstants::MessageType::ToolCall:      obj["role"] = "tool"; break;
-        }
-
-        // 单文本片段 → 字符串 content
-        if (msg.parts.size() == 1 && msg.parts[0].type == ChatMessagePart::Type::Text) {
-            obj["content"] = msg.parts[0].data;
-        }
-        // 多片段 → 数组 content（多模态）
-        else {
-            QJsonArray partsArray;
-            for (const ChatMessagePart& part : msg.parts) {
-                QJsonObject partObj;
-                if (part.type == ChatMessagePart::Type::Text) {
-                    partObj["type"] = "text";
-                    partObj["text"] = part.data;
-                } else if (part.type == ChatMessagePart::Type::ImageUrl) {
-                    partObj["type"] = "image_url";
-                    QJsonObject urlObj;
-                    urlObj["url"] = part.data;
-                    partObj["image_url"] = urlObj;
-                }
-                partsArray.append(partObj);
-            }
-            obj["content"] = partsArray;
-        }
-
-        //废弃
-        // if (!msg.senderName.isEmpty()) {
-        //     obj["name"] = msg.senderName;
-        // }
-
+        obj = msg.toJson();
         msgArray.append(obj);
     }
 

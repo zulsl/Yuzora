@@ -83,7 +83,6 @@ private:
 
     CompletionPresetDao* m_completionPresetDao = nullptr;
     PromptDao* m_promptDao = nullptr;
-    CompletionPresetEntity m_currentActivePreset;//当前激活的预设
 };
 
 #endif

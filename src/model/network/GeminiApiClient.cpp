@@ -165,46 +165,46 @@ QJsonArray GeminiApiClient::buildContents(const QList<ChatMessage>& messages) co
 {
     QJsonArray contents;
 
-    for (const ChatMessage& msg : messages) {
-        QJsonObject content;
-        // 角色映射：User -> "user", Assistant -> "model"
-        // Gemini 不支持 system 角色，通常将系统指令作为第一条 user 消息处理，或使用 system_instruction 字段（需额外支持）
-        switch (msg.role) {
-        case GlobalConstants::MessageType::System:
-            // 为了简化，将系统消息作为 user 消息，但加上特定前缀？或者忽略？这里按普通 user 处理，但需用户自行处理
-            // 更规范的用法是使用 system_instruction 字段，我们可以在 buildRequestBody 中单独处理第一个 system 消息
-            // 但为保持通用，直接将 system 当作 user，内容前面加 "[System] " ？但更好的是在外部处理，我们仅做映射
-            content["role"] = "user";
-            break;
-        case GlobalConstants::MessageType::User:
-            content["role"] = "user";
-            break;
-        case GlobalConstants::MessageType::Assistant:
-            content["role"] = "model";
-            break;
-        default:
-            content["role"] = "user"; // fallback
-        }
+    // for (const ChatMessage& msg : messages) {
+    //     QJsonObject content;
+    //     // 角色映射：User -> "user", Assistant -> "model"
+    //     // Gemini 不支持 system 角色，通常将系统指令作为第一条 user 消息处理，或使用 system_instruction 字段（需额外支持）
+    //     switch (msg.role) {
+    //     case GlobalConstants::MessageType::System:
+    //         // 为了简化，将系统消息作为 user 消息，但加上特定前缀？或者忽略？这里按普通 user 处理，但需用户自行处理
+    //         // 更规范的用法是使用 system_instruction 字段，我们可以在 buildRequestBody 中单独处理第一个 system 消息
+    //         // 但为保持通用，直接将 system 当作 user，内容前面加 "[System] " ？但更好的是在外部处理，我们仅做映射
+    //         content["role"] = "user";
+    //         break;
+    //     case GlobalConstants::MessageType::User:
+    //         content["role"] = "user";
+    //         break;
+    //     case GlobalConstants::MessageType::Assistant:
+    //         content["role"] = "model";
+    //         break;
+    //     default:
+    //         content["role"] = "user"; // fallback
+    //     }
 
-        // 构建 parts 数组
-        QJsonArray parts;
-        for (const ChatMessagePart& part : msg.parts) {
-            QJsonObject partObj;
-            if (part.type == ChatMessagePart::Type::Text) {
-                partObj["text"] = part.data;
-            } else if (part.type == ChatMessagePart::Type::ImageUrl) {
-                // Gemini 支持 inlineData 或 fileData，此处简化，仅做示例
-                // 假设 data 是 base64 图片数据或 URL，Gemini 需使用 inlineData
-                // 此处省略具体实现，仅做示意
-                partObj["inlineData"] = QJsonObject{{"mimeType", "image/jpeg"}, {"data", part.data}};
-            }
-            parts.append(partObj);
-        }
-        content["parts"] = parts;
+    //     // 构建 parts 数组
+    //     QJsonArray parts;
+    //     for (const ChatMessagePart& part : msg.parts) {
+    //         QJsonObject partObj;
+    //         if (part.type == ChatMessagePart::Type::Text) {
+    //             partObj["text"] = part.data;
+    //         } else if (part.type == ChatMessagePart::Type::ImageUrl) {
+    //             // Gemini 支持 inlineData 或 fileData，此处简化，仅做示例
+    //             // 假设 data 是 base64 图片数据或 URL，Gemini 需使用 inlineData
+    //             // 此处省略具体实现，仅做示意
+    //             partObj["inlineData"] = QJsonObject{{"mimeType", "image/jpeg"}, {"data", part.data}};
+    //         }
+    //         parts.append(partObj);
+    //     }
+    //     content["parts"] = parts;
 
-        // 如果有多条消息，且角色相同，Gemini 允许合并，但为简单，我们每条独立
-        contents.append(content);
-    }
+    //     // 如果有多条消息，且角色相同，Gemini 允许合并，但为简单，我们每条独立
+    //     contents.append(content);
+    // }
 
     return contents;
 }

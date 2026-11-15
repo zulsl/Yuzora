@@ -461,7 +461,7 @@ void PromptBuilder::populateChatCompletion(
         SMessage m;
         m.identifier = QStringLiteral("continuePrefill");
         m.role = lastMsg.role;
-        m.content = lastMsg.testContent;
+        m.content = lastMsg.textContent();
         m.tokens = estimateTokens(m.content) + PER_MESSAGE_OVERHEAD;
         controlPrompts.add(m);
         chatCompletion.reserveBudget(m.tokens);
@@ -670,7 +670,7 @@ QList<ChatMessage> PromptBuilder::convertHistoryToMessages(const QList<ChatMessa
 
         ChatMessage m;
         m.role = item.type;
-        m.testContent = item.content.trimmed();
+        m.appendText(item.content.trimmed());
         m.senderName = item.senderName;
         result.append(m);
     }
@@ -751,7 +751,7 @@ QList<ChatMessage> PromptBuilder::populationInjectionPrompts(
             if (!byRole.contains(role)) continue;
             ChatMessage m;
             m.role = role;
-            m.testContent = byRole[role];
+            m.appendText(byRole[role]);
             result.insert(insertIdx + offset, m);
             offset++;
         }
@@ -791,7 +791,7 @@ void PromptBuilder::populateDialogueExamples(const QList<QList<ChatMessage>> &me
             SMessage m;
             m.identifier = QStringLiteral("dialogueExamples-%1-%2").arg(&dialogue - &messageExamples[0]).arg(i);
             m.role = GlobalConstants::MessageType::System;
-            m.content = dialogue[i].testContent;
+            m.content = dialogue[i].textContent();
             m.name = dialogue[i].senderName;
             m.tokens = estimateTokens(m.content) + PER_MESSAGE_OVERHEAD;
             block.append(m);
@@ -843,12 +843,12 @@ void PromptBuilder::populateChatHistory(
     int tempBudget = chatCompletion.remaining();
     for (int i = messages.size() - 1; i >= 0; --i) {
         const ChatMessage & cm = messages[i];
-        if (cm.testContent.isEmpty()) continue;
+        if (cm.parts.isEmpty()) continue;
 
         SMessage m;
         m.identifier = QStringLiteral("chatHistory-%1").arg(i);
         m.role = cm.role;
-        m.content = cm.testContent;
+        m.content = cm.textContent();
         m.name = cm.senderName;
         m.tokens = estimateTokens(m.content) + PER_MESSAGE_OVERHEAD;
 

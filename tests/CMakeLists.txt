@@ -272,3 +272,109 @@ add_test(NAME YuzoraCompletionPresetDraftTests COMMAND YuzoraCompletionPresetDra
 set_tests_properties(YuzoraCompletionPresetDraftTests PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
 )
+
+qt_add_executable(YuzoraChatServiceTests
+    ChatServiceTest.cpp
+    ../src/model/service/ChatService.cpp
+    ../src/model/service/ChatService.h
+    ../src/model/service/CharacterService.cpp
+    ../src/model/service/CharacterService.h
+    ../src/model/service/SettingsService.cpp
+    ../src/model/service/SettingsService.h
+    ../src/model/dao/ChatSessionDao.cpp
+    ../src/model/dao/ChatSessionDao.h
+    ../src/model/dao/ChatMessageDao.cpp
+    ../src/model/dao/ChatMessageDao.h
+    ../src/model/dao/CharacterDao.cpp
+    ../src/model/dao/CharacterDao.h
+    ../src/model/dao/SettingsDao.cpp
+    ../src/model/dao/SettingsDao.h
+    ../src/model/dao/BaseDao.h
+    ../src/model/dao/IConnectionProvider.h
+    ../src/model/dao/ConnectionProviderRegistry.cpp
+    ../src/model/dao/ConnectionProviderRegistry.h
+    ../src/model/service/completion/ChatCompletionRunner.h
+    ../src/model/service/SessionService.cpp
+    ../src/model/service/SessionService.h
+    ../src/model/service/greeting/GreetingService.cpp
+    ../src/model/service/greeting/GreetingService.h
+    ../src/model/service/TransactionScope.h
+    ../src/model/entity/CharacterEntity.h
+    ../src/model/entity/ChatMessageEntity.h
+    ../src/model/entity/ChatSessionEntity.h
+    ../src/model/entity/SettingsEntity.h
+    ../src/model/entity/ApiConfigEntity.h
+    ../src/model/entity/CompletionPresetEntity.h
+    ../src/model/entity/PromptEntity.h
+    ../src/base/AppException.h
+    ../src/base/GlobalConstants.cpp
+    ../src/base/GlobalConstants.h
+)
+
+target_include_directories(YuzoraChatServiceTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/base
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/dao
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/prompt
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/network
+)
+
+target_link_libraries(YuzoraChatServiceTests PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Sql Qt6::Test)
+set_target_properties(YuzoraChatServiceTests PROPERTIES WIN32_EXECUTABLE FALSE)
+
+add_test(NAME YuzoraChatServiceTests COMMAND YuzoraChatServiceTests)
+set_tests_properties(YuzoraChatServiceTests PROPERTIES
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+)
+
+qt_add_executable(YuzoraApiConfigViewModelTests
+    ApiConfigViewModelTest.cpp
+    ../src/viewmodel/ApiConfigViewModel.cpp
+    ../src/viewmodel/ApiConfigViewModel.h
+    ../src/viewmodel/ApiConfigDraft.cpp
+    ../src/viewmodel/ApiConfigDraft.h
+    ../src/model/service/ApiConfigService.cpp
+    ../src/model/service/ApiConfigService.h
+    ../src/model/dao/ApiConfigDao.cpp
+    ../src/model/dao/ApiConfigDao.h
+    ../src/model/list/ApiConfigListModel.cpp
+    ../src/model/list/ApiConfigListModel.h
+    ../src/model/dao/BaseDao.h
+    ../src/model/dao/IConnectionProvider.h
+    ../src/model/dao/ConnectionProviderRegistry.cpp
+    ../src/model/dao/ConnectionProviderRegistry.h
+    ../src/model/network/BaseApiClient.cpp
+    ../src/model/network/BaseApiClient.h
+    ../src/model/network/ChatMessage.cpp
+    ../src/model/network/ChatMessage.h
+    ../src/model/entity/ApiConfigEntity.h
+    ../src/model/entity/CompletionPresetEntity.h
+    ../src/model/entity/PromptEntity.h
+    ../src/base/GlobalConstants.cpp
+    ../src/base/GlobalConstants.h
+)
+
+target_include_directories(YuzoraApiConfigViewModelTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/base
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/dao
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/list
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/viewmodel
+)
+
+target_link_libraries(YuzoraApiConfigViewModelTests PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Sql Qt6::Network Qt6::Test)
+set_target_properties(YuzoraApiConfigViewModelTests PROPERTIES WIN32_EXECUTABLE FALSE)
+
+add_test(NAME YuzoraApiConfigViewModelTests COMMAND YuzoraApiConfigViewModelTests)
+set_tests_properties(YuzoraApiConfigViewModelTests PROPERTIES
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+)

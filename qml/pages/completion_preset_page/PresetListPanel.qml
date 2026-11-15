@@ -66,7 +66,7 @@ Item {
 
                 width: ListView.view.width
                 height: Theme.touchTarget
-                highlighted: CompletionPresetViewModel.currentEditingPreset.id === modelData.id
+                highlighted: CompletionPresetViewModel.currentPreset.id === modelData.id
 
                 onClicked: {
                     presetListView.currentIndex = index
@@ -87,7 +87,7 @@ Item {
                     }
 
                     TagChip {
-                        visible: presetDelegate.modelData.isDefault === true
+                        visible: presetDelegate.modelData.isActive === true
                         text: "启用"
                         tone: "success"
                     }

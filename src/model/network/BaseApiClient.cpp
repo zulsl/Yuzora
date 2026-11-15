@@ -33,7 +33,7 @@ void BaseApiClient::sendChatCompletion(const QList<ChatMessage> &messages)
     QJsonObject bodyJson = buildRequestBody(messages);
     QByteArray payload = QJsonDocument(bodyJson).toJson();
     qDebug() << "发送请求至:" << m_apiConfig.baseDomain;
-    qDebug().noquote() << "请求负载:" << payload;
+    qDebug().noquote() << "请求负载:\n" << payload;
 
     //接收post响应
     m_currentReply = m_networkManager->post(request, payload);
@@ -63,7 +63,8 @@ void BaseApiClient::fetchModelList()
 
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     if (!m_apiConfig.apiKey.isEmpty()) {
-        request.setRawHeader("Authorization", QString("Bearer %1").arg(m_apiConfig.apiKey).toUtf8());
+        request.setRawHeader(
+            "Authorization", QString("Bearer %1").arg(m_apiConfig.apiKey).toUtf8());
     }else Utils::writeLog("ERROR","BaseApiClient","apiKey为空");
 
     m_currentReply = m_networkManager->get(request);
@@ -75,6 +76,7 @@ void BaseApiClient::fetchModelList()
         {
             //读取并保存模型列表
             QStringList modelNames = parseModelList(m_currentReply->readAll());
+            qDebug()<<"模型获取成功:"<<modelNames;
             emit modelListFetched(modelNames);
         }
         else
@@ -148,7 +150,20 @@ QString BaseApiClient::parseCompletionResponse(const QJsonObject &responseJson) 
     if (choices.isEmpty()) return QString();
     QJsonObject choice = choices.first().toObject();
     QJsonObject message = choice.value("message").toObject();
-    return message.value("content").toString();
+
+    // content 可能是字符串，也可能是多模态数组（[{"type":"text","text":"..."}]）
+    const QJsonValue content = message.value("content");
+    if (content.isArray()) {
+        QStringList texts;
+        for (const QJsonValue& item : content.toArray()) {
+            const QJsonObject part = item.toObject();
+            const QString text = part.value("text").toString();
+            if (!text.isEmpty())
+                texts.append(text);
+        }
+        return texts.join(QString());
+    }
+    return content.toString();
 
 }
 

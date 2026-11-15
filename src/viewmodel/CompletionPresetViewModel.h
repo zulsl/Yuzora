@@ -21,7 +21,7 @@ class CompletionPresetDraft;
  * @brief 对话补全预设视图模型
  * 职责：预设列表 / 提示词条目列表两个数据源，当前编辑中的预设快照，以及导入导出。
  * 本类以 QML 单例形式暴露给 QML（类型名 CompletionPresetViewModel）。
- * 注意：对外暴露的是 currentEditingPreset；历史 QML 里误写的 currentPreset 并不存在。
+ * 注意：对外暴露的是 currentPreset；历史 QML 里误写的 currentPreset 并不存在。
  */
 class CompletionPresetViewModel : public QObject {
     Q_OBJECT
@@ -42,13 +42,14 @@ public:
     Q_PROPERTY(PresetPromptListModel* presetPromptModel READ presetPromptModel CONSTANT)
 
     //当前预设（只读，用于列表、删除、设为默认等操作）
-    Q_PROPERTY(CompletionPresetEntity currentEditingPreset READ currentEditingPreset NOTIFY currentEditingPresetChanged)
+    Q_PROPERTY(CompletionPresetEntity currentPreset READ currentPreset NOTIFY currentPresetChanged)
+
     // 编辑草稿：强类型 QObject，QML 直接读写；ViewModel 负责 dirty 和保存
     Q_PROPERTY(CompletionPresetDraft* presetDraft READ presetDraft NOTIFY presetDraftChanged)
     Q_PROPERTY(bool presetDirty READ presetDirty NOTIFY presetDirtyChanged)
 
     //有选择
-    Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY currentEditingPresetChanged)
+    Q_PROPERTY(bool hasSelection READ hasSelection NOTIFY currentPresetChanged)
     //预设详情的当前 Tab：0=基础参数，1=提示词条目
     Q_PROPERTY(int presetDetailTab READ presetDetailTab WRITE setPresetDetailTab
                NOTIFY presetDetailTabChanged)
@@ -59,7 +60,7 @@ public:
     // 属性读取
     PresetListModel* presetModel() const;
     PresetPromptListModel* presetPromptModel() const;
-    CompletionPresetEntity currentEditingPreset() const;
+    CompletionPresetEntity currentPreset() const;
     CompletionPresetDraft* presetDraft() const;
     bool presetDirty() const;
     bool hasSelection() const;
@@ -73,6 +74,12 @@ public:
     Q_INVOKABLE void deletePreset(const QString& presetId);//删除
     Q_INVOKABLE void setActivePreset(const QString& presetId);//设置激活
     Q_INVOKABLE void renamePreset(const QString& presetId, const QString& newName);//重命名
+    Q_INVOKABLE void setMaxContextToken(const QVariant& value);//设置最大上下文
+    Q_INVOKABLE void setMaxResponseToken(const QVariant& value);
+    Q_INVOKABLE void setStreamEnabled(const QVariant& value);//设置流式
+    Q_INVOKABLE void setTopP(const QVariant& value);
+    Q_INVOKABLE void setTopK(const QVariant& value);
+    //(弃用)
     Q_INVOKABLE void setPresetDraftField(const QString& field, const QVariant& value);
     Q_INVOKABLE bool savePresetDraft();
     Q_INVOKABLE void discardPresetDraft();
@@ -99,7 +106,7 @@ signals:
     void exportSuccess();
     void operationError(const QString& errorMsg);
     void operationTip(const QString& tipMsg);
-    void currentEditingPresetChanged();
+    void currentPresetChanged();
     void presetDraftChanged();
     void presetDirtyChanged();
     void presetDetailTabChanged();
@@ -111,7 +118,7 @@ private:
     PresetPromptListModel* m_presetPromptListModel = nullptr;
 
 
-    CompletionPresetEntity m_currentEditingPreset;//当前已保存快照
+    CompletionPresetEntity m_currentPreset;
     CompletionPresetDraft* m_presetDraft = nullptr;
     CompletionPresetEntity m_presetBaseline;
     bool m_presetDirty = false;
@@ -120,6 +127,8 @@ private:
     PromptEntity makeNewPrompt() const;
     void reloadCurrentPresetAndPrompts();
     void resetPresetDraft(const CompletionPresetEntity& entity);
+    // 即时保存成功后：草稿同步该字段 + 基线前移，避免"保存参数"把旧值写回去
+    void syncDraftWithSavedField(const QString& field, const QVariant& value);
     CompletionPresetEntity draftToPreset() const;
     int roleForPromptField(const QString& field) const;
 

@@ -2,20 +2,41 @@
 #define CHATSERVICE_H
 
 #include <QObject>
-#include <QJsonArray>
-#include "ChatSessionDao.h"
+#include "ChatSessionEntity.h"
 #include "ChatMessageDao.h"
 #include "CharacterDao.h"
 #include "ChatMessageEntity.h"
-#include "CompletionPresetEntity.h"
-#include "CharacterEntity.h"
-#include "BaseApiClient.h"
+#include "ChatMessage.h"
+#include "TransactionScope.h"
+
+class CharacterService;
+class SettingsService;
+class ChatCompletionRunner;
+class GreetingService;
+class SessionService;
+
+// ChatService 的全部协作者。生产由 ChatServiceAssembly.cpp 组装，
+// 单测按需替换（假补全器、假事务、内存库 DAO）。
+// 约定：这里传进来的一律只借用，不接管所有权。
+struct ChatServiceDependencies {
+    SessionService* sessions = nullptr;            // 会话表 + 当前会话指针
+    ChatMessageDao* messageDao = nullptr;
+    CharacterDao* characterDao = nullptr;
+    CharacterService* characterService = nullptr;
+    SettingsService* settingsService = nullptr;
+    ChatCompletionRunner* completion = nullptr;    // 补全请求的出口（网络/配置）
+    TransactionScope* transaction = nullptr;       // 事务边界
+    GreetingService* greeting = nullptr;           // 开场白状态
+};
 
 class ChatService : public QObject {
     Q_OBJECT
 public:
     static ChatService& instance();
     ~ChatService() override;
+
+    // 测试/组合根用：协作者全部注入（见 ChatServiceDependencies）。
+    explicit ChatService(const ChatServiceDependencies& deps, QObject* parent = nullptr);
 
     ChatService(const ChatService&) = delete;
     ChatService& operator=(const ChatService&) = delete;
@@ -42,8 +63,6 @@ public:
 
 
     QString openCharacterSession(const QString& charId);//打开角色会话
-    //保存角色当前会话为最近会话（切换会话时自动调用）
-    void saveCharacterLastSession(const QString& charId, const QString& sessionId);
 // ========== 消息管理 ==========
     QList<ChatMessageEntity> loadMessagePage(
         const QString& sessionId, int offset = 0, int limit = 50);//加载聊天页面
@@ -54,12 +73,11 @@ public:
     void deleteMessage(const QString& messageId);//删除消息
 
     // ========== 开场白切换 ==========
-    // 开场白集合 = [角色首条消息] + 备选开场白（各自过滤掉空串）。
-    // 会话的第一条 assistant 消息用 metadata.greetingIndex 记住自己用的是第几条，
-    // 切换就是替换这条消息的内容，不新增消息。
-    QString greetingMessageId() const { return m_greetingMessageId; }
-    int greetingIndex() const { return m_greetingIndex; }
-    int greetingCount() const { return m_greetingCount; }
+    // 状态由 GreetingService 维护，这里只做转发（QML 依赖这三个属性不变）。
+    // 开场白集合 = [角色首条消息] + 备选开场白；切换替换承载消息的内容，不新增消息。
+    QString greetingMessageId() const;
+    int greetingIndex() const;
+    int greetingCount() const;
     void switchGreeting(int delta);//delta = +1 / -1，循环取模
 
     // ========== AI生成核心 ==========
@@ -97,52 +115,39 @@ signals:
     void operationError(const QString& errorMsg);//操作错误
 
 private slots:
-    void onStreamChunkReceived(const QString& chunk);//收到流式文本块
+    // 补全器（生成请求）的三个回调，语义与旧版网络槽一一对应
+    void onCompletionChunk(const QString& chunk);//收到流式文本块
     void onCompletionFinished(const QString& fullText);//请求完成
-    void onRequestFailed(const QString& error);
-    void onRequestTimeout();
+    void onCompletionFailed(const QString& error);//请求失败
 
 private:
+    // 仅 instance() 使用：在 ChatServiceComposition.cpp 里组装生产依赖
     explicit ChatService(QObject* parent = nullptr);
 
     // 内部业务流程
-    void startGeneration(const QList<ChatMessage>& messages);//开始生成
-    QList<ChatMessage> buildPromptContext(const QString& userInput = QString());
     bool insertUserMessage(const QString& content, QString& outMessageId);//追加聊天记录
     bool insertPlaceholderAssistantMessage(QString& outMessageId);//追加助手占位符
-    void finalizeMessage(const QString& messageId,
-        GlobalConstants::MessageGenerationStatus status);//()
-
-    // 工具方法
-    void cleanupCurrentClient();
-    void updateSessionLastModified(const QString& sessionId);//更新会话时间戳
-    void updateSessionTitle();//更新会话标题
-    QString getCharacterLastSessionId(const QString& charId);//读取角色上次会话ID
-
-    // 开场白：拼集合、刷新当前会话的开场白状态、把第 index 条写进某条消息
-    QStringList greetingTextsFor(const QString& characterId) const;
-    void refreshGreetingState();
-    void applyGreetingIndex(const QString& messageId, int index);
 
 // DAO依赖
     CharacterDao* m_characterDao = nullptr;
-    ChatSessionDao* m_sessionDao = nullptr;
     ChatMessageDao* m_messageDao = nullptr;
 
+    // 会话服务（借用，不持有）：会话表 + 当前会话指针
+    SessionService* m_sessions = nullptr;
+
+    // 业务服务依赖（借用，不持有）
+    CharacterService* m_characterService = nullptr;
+    SettingsService* m_settingsService = nullptr;
+
+    // 补全出口 / 事务边界 / 开场白（借用，不持有）
+    ChatCompletionRunner* m_completion = nullptr;
+    TransactionScope* m_transaction = nullptr;
+    GreetingService* m_greeting = nullptr;
+
     // 运行时状态（唯一可信源）
-    QString m_currentCharacterId;//当前角色id
-    QString m_currentSessionId;//当前会话id
     QString m_generatingMessageId;//回复消息id
     QString m_fullResponse;//完整回复内容()
     bool m_isGenerating = false;//正在生成
-
-    // 开场白状态（-1 / 空串 = 当前会话没有可切换的开场白）
-    QString m_greetingMessageId;
-    int m_greetingIndex = -1;
-    int m_greetingCount = 0;
-
-    // 配置与网络
-    BaseApiClient* m_currentClient = nullptr;
 };
 
 #endif // CHATSERVICE_H

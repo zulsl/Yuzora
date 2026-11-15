@@ -30,7 +30,6 @@ void ModelFactory::registerAllModels()
     };
     // 以下模型为预留扩展，未实现具体客户端，创建时返回 nullptr
     m_creators[GlobalConstants::ModelType::Claude] = nullptr;
-    m_creators[GlobalConstants::ModelType::Doubao] = nullptr;
     m_creators[GlobalConstants::ModelType::Gemini] = nullptr;
     m_creators[GlobalConstants::ModelType::Unknown] = nullptr;
 }

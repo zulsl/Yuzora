@@ -10,9 +10,8 @@ import Yuzora 1.0
 MasterDetailPage {
     id: root
 
-    readonly property bool compactDetailVisible: layoutLoader.item
-                                                ? layoutLoader.item.detailShown === true
-                                                : false
+    readonly property bool compactDetailVisible:
+        layoutLoader.item ? layoutLoader.item.detailShown === true : false
 
     listTitle: "对话预设"
     detailTitle: "预设编辑"

@@ -66,7 +66,11 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/list/CharacterListModel.h src/model/list/ChatMessageListModel.h
         src/model/dao/CharacterDao.cpp src/model/dao/ChatMessageDao.cpp src/model/dao/ChatSessionDao.cpp src/model/dao/CompletionPresetDao.cpp src/model/dao/SettingsDao.cpp src/model/dao/VectorMemoryDao.cpp src/model/dao/WorldInfoBookDao.cpp
         src/model/service/CharacterCardParser.cpp src/model/service/ChatService.cpp src/model/service/MemoryService.cpp src/model/service/WorldInfoMatcher.cpp
-        src/viewmodel/ApiConfigViewModel.cpp src/viewmodel/CharacterViewModel.cpp src/viewmodel/CharacterDraft.cpp src/viewmodel/ChatViewModel.cpp src/viewmodel/CompletionPresetViewModel.cpp src/viewmodel/CompletionPresetDraft.cpp src/viewmodel/SettingsViewModel.cpp src/viewmodel/WorldInfoViewModel.cpp src/viewmodel/WorldInfoEntryViewModel.cpp
+        src/model/service/ChatServiceAssembly.cpp src/model/service/TransactionScope.h
+        src/model/service/SessionService.cpp src/model/service/SessionService.h
+        src/model/service/completion/ChatCompletionRunner.h src/model/service/completion/ApiCompletionRunner.cpp src/model/service/completion/ApiCompletionRunner.h
+        src/model/service/greeting/GreetingService.cpp src/model/service/greeting/GreetingService.h
+        src/viewmodel/ApiConfigViewModel.cpp src/viewmodel/ApiConfigDraft.cpp src/viewmodel/ApiConfigDraft.h src/viewmodel/CharacterViewModel.cpp src/viewmodel/CharacterDraft.cpp src/viewmodel/ChatViewModel.cpp src/viewmodel/CompletionPresetViewModel.cpp src/viewmodel/CompletionPresetDraft.cpp src/viewmodel/SettingsViewModel.cpp src/viewmodel/WorldInfoViewModel.cpp src/viewmodel/WorldInfoEntryViewModel.cpp
         src/model/list/CharacterListModel.cpp src/model/list/ChatMessageListModel.cpp
         src/model/list/ChatMessageItemModel.cpp src/model/list/ChatMessageItemModel.h
         src/model/dao/ApiConfigDao.h src/model/dao/ApiConfigDao.cpp
@@ -96,6 +100,7 @@ qt_add_qml_module(${PROJECT_NAME}
         src/base/ScopeTimer.h src/base/ScopeTimer.cpp
         src/model/dao/WorldInfoEntryDao.h src/model/dao/WorldInfoEntryDao.cpp
         src/model/service/prompt/ChatCompletion.cpp src/model/service/prompt/ChatCompletion.h
+        src/model/service/prompt/ChatPromptContext.cpp src/model/service/prompt/ChatPromptContext.h
         src/model/service/prompt/ChatMessageGroup.h
 
     QML_FILES

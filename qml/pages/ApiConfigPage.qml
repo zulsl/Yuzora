@@ -67,9 +67,9 @@ PageScaffold {
                                 height: Theme.spaceSm
                                 radius: width / 2
                                 anchors.verticalCenter: parent.verticalCenter
-                                color: ApiConfigViewModel.currentIsActive ? Theme.success
+                                color: ApiConfigViewModel.draft.isActive ? Theme.success
                                                                           : "transparent"
-                                border.width: ApiConfigViewModel.currentIsActive ? 0 : 1
+                                border.width: ApiConfigViewModel.draft.isActive ? 0 : 1
                                 border.color: Theme.borderStrong
                             }
 
@@ -120,14 +120,14 @@ PageScaffold {
                     AppButton {
                         text: "设为当前使用"
                         variant: "secondary"
-                        enabled: !ApiConfigViewModel.currentIsActive
+                        enabled: !ApiConfigViewModel.draft.isActive
                         onClicked: ApiConfigViewModel.applyCurrentConfig()
                     }
 
                     AppButton {
                         text: "删除"
                         variant: "danger"
-                        visible: !ApiConfigViewModel.isCurrentBuiltin
+                        visible: !ApiConfigViewModel.draft.isBuiltin
                         onClicked: deleteDialog.open()
                     }
 
@@ -150,16 +150,17 @@ PageScaffold {
 
                 LabeledField {
                     label: "配置名称"
-                    visible: !ApiConfigViewModel.isCurrentBuiltin
+                    visible: !ApiConfigViewModel.draft.isBuiltin
                     TextField {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        text: ApiConfigViewModel.configName
+                        id: nameField
+                        text: ApiConfigViewModel.draft.name
                         TextContextMenu {}
                         placeholderText: "给这个 API 配置起个名字"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
-                        onTextEdited: ApiConfigViewModel.setConfigName(text)
+                        onTextEdited: ApiConfigViewModel.draft.name = text
                     }
                 }
 
@@ -171,13 +172,13 @@ PageScaffold {
                         TextContextMenu {}
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        text: ApiConfigViewModel.apiKey
+                        text: ApiConfigViewModel.draft.apiKey
                         echoMode: TextInput.Password
                         placeholderText: "sk-*************"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
                         rightPadding: Theme.touchTarget
-                        onTextEdited: ApiConfigViewModel.setApiKey(text)
+                        onTextEdited: ApiConfigViewModel.draft.apiKey = text
 
                         ToolButton {
                             anchors.right: parent.right
@@ -194,31 +195,33 @@ PageScaffold {
 
                 LabeledField {
                     label: "API 地址"
-                    visible: ApiConfigViewModel.showDomainInput
+                    visible: !ApiConfigViewModel.draft.isBuiltin
                     TextField {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        text: ApiConfigViewModel.baseDomain
+                        id: domainField
+                        text: ApiConfigViewModel.draft.baseDomain
                         TextContextMenu {}
                         placeholderText: "https://api.openai.com"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
-                        onTextEdited: ApiConfigViewModel.setBaseDomain(text)
+                        onTextEdited: ApiConfigViewModel.draft.baseDomain = text
                     }
                 }
 
                 LabeledField {
                     label: "接口路径"
-                    visible: ApiConfigViewModel.showDomainInput
+                    visible: !ApiConfigViewModel.draft.isBuiltin
                     TextField {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        text: ApiConfigViewModel.apiPath
+                        id: pathField
+                        text: ApiConfigViewModel.draft.apiPath
                         TextContextMenu {}
                         placeholderText: "/chat/completions"
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
-                        onTextEdited: ApiConfigViewModel.setApiPath(text)
+                        onTextEdited: ApiConfigViewModel.draft.apiPath = text
                     }
                 }
 
@@ -227,11 +230,11 @@ PageScaffold {
                     ComboBox {
                         Layout.fillWidth: true
                         implicitHeight: Theme.controlMd
-                        model: ApiConfigViewModel.modelList
-                        currentIndex: ApiConfigViewModel.currentModelsIndex
+                        model: ApiConfigViewModel.draft.modelList
+                        currentIndex: ApiConfigViewModel.draft.modelsIndex
                         font.pixelSize: Theme.fontBody
                         font.family: Theme.fontFamily
-                        onActivated: (index) => ApiConfigViewModel.setCurrentModelsIndex(index)
+                        onActivated: (index) => ApiConfigViewModel.draft.setCurrentModelsIndex(index)
                     }
                 }
 
@@ -242,12 +245,12 @@ PageScaffold {
                     AppButton {
                         text: "获取可用模型"
                         variant: "secondary"
-                        enabled: !ApiConfigViewModel.fetchModelListState
+                        enabled: !ApiConfigViewModel.isFetchingModels
                         onClicked: ApiConfigViewModel.fetchModelList()
                     }
 
                     BusyIndicator {
-                        running: ApiConfigViewModel.fetchModelListState
+                        running: ApiConfigViewModel.isFetchingModels
                         visible: running
                         implicitWidth: Theme.iconLg
                         implicitHeight: Theme.iconLg
@@ -258,6 +261,29 @@ PageScaffold {
             }
 
             Item { Layout.fillHeight: true }
+        }
+    }
+
+    // 文本控件的 text: draft.xxx 绑定在用户输入后会被控件内部赋值断掉，
+    // 只靠绑定会出现"切了配置但输入框还是上一份的内容"。
+    // 这里在草稿被外部改动（切换配置、拉取模型列表）时重新对齐文本。
+    Connections {
+        target: ApiConfigViewModel.draft
+        function onNameChanged() {
+            if (nameField.text !== ApiConfigViewModel.draft.name && !nameField.activeFocus)
+                nameField.text = ApiConfigViewModel.draft.name
+        }
+        function onApiKeyChanged() {
+            if (keyField.text !== ApiConfigViewModel.draft.apiKey && !keyField.activeFocus)
+                keyField.text = ApiConfigViewModel.draft.apiKey
+        }
+        function onBaseDomainChanged() {
+            if (domainField.text !== ApiConfigViewModel.draft.baseDomain && !domainField.activeFocus)
+                domainField.text = ApiConfigViewModel.draft.baseDomain
+        }
+        function onApiPathChanged() {
+            if (pathField.text !== ApiConfigViewModel.draft.apiPath && !pathField.activeFocus)
+                pathField.text = ApiConfigViewModel.draft.apiPath
         }
     }
 

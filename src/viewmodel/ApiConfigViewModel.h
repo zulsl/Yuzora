@@ -3,22 +3,21 @@
 
 #include <QObject>
 #include <QString>
-#include <QStringList>
+#include <QTimer>
 #include <QtQml/qqmlregistration.h>
 #include <QQmlEngine>
 
-#include "ApiConfigEntity.h"
+#include "ApiConfigDraft.h"
 #include "ApiConfigListModel.h"
 #include "ApiConfigService.h"
 
 class QJSEngine;
 
 /**
- * @brief 模型 API 配置视图模型（页面级）
+ * @brief 模型 API 配置页的视图模型
  *
- * 职责：配置列表/选中、表单字段快照、测试与拉取状态。
- * 方案 A：原 ApiConfigFormViewModel 已合并回本类，避免两个 QML 单例
- * 各自持有一份“当前配置”导致同步问题。
+ * 职责：配置列表/选中、草稿装配、防抖落库、拉取模型列表的异步状态。
+ * 字段读写全部走 ApiConfigDraft（见该类的注释），VM 不再自己存一份实体快照。
  *
  * 对外暴露为 QML 单例，类型名 ApiConfigViewModel。
  */
@@ -38,97 +37,57 @@ public:
         return &instance;
     }
 
+    // 测试/组合根可注入 Service；生产走 create()。
+    explicit ApiConfigViewModel(ApiConfigService* service, QObject* parent = nullptr);
     ~ApiConfigViewModel() override;
 
-    // ---- 列表/选中 ----
     Q_PROPERTY(ApiConfigListModel* configListModel READ configListModel CONSTANT)
-    Q_PROPERTY(QString currentConfigId READ currentConfigId WRITE setCurrentConfigId
-               NOTIFY currentConfigIdChanged)
-    Q_PROPERTY(bool currentIsActive READ currentIsActive NOTIFY currentIsActiveChanged)
+    Q_PROPERTY(QString currentConfigId READ currentConfigId NOTIFY currentConfigIdChanged)
+    Q_PROPERTY(ApiConfigDraft* draft READ draft CONSTANT)
+    Q_PROPERTY(bool isFetchingModels READ isFetchingModels NOTIFY isFetchingModelsChanged)
 
-    // ---- 表单字段 ----
-    Q_PROPERTY(bool isCurrentBuiltin READ isBuiltin NOTIFY currentConfigChanged)
-    Q_PROPERTY(bool showDomainInput READ showDomainInput NOTIFY currentConfigChanged)
-    Q_PROPERTY(QString configName READ configName WRITE setConfigName NOTIFY configNameChanged)
-    Q_PROPERTY(QString apiKey READ apiKey WRITE setApiKey NOTIFY apiKeyChanged)
-    Q_PROPERTY(QString baseDomain READ baseDomain WRITE setBaseDomain NOTIFY baseDomainChanged)
-    Q_PROPERTY(QString apiPath READ apiPath WRITE setApiPath NOTIFY apiPathChanged)
-    Q_PROPERTY(QStringList modelList READ modelList NOTIFY modelListChanged)
-    Q_PROPERTY(int currentModelsIndex READ currentModelsIndex WRITE setCurrentModelsIndex
-               NOTIFY currentModelsIndexChanged FINAL)
-
-    // ---- 异步状态 ----
-    Q_PROPERTY(bool fetchModelListState READ fetchModelListState NOTIFY fetchModelListStateChanged)
-
-    // ---- 列表/选中 ----
     ApiConfigListModel* configListModel() const;
     QString currentConfigId() const;
-    bool currentIsActive() const;
-    bool fetchModelListState() const;
-
-    // ---- 表单 ----
-    bool isBuiltin() const;
-    bool showDomainInput() const;
-    QString configName() const;
-    QString apiKey() const;
-    QString baseDomain() const;
-    QString apiPath() const;
-    QStringList modelList() const;
-    int currentModelsIndex() const;
+    ApiConfigDraft* draft() const;
+    bool isFetchingModels() const;
 
     // ---- 供 QML 使用 ----
     Q_INVOKABLE void selectConfig(const QString& configId);
-    Q_INVOKABLE void setCurrentConfigId(const QString& id);
-    Q_INVOKABLE void refreshList();
     Q_INVOKABLE bool addCustomConfig(const QString& configName);
     Q_INVOKABLE void deleteCurrentConfig();
     Q_INVOKABLE void fetchModelList();
     Q_INVOKABLE void applyCurrentConfig();
 
-    Q_INVOKABLE void setConfigName(const QString& name);
-    Q_INVOKABLE void setApiKey(const QString& key);
-    Q_INVOKABLE void setBaseDomain(const QString& domain);
-    Q_INVOKABLE void setApiPath(const QString& path);
-    Q_INVOKABLE void setCurrentModelsIndex(int newIndex);
-
 signals:
-    // 列表/选中
     void currentConfigIdChanged();
-    void currentIsActiveChanged();
-    void fetchModelListStateChanged();
-    void deleteSuccess();
+    void isFetchingModelsChanged();
 
-    // 表单
-    void currentConfigChanged();
-    void configNameChanged();
-    void apiKeyChanged();
-    void baseDomainChanged();
-    void apiPathChanged();
-    void modelListChanged();
-    void currentModelsIndexChanged();
-
-    // 通用提示
+    // 通用提示（来自 Service）
     void operationError(const QString& errorMsg);
     void operationTip(const QString& tipMsg);
 
 private slots:
     void onFetchModelListState(const QString& configId);
+    void onModelListUpdated(const QString& configId);
 
 private:
-    void loadCurrentConfigDetail();
-    void saveCurrentConfig();
-    int getModelsIndex();
+    void refreshList();
+    void loadDraft(const QString& configId);
+    // 保证 currentModel 落在列表里（空值/失效则取第一条并立即落库）
+    void ensureCurrentModelSelected();
+    void scheduleSave();
+    void flushPendingSave();
+    void cancelPendingSave();
 
     ApiConfigService* m_service = nullptr;
     ApiConfigListModel* m_configListModel = nullptr;
+    ApiConfigDraft* m_draft = nullptr;
+
+    // 防抖：键盘输入期间不写库，停手 300ms 后统一落库
+    QTimer m_saveTimer;
 
     QString m_currentConfigId;
-
-    // 当前编辑快照（唯一一份）
-    ApiConfigEntity m_currentSelectConfig;
-    int m_currentModelsIndex = -1;
-
-    bool m_fetchModelListState = false;
+    bool m_fetching = false;
 
     // 构造函数必须 private：QML 单例只有在"无法默认构造"时才会调用 create()。
     // 若保持 public，引擎会自己 new 一个实例，C++ 侧的静态实例就与 QML 拿到的

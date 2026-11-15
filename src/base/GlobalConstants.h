@@ -79,12 +79,14 @@ QML_ELEMENT
 // ======================================
 // 枚举定义
 // ======================================
-    // AI大模型类型枚举
+    // AI接口格式枚举
     enum class ModelType {
         OpenAI,//openai兼容类型
-        DeepSeek,
-        Doubao,
+        ChatCompletions,
+        Responses,
+        AnthropicMessages,
         Gemini,
+        DeepSeek,
         Claude,
         Unknown
     };
@@ -150,7 +152,7 @@ QML_ELEMENT
         RegexMatch//正则表达式匹配
     };
 
-    //旧版
+
     // 枚举与字符串互转工具方法
     QString messageTypeToString(MessageType type);
     MessageType stringToMessageType(const QString& str);

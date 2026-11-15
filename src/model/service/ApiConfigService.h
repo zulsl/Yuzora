@@ -42,6 +42,7 @@ signals:
     void configDeleted(const QString& configId);//配置删除
 
     void fetchModelListEnd(const QString& configId);
+    void modelListUpdated(const QString& configId);
 
     void operationTip(const QString& tipMsg);//提示信息
     void operationError(const QString& errorMsg);//操作错误

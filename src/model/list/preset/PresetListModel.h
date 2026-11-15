@@ -11,7 +11,7 @@ public:
     enum Roles {
         IdRole = Qt::UserRole + 1,
         NameRole,
-        IsDefaultRole
+        IsActiveRole
     };
 
     explicit PresetListModel(QObject* parent = nullptr);

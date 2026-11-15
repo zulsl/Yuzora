@@ -21,20 +21,28 @@ struct CompletionPresetEntity {
 public:
     QString id;                                 //唯一id
     QString name;
-    bool isDefault = false;                     //是否启用
+    bool isActive = false;                     //是否启用
 
     // ========== 基础生成 ==========
     int maxContextToken = 4096;                         //最大上下文长度（以词符数计）上下文窗口
     int maxResponseToken = 1024;                        //最大回复长度（以词符数计）
     bool streamEnabled = true;                          //是否流式
+    QJsonObject stream_options;//流式响应选项,仅在stream:true时生效。只控制用量信息的返回方式,不改变计费规则。
+
+    // ========== 常用参数 ==========
+    QJsonObject thinking;//控制大模型是否开启思维链。
+    QString reasoning_effort;//控制模型的推理程度
+    QJsonObject response_format;//指定模型的响应输出格式
+    QStringList stop;   //停止词列表,当模型生成的文本中遇到这些指定的字符串时会立即停止生成。
 
     // ========== 核心采样参数 ==========
     double temperature = 0.7;                   //温度(创造力,越低越死板,越高越放飞自我.写作推荐1.0,问答0.3~0.7)
     double topP = 0.9;                          //词汇多样性(0.1:只选最肯定的词,0.9:选概率前 90% 的词,写作推荐0.95)
-    double topK = 40;                           //候选词数量(topK=1:永远选概率最高的(最死板),topK=40:从前40个词里随机选(自然),写作推荐60)
-    double frequencyPenalty = 0.0;              //频率惩罚
-    double presencePenalty = 0.0;               //存在惩罚
 
+    //以下弃用
+    double topK = 40;                           //候选词数量(topK=1:永远选概率最高的(最死板),topK=40:从前40个词里随机选(自然),写作推荐60)
+    double frequencyPenalty = 0.0;              //频率惩罚(弃用)
+    double presencePenalty = 0.0;               //存在惩罚(弃用)
     double repetitionPenalty = 1.1;             //重复惩罚
     //一种更广义的惩罚，直接对已出现过的 token 的概率进行削减。(1.0:不惩罚,1.1:轻微惩罚(默认)1.5~2.0:强惩罚.写作推荐1.05)
     double topA = 0.0;                          //局部典型采样
@@ -100,7 +108,7 @@ public:
 
     Q_PROPERTY(QString id MEMBER id)
     Q_PROPERTY(QString name MEMBER name)
-    Q_PROPERTY(bool isDefault MEMBER isDefault)
+    Q_PROPERTY(bool isActive MEMBER isActive)
     Q_PROPERTY(int maxContextToken MEMBER maxContextToken)
     Q_PROPERTY(int maxResponseToken MEMBER maxResponseToken)
     Q_PROPERTY(bool streamEnabled MEMBER streamEnabled)

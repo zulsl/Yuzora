@@ -6,9 +6,9 @@ namespace GlobalConstants
     {
         switch (type)
         {
-        case MessageType::User: return "User";
-        case MessageType::Assistant: return "Assistant";
-        case MessageType::System: return "System";
+        case MessageType::User: return "user";
+        case MessageType::Assistant: return "assistant";
+        case MessageType::System: return "system";
         default: return "User";
         }
     }

@@ -23,7 +23,6 @@ Item {
         target: ApiConfigViewModel
         function onOperationError(message) { Ui.toast(message, true) }
         function onOperationTip(message) { Ui.toast(message, false) }
-        function onDeleteSuccess() { Ui.toast("配置已删除", false) }
     }
 
     Connections {

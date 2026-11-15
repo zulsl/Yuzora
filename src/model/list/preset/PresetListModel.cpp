@@ -27,7 +27,7 @@ QVariant PresetListModel::data(const QModelIndex& index, int role) const
     switch (role) {
         case IdRole: return e.id;
         case NameRole: return e.name;
-        case IsDefaultRole: return e.isDefault;
+        case IsActiveRole: return e.isActive;
         default: return {};
     }
 }
@@ -37,7 +37,7 @@ QHash<int, QByteArray> PresetListModel::roleNames() const
     QHash<int, QByteArray> roles;
     roles[IdRole] = "id";
     roles[NameRole] = "name";
-    roles[IsDefaultRole] = "isDefault";
+    roles[IsActiveRole] = "isActive";
     return roles;
 }
 

@@ -39,7 +39,7 @@ public:
             if (m.content.isEmpty()) continue;
             ChatMessage c;
             c.role = m.role;
-            c.testContent = m.content;
+            c.appendText(m.content);
             c.senderName = m.name;
             chat.append(c);
         }

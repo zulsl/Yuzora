@@ -14,7 +14,7 @@ Item {
     implicitWidth: 480
     implicitHeight: 600
 
-    property completionPresetEntity editingPreset: CompletionPresetViewModel.currentEditingPreset
+    property completionPresetEntity editingPreset: CompletionPresetViewModel.currentPreset
 
     // 基础参数使用 VM 草稿，QML 不再直接修改实体。
     function draftValue(field) {
@@ -40,7 +40,7 @@ Item {
             AppButton {
                 text: "设为启用"
                 variant: "secondary"
-                enabled: root.editingPreset && !root.editingPreset.isDefault
+                enabled: root.editingPreset && !root.editingPreset.isActive
                 onClicked: {
                     CompletionPresetViewModel.setActivePreset(root.editingPreset.id)
                     Ui.toast("已设为启用预设", false)
@@ -59,7 +59,7 @@ Item {
             AppButton {
                 text: "删除预设"
                 variant: "danger"
-                enabled: root.editingPreset && !root.editingPreset.isDefault
+                enabled: root.editingPreset && !root.editingPreset.isActive
                 onClicked: deleteDialog.open()
             }
         }
@@ -155,157 +155,128 @@ Item {
             Item {
                 id: basicTab
 
-                ColumnLayout {
+                ScrollView {
+                    id: basicScroll
                     anchors.fill: parent
-                    spacing: Theme.spaceSm
+                    contentWidth: availableWidth
+                    clip: true
 
-                    ScrollView {
-                        id: basicScroll
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        contentWidth: availableWidth
-                        clip: true
+                    ColumnLayout {
+                        // 给右侧滚动条留出空间，避免滚动条压住输入框
+                        width: basicScroll.availableWidth - Theme.spaceMd
+                        spacing: Theme.sectionGap
 
-                ColumnLayout {
-                    // 给右侧滚动条留出空间，避免滚动条压住输入框
-                    width: basicScroll.availableWidth - Theme.spaceMd
-                    spacing: Theme.sectionGap
+                        SectionCard {
+                            title: "基础设置"
+                            Layout.fillWidth: true
 
-                    SectionCard {
-                        title: "基础设置"
-                        Layout.fillWidth: true
+                            LabeledField {
+                                label: "预设名称"
+                                TextField {
+                                    Layout.fillWidth: true
+                                    implicitHeight: Theme.controlMd
+                                    id: nameField
+                                    text: root.editingPreset.name
+                                    TextContextMenu {}
+                                    font.pixelSize: Theme.fontBody
+                                    font.family: Theme.fontFamily
+                                    onTextEdited: CompletionPresetViewModel.renamePreset(root.editingPreset.id,text)
+                                }
+                            }
 
-                        LabeledField {
-                            label: "预设名称"
-                            TextField {
+                            LabeledField {
+                                label: "最大上下文(按Token计数)"
+                                SpinBox {
+                                    Layout.fillWidth: true
+                                    implicitHeight: Theme.controlMd
+                                    from: 512
+                                    to: 2000000
+                                    stepSize: 512
+                                    editable: true
+                                    id: maxContextSpin
+                                    value: root.editingPreset.maxContextToken
+                                    onValueModified: CompletionPresetViewModel.setMaxContextToken(value)
+                                }
+                            }
+
+                            LabeledField {
+                                label: "最大回复(按Token计数)"
+                                SpinBox {
+                                    Layout.fillWidth: true
+                                    implicitHeight: Theme.controlMd
+                                    from: 64
+                                    to: 128000
+                                    stepSize: 64
+                                    editable: true
+                                    id: maxResponseSpin
+                                    value: root.editingPreset.maxResponseToken || 1024
+                                    onValueModified: CompletionPresetViewModel.setMaxResponseToken(value)
+                                }
+                            }
+
+                            LabeledField {
+                                label: "流式输出"
+                                Switch {
+                                    Layout.alignment: Qt.AlignLeft
+                                    id: streamSwitch
+                                    checked: root.editingPreset.streamEnabled === true
+                                    onToggled: CompletionPresetViewModel.setStreamEnabled(checked)
+                                }
+                            }
+                        }
+
+                        SectionCard {
+                            title: "采样参数"
+                            Layout.fillWidth: true
+
+                            SliderFloatInput {
                                 Layout.fillWidth: true
-                                implicitHeight: Theme.controlMd
-                                text: CompletionPresetViewModel.presetDraft
-                                      ? CompletionPresetViewModel.presetDraft.name : ""
-                                TextContextMenu {}
-                                font.pixelSize: Theme.fontBody
-                                font.family: Theme.fontFamily
-                                onTextEdited: if (CompletionPresetViewModel.presetDraft)
-                                    CompletionPresetViewModel.presetDraft.name = text
+                                labelText: "温度（创造力，写作推荐 1.0）"
+                                from: 0.0
+                                to: 2.0
+                                value: root.editingPreset.temperature
+                                onEdited: CompletionPresetViewModel.setTemperature(value)
                             }
-                        }
 
-                        LabeledField {
-                            label: "最大上下文"
-                            SpinBox {
+                            //不再支持
+                            // SliderFloatInput {
+                            //     Layout.fillWidth: true
+                            //     labelText: "频率惩罚"
+                            //     from: -2.0
+                            //     to: 2.0
+                            //     value: //
+                            //     onEdited: //
+                            // }
+                            //
+                            // SliderFloatInput {
+                            //     Layout.fillWidth: true
+                            //     labelText: "存在惩罚"
+                            //     from: -2.0
+                            //     to: 2.0
+                            //     value:
+                            //     onEdited:
+                            // }
+
+                            SliderFloatInput {
                                 Layout.fillWidth: true
-                                implicitHeight: Theme.controlMd
-                                from: 512
-                                to: 2000000
-                                stepSize: 512
-                                editable: true
-                                value: root.draftValue("maxContextToken") || 4096
-                                onValueModified: CompletionPresetViewModel.setPresetDraftField("maxContextToken", value)
+                                labelText: "Top-P（词汇多样性，写作推荐 0.95）"
+                                from: 0.0
+                                to: 1.0
+                                value: root.editingPreset.topP
+                                onEdited: CompletionPresetViewModel.setTopP(value)
                             }
-                        }
 
-                        LabeledField {
-                            label: "最大回复 Token"
-                            SpinBox {
+                            SliderFloatInput {
                                 Layout.fillWidth: true
-                                implicitHeight: Theme.controlMd
-                                from: 64
-                                to: 128000
-                                stepSize: 64
-                                editable: true
-                                value: root.draftValue("maxResponseToken") || 1024
-                                onValueModified: CompletionPresetViewModel.setPresetDraftField("maxResponseToken", value)
+                                labelText: "Top-K（候选词数量，写作推荐 60）"
+                                from: 0
+                                to: 200
+                                value: root.editingPreset.topK
+                                onEdited: CompletionPresetViewModel.setTopK(value)
                             }
                         }
 
-                        LabeledField {
-                            label: "流式输出"
-                            Switch {
-                                Layout.alignment: Qt.AlignLeft
-                                checked: root.draftValue("streamEnabled") !== false
-                                onToggled: CompletionPresetViewModel.setPresetDraftField("streamEnabled", checked)
-                            }
-                        }
-                    }
-
-                    SectionCard {
-                        title: "采样参数"
-                        Layout.fillWidth: true
-
-                        SliderFloatInput {
-                            Layout.fillWidth: true
-                            labelText: "温度（创造力，写作推荐 1.0）"
-                            from: 0.0
-                            to: 2.0
-                            value: root.draftValue("temperature") !== undefined
-                                   ? root.draftValue("temperature") : 0.7
-                            onEdited: CompletionPresetViewModel.setPresetDraftField("temperature", value)
-                        }
-
-                        SliderFloatInput {
-                            Layout.fillWidth: true
-                            labelText: "频率惩罚"
-                            from: -2.0
-                            to: 2.0
-                            value: root.draftValue("frequencyPenalty") !== undefined
-                                   ? root.draftValue("frequencyPenalty") : 0.0
-                            onEdited: CompletionPresetViewModel.setPresetDraftField("frequencyPenalty", value)
-                        }
-
-                        SliderFloatInput {
-                            Layout.fillWidth: true
-                            labelText: "存在惩罚"
-                            from: -2.0
-                            to: 2.0
-                            value: root.draftValue("presencePenalty") !== undefined
-                                   ? root.draftValue("presencePenalty") : 0.0
-                            onEdited: CompletionPresetViewModel.setPresetDraftField("presencePenalty", value)
-                        }
-
-                        SliderFloatInput {
-                            Layout.fillWidth: true
-                            labelText: "Top-P（词汇多样性，写作推荐 0.95）"
-                            from: 0.0
-                            to: 1.0
-                            value: root.draftValue("topP") !== undefined
-                                   ? root.draftValue("topP") : 0.9
-                            onEdited: CompletionPresetViewModel.setPresetDraftField("topP", value)
-                        }
-
-                        SliderFloatInput {
-                            Layout.fillWidth: true
-                            labelText: "Top-K（候选词数量，写作推荐 60）"
-                            from: 0
-                            to: 200
-                            value: root.draftValue("topK") !== undefined
-                                   ? root.draftValue("topK") : 40
-                            onEdited: CompletionPresetViewModel.setPresetDraftField("topK", value)
-                        }
-                    }
-
-                    Item { Layout.fillHeight: true }
-                }
-            }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        implicitHeight: 1
-                        color: Theme.borderDefault
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: Theme.spaceSm
-
-                        Item { Layout.fillWidth: true }
-
-                        AppButton {
-                            text: "保存参数"
-                            variant: "primary"
-                            onClicked: {
-                                CompletionPresetViewModel.savePresetDraft()
-                            }
-                        }
+                        Item { Layout.fillHeight: true }
                     }
                 }
             }

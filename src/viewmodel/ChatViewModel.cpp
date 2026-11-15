@@ -151,7 +151,6 @@ ChatMessageListModel* ChatViewModel::messageModel() const
 QString ChatViewModel::currentPresetName() const
 {
     return m_completionPresetService->getActivePreset().name;
-    // return m_currentPresetName;
 }
 
 // ======================================
@@ -313,9 +312,14 @@ void ChatViewModel::onGenerationChunk(const QString& messageId, const QString& c
 
 void ChatViewModel::onGenerationFinished(const QString& messageId, const QString& fullText)
 {
-    Q_UNUSED(fullText)
     m_isGenerating = false;
     emit isGeneratingChanged();
+
+    // 非流式响应没有 chunk，列表项的 content 一直是空的，只能在这里用完整文本补上。
+    // 流式时 fullText 与逐块累加的结果相同，updateMessageContent 内部会判等直接返回。
+    if (!fullText.isEmpty())
+        m_messageModel->updateMessageContent(messageId, fullText);
+
     m_messageModel->updateMessageStatus(messageId,
         static_cast<int>(GlobalConstants::MessageGenerationStatus::Normal));
 
