@@ -437,7 +437,8 @@ void ChatService::regenerateLastMessage()
 
     // 重新构建上下文（无新用户输入）
     QList<ChatMessage> messages = buildChatPromptContext(
-        m_sessions->currentCharacterId(), m_sessions->currentSessionId(), QString(), m_messageDao, m_characterService);
+        m_sessions->currentCharacterId(), m_sessions->currentSessionId(), QString(), m_messageDao, m_characterService,
+        QStringLiteral("regenerate"));
 
     m_generatingMessageId = newAssistantMsgId;
     m_fullResponse.clear();
@@ -460,7 +461,8 @@ void ChatService::continueGeneration()
     emit messageAppended(m_messageDao->selectById(assistantMsgId));
 
     QList<ChatMessage> messages = buildChatPromptContext(
-        m_sessions->currentCharacterId(), m_sessions->currentSessionId(), QString(), m_messageDao, m_characterService);
+        m_sessions->currentCharacterId(), m_sessions->currentSessionId(), QString(), m_messageDao, m_characterService,
+        QStringLiteral("continue"));
 
     m_generatingMessageId = assistantMsgId;
     m_fullResponse.clear();

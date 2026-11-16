@@ -70,7 +70,7 @@ private:
     explicit CompletionPresetService(QObject* parent = nullptr);
     void initBuiltinPresets();
     QStringList parsePromptOrder(const QJsonObject& cpJson,QHash<QString, bool>& h_isActive);
-    void CreateDefaultPromptEntries(const QString& presetId,QStringList & promptOrderList);
+    void CreateDefaultPromptEntries(const QString& presetId,QStringList & promptOrderList);//创建默认提示词条目
     bool validatePreset(const CompletionPresetEntity& preset, QString& outError);//验证预设(用处不大)
     QStringList normalizePromptOrder(const QStringList& order) const;
     bool writePromptChange(const CompletionPresetEntity& preset, const PromptEntity& prompt,

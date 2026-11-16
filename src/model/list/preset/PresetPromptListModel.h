@@ -20,6 +20,7 @@ public:
         DepthRole,//深度
         SortOrderRole,//顺序
         SystemPromptRole,//系统内置提示词
+        MarkerRole,//标记/占位提示词（内容由运行时填充，不可编辑）
         ExpandedStateRole// 展开状态
     };
 

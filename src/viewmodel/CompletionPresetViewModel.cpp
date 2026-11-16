@@ -24,8 +24,6 @@ CompletionPresetViewModel::CompletionPresetViewModel(QObject* parent)
     });
 
     // 绑定 Service 层信号
-    // connect(m_service, &CompletionPresetService::presetListChanged,
-    //         this, &CompletionPresetViewModel::refreshList);
     connect(m_service, &CompletionPresetService::operationError,
             this, &CompletionPresetViewModel::operationError);
     connect(m_service, &CompletionPresetService::exportSuccess,
@@ -40,6 +38,14 @@ CompletionPresetViewModel::CompletionPresetViewModel(QObject* parent)
 
     // 初始化加载列表
     refreshList();
+
+    // 首启时把"正在编辑的预设"也指向当前生效的那条。
+    // 否则 currentPreset 一直是默认构造的空实体，要等用户点开预设页
+    // （PresetListPanel 里点某一行才调 selectPreset）才会被填上，
+    // 期间任何绑 currentPreset 的界面（比如聊天页的副标题）读到的都是空。
+    const CompletionPresetEntity active = m_service->getActivePreset();
+    if (!active.id.isEmpty())
+        selectPreset(active.id);
 }
 
 CompletionPresetViewModel::~CompletionPresetViewModel() = default;
@@ -60,6 +66,23 @@ PresetPromptListModel *CompletionPresetViewModel::presetPromptModel() const
 CompletionPresetEntity CompletionPresetViewModel::currentPreset() const
 {
     return m_currentPreset;
+}
+
+CompletionPresetEntity CompletionPresetViewModel::activePreset() const
+{
+    return m_activePreset;
+}
+
+void CompletionPresetViewModel::refreshActivePreset()
+{
+    const CompletionPresetEntity active = m_service->getActivePreset();
+
+    // 只比较展示会用到的字段，避免每次刷新列表都白发一次信号
+    if (active.id == m_activePreset.id && active.name == m_activePreset.name)
+        return;
+
+    m_activePreset = active;
+    emit activePresetChanged();
 }
 
 CompletionPresetDraft* CompletionPresetViewModel::presetDraft() const
@@ -100,6 +123,9 @@ void CompletionPresetViewModel::refreshList()
     QList<CompletionPresetEntity> entities = m_service->getAllPresets();
 
     m_presetModel->loadList(entities);
+
+    // 生效预设跟着一起刷新：聊天页读的是它，不能等用户开预设页才更新
+    refreshActivePreset();
 }
 
 void CompletionPresetViewModel::selectPreset(const QString& presetId)
@@ -427,6 +453,14 @@ void CompletionPresetViewModel::setPromptField(const QString& promptId, const QS
                                                 const QVariant& value)
 {
     if (promptId.isEmpty()) {
+        return;
+    }
+
+    // 占位提示词（marker=true）的内容是运行时填的，界面上不能编辑。
+    // 界面那边已经把输入框锁住了，这里再挡一层，防止别的入口把内容写进去。
+    if (field == QStringLiteral("content")
+        && m_presetPromptListModel->entryById(promptId).marker) {
+        emit operationTip(QStringLiteral("系统占位提示词的内容不可编辑"));
         return;
     }
 

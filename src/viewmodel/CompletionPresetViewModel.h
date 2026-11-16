@@ -41,8 +41,11 @@ public:
     Q_PROPERTY(PresetListModel* presetModel READ presetModel CONSTANT)
     Q_PROPERTY(PresetPromptListModel* presetPromptModel READ presetPromptModel CONSTANT)
 
-    //当前预设（只读，用于列表、删除、设为默认等操作）
+    //当前预设（只读，用于列表、删除、设为启用等操作）
     Q_PROPERTY(CompletionPresetEntity currentPreset READ currentPreset NOTIFY currentPresetChanged)
+
+    // 当前生效（用于生成）的预设。启动时就已加载，不依赖预设页是否被打开过。
+    Q_PROPERTY(CompletionPresetEntity activePreset READ activePreset NOTIFY activePresetChanged)
 
     // 编辑草稿：强类型 QObject，QML 直接读写；ViewModel 负责 dirty 和保存
     Q_PROPERTY(CompletionPresetDraft* presetDraft READ presetDraft NOTIFY presetDraftChanged)
@@ -61,6 +64,7 @@ public:
     PresetListModel* presetModel() const;
     PresetPromptListModel* presetPromptModel() const;
     CompletionPresetEntity currentPreset() const;
+    CompletionPresetEntity activePreset() const;
     CompletionPresetDraft* presetDraft() const;
     bool presetDirty() const;
     bool hasSelection() const;
@@ -107,6 +111,7 @@ signals:
     void operationError(const QString& errorMsg);
     void operationTip(const QString& tipMsg);
     void currentPresetChanged();
+    void activePresetChanged();
     void presetDraftChanged();
     void presetDirtyChanged();
     void presetDetailTabChanged();
@@ -119,6 +124,7 @@ private:
 
 
     CompletionPresetEntity m_currentPreset;
+    CompletionPresetEntity m_activePreset;   // 生效预设（用于生成/展示）
     CompletionPresetDraft* m_presetDraft = nullptr;
     CompletionPresetEntity m_presetBaseline;
     bool m_presetDirty = false;
@@ -126,6 +132,8 @@ private:
 
     PromptEntity makeNewPrompt() const;
     void reloadCurrentPresetAndPrompts();
+    // 从 Service 重新读"生效预设"，并按需发 activePresetChanged
+    void refreshActivePreset();
     void resetPresetDraft(const CompletionPresetEntity& entity);
     // 即时保存成功后：草稿同步该字段 + 基线前移，避免"保存参数"把旧值写回去
     void syncDraftWithSavedField(const QString& field, const QVariant& value);

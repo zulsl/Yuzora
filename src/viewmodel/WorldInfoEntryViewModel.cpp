@@ -30,9 +30,23 @@ WorldInfoEntryViewModel::WorldInfoEntryViewModel(QObject* parent)
 
     connect(m_service, &WorldInfoService::operationError,
             this, &WorldInfoEntryViewModel::operationError);
+
+    // 条目数变化统一在这里转发：增删、切换文集都落到模型信号上，
+    // 不必在每个改列表的入口里手动发一次（漏一处空态就不刷新）。
+    connect(m_entryModel, &QAbstractItemModel::rowsInserted,
+            this, [this] { emit entryCountChanged(); });
+    connect(m_entryModel, &QAbstractItemModel::rowsRemoved,
+            this, [this] { emit entryCountChanged(); });
+    connect(m_entryModel, &QAbstractItemModel::modelReset,
+            this, [this] { emit entryCountChanged(); });
 }
 
 WorldInfoEntryViewModel::~WorldInfoEntryViewModel() = default;
+
+int WorldInfoEntryViewModel::entryCount() const
+{
+    return m_entryModel->rowCount();
+}
 
 WorldInfoEntryListModel* WorldInfoEntryViewModel::entryModel() const
 {

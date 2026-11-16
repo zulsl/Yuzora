@@ -26,39 +26,16 @@ WorldInfoResult WorldInfoMatcher::matchAndResolve(
     )
 {
     //===== 构建扫描文本 =====
-    QString scanText = buildScanText(history,userInput,character);// 已拼好的扫描文本
-
-
+    QString scanText = buildScanText(history,userInput);// 已拼好的扫描文本
 
     // ===== 第一步：首轮匹配 =====
     QList<WorldInfoEntryEntity> activated;//匹配成功的条目
 
+    //判定命中
     for (const auto& entry : entries) {
-        // if (entry.disable) continue;
-
-        // 1. 常驻直接命中()
-        bool hit = entry.constant;
-
-        // 2. 关键词匹配
-        if (!hit && !entry.vectorized && !entry.keywords.isEmpty()) {
-            hit = isMatch(entry,scanText,world_info_case_sensitive,world_info_match_whole_words);
-        }
-
-        // 3. 次关键词（selective）
-        if (hit && entry.selective && !entry.secondaryKeywords.isEmpty()) {
-            hit = checkSelective(entry, scanText,world_info_case_sensitive,world_info_match_whole_words);
-        }
-
-        // 4. 概率(未完成)
-        // if (hit && entry.useProbability && entry.probability < 100) {
-        //     hit = rollProbability(entry);
-        // }
-
-        // 5. 粘性/冷却/延迟（未完成）
-        // if (hit && stickyCache.contains(entry.id)) hit = false;
-        // if (hit && entry.cooldown > 0) hit = false;
-
-        if (hit) activated.append(entry);
+        // 判定条件统一收在 evaluateEntry() 里，递归扫描用的是同一个函数
+        if (evaluateEntry(entry, scanText))
+            activated.append(entry);
     }
 
     // ===== 第二步：递归扫描 =====
@@ -76,7 +53,7 @@ WorldInfoResult WorldInfoMatcher::matchAndResolve(
 
     // ===== 第五步：按 "插入位置" 分类 =====
     QList<WorldInfoEntryEntity> before, after;//两个列表
-    QMap<int, QList<WorldInfoEntryEntity>> depthMap;//深度列表
+    QMap<int, QMap<GlobalConstants::MessageType, QList<WorldInfoEntryEntity>>> depthMap;//<深度, <角色, 条目>>
     QList<WorldInfoExample> examples;//对话示例
     QMap<QString, QStringList> outlets;//outlet
 
@@ -84,11 +61,15 @@ WorldInfoResult WorldInfoMatcher::matchAndResolve(
         switch (entry.position) {
         case WorldInfoEntryEntity::BeforeChar: before.append(entry); break;
         case WorldInfoEntryEntity::AfterChar: after.append(entry);  break;
-        case WorldInfoEntryEntity::AtDepth: depthMap[entry.insertDepth].append(entry); break;
+        case WorldInfoEntryEntity::AtDepth:
+            depthMap[entry.insertDepth][entry.insertRole].append(entry);
+            break;
         case WorldInfoEntryEntity::EMTop:
-            examples.append({entry.content, WorldInfoEntryEntity::EMTop}); break;
+            examples.append({entry.content, WorldInfoEntryEntity::EMTop, entry.sortOrder});
+            break;
         case WorldInfoEntryEntity::EMBottom:
-            examples.append({entry.content, WorldInfoEntryEntity::EMBottom}); break;
+            examples.append({entry.content, WorldInfoEntryEntity::EMBottom, entry.sortOrder});
+            break;
         case WorldInfoEntryEntity::Outlet:
             outlets[entry.group].append(entry.content); break;
         default:
@@ -97,15 +78,23 @@ WorldInfoResult WorldInfoMatcher::matchAndResolve(
         }
     }
 
-    // ===== 第六步：排序 =====
+    // ===== 第六步：排序（必须稳定，保证同样的数据每次得到同样的顺序） =====
     auto byOrder = [](const WorldInfoEntryEntity& a, const WorldInfoEntryEntity& b) {
         return a.sortOrder < b.sortOrder;
     };
-    std::sort(before.begin(), before.end(), byOrder);
-    std::sort(after.begin(), after.end(), byOrder);
-    for (auto it = depthMap.begin(); it != depthMap.end(); ++it) {
-        std::sort(it.value().begin(), it.value().end(), byOrder);
+    std::stable_sort(before.begin(), before.end(), byOrder);
+    std::stable_sort(after.begin(), after.end(), byOrder);
+    for (auto depthIt = depthMap.begin(); depthIt != depthMap.end(); ++depthIt) {
+        for (auto roleIt = depthIt.value().begin(); roleIt != depthIt.value().end(); ++roleIt) {
+            std::stable_sort(roleIt.value().begin(), roleIt.value().end(), byOrder);
+        }
     }
+    // 示例条目也排序：同一位置（EMTop/EMBottom）内按 sortOrder，并列时保持激活顺序
+    std::stable_sort(examples.begin(), examples.end(),
+        [](const WorldInfoExample& a, const WorldInfoExample& b) {
+            if (a.position != b.position) return a.position < b.position;
+            return a.sortOrder < b.sortOrder;
+        });
 
     // ===== 第七步：组装输出 =====
     WorldInfoResult result;
@@ -113,22 +102,29 @@ WorldInfoResult WorldInfoMatcher::matchAndResolve(
     //将条目内容加入列表
     auto joinContents = [](const QList<WorldInfoEntryEntity>& list) {
         QStringList parts;
-        for (const auto& e : list) parts << e.content.trimmed();
+        for (const auto& e : list) {
+            const QString content = e.content.trimmed();
+            if (!content.isEmpty()) parts << content;
+        }
         return parts.join('\n');
     };
     result.worldInfoBefore = joinContents(before);
     result.worldInfoAfter  = joinContents(after);
     result.worldInfoExamples = examples;
 
-    //按顺序加入in-chat深度表(待优化***)
-    for (auto it = depthMap.begin(); it != depthMap.end(); ++it) {
-        WorldInfoDepthGroup group;
-        group.depth = it.key();
-        group.insertRole = it.value().first().insertRole;   // 同 depth 默认同 role
-        for (const auto& e : it.value()) {
-            group.entries << e.content.trimmed();
+    // 每个 (depth, role) 一个组；PromptBuilder 侧再按 role 合并成消息
+    for (auto depthIt = depthMap.begin(); depthIt != depthMap.end(); ++depthIt) {
+        for (auto roleIt = depthIt.value().begin(); roleIt != depthIt.value().end(); ++roleIt) {
+            WorldInfoDepthGroup group;
+            group.depth = depthIt.key();
+            group.insertRole = roleIt.key();
+            for (const auto& e : roleIt.value()) {
+                const QString content = e.content.trimmed();
+                if (!content.isEmpty()) group.entries << content;
+            }
+            if (!group.entries.isEmpty())
+                result.worldInfoDepth.append(group);
         }
-        result.worldInfoDepth.append(group);
     }
 
     //outlets
@@ -145,18 +141,63 @@ WorldInfoResult WorldInfoMatcher::matchAndResolve(
     return result;
 }
 
-QString WorldInfoMatcher::buildScanText(const QList<ChatMessageEntity> &history, const QString &userInput, const CharacterEntity &character)
+// ======================================
+// 命中判定（首轮 / 递归共用）
+// ======================================
+bool WorldInfoMatcher::evaluateEntry(const WorldInfoEntryEntity& entry,
+                                    const QString& scanText) const
 {
-    // 1. 构造扫描文本
-    QString scanText;
-    scanText += userInput + "\n";
+    // 1. 常驻直接命中
+    bool hit = entry.constant;
+    if(hit) return hit;
 
+    // 2. 关键词匹配（向量化条目不走关键词）
+    if (!hit && !entry.vectorized && !entry.keywords.isEmpty()) {
+        hit = isMatch(entry, scanText, world_info_case_sensitive, world_info_match_whole_words);
+    }
+
+    // 3. 次关键词（selective）：首轮和递归都要判，否则同一条数据会有两套结果
+    if (hit && entry.selective && !entry.secondaryKeywords.isEmpty()) {
+        hit = checkSelective(entry, scanText, world_info_case_sensitive,
+                             world_info_match_whole_words);
+    }
+
+    // 4. 概率（未完成）
+    // if (hit && entry.useProbability && entry.probability < 100) {
+    //     hit = rollProbability(entry.probability);
+    // }
+
+    // 5. 粘性/冷却/延迟（未完成）
+    // if (hit && stickyCache.contains(entry.id)) hit = false;
+
+    return hit;
+}
+
+QString WorldInfoMatcher::buildScanText(const QList<ChatMessageEntity> &history, const QString &userInput)
+{
     // 只扫描最近 N 条
     int scanDepth = world_info_depth;
     QList<ChatMessageEntity> recent;
     for (int i = history.size() - 1; i >= 0 && recent.size() < scanDepth; --i) {
         recent.prepend(history[i]);
     }
+
+    // 最新用户输入通常已经在历史里了（sendMessage 先落库、再构上下文），
+    // 再单独拼一遍会让同一段文本被扫描两次。这里只在"历史里没有这轮输入"时补上
+    // （例如 regenerate / continue 这类 userInput 为空、或历史里还没有这条的情况）。
+    bool userInputAlreadyInHistory = false;
+    if (!userInput.isEmpty()) {
+        const QString needle = userInput.trimmed();
+        for (const auto& msg : recent) {
+            if (msg.type == GlobalConstants::MessageType::User
+                && msg.content.trimmed() == needle) {
+                userInputAlreadyInHistory = true;
+                break;
+            }
+        }
+    }
+
+    QString scanText;
     for (const auto& msg : recent) {
         if (world_info_include_names)
             scanText += msg.senderName + ": " + msg.content + "\n";
@@ -164,9 +205,12 @@ QString WorldInfoMatcher::buildScanText(const QList<ChatMessageEntity> &history,
             scanText += msg.content + "\n";
     }
 
-    scanText += character.description + "\n";
-    scanText += character.personality + "\n";
-    scanText += character.scenario + "\n";
+    if (!userInput.isEmpty() && !userInputAlreadyInHistory)
+        scanText += userInput + "\n";
+
+    // scanText += character.description + "\n";
+    // scanText += character.personality + "\n";
+    // scanText += character.scenario + "\n";
 
     return scanText;
 }
@@ -232,7 +276,7 @@ bool WorldInfoMatcher::rollProbability(int probability)
     return QRandomGenerator::global()->bounded(100) < probability;
 }
 
-bool WorldInfoMatcher::isMatch(const WorldInfoEntryEntity &entry, const QString &scanText, bool globalCaseSensitive, bool globalWholeWords)
+bool WorldInfoMatcher::isMatch(const WorldInfoEntryEntity &entry, const QString &scanText, bool globalCaseSensitive, bool globalWholeWords) const
 {
     // bool caseSensitive = entry.caseSensitive.value_or(globalCaseSensitive);
     // bool wholeWords = entry.matchWholeWords.value_or(globalWholeWords);
@@ -261,7 +305,7 @@ bool WorldInfoMatcher::isMatch(const WorldInfoEntryEntity &entry, const QString 
     return false;
 }
 
-bool WorldInfoMatcher::checkSelective(const WorldInfoEntryEntity &entry, const QString &scanText, bool globalCaseSensitive, bool globalWholeWords)
+bool WorldInfoMatcher::checkSelective(const WorldInfoEntryEntity &entry, const QString &scanText, bool globalCaseSensitive, bool globalWholeWords) const
 {
     QList<bool> matchResults;
     for (const QString& key : entry.secondaryKeywords) {
@@ -309,9 +353,10 @@ QList<WorldInfoEntryEntity> WorldInfoMatcher::applyRecursion(QList<WorldInfoEntr
             if (entry.preventRecursion) continue;
             if (entry.delayUntilRecursion && step == 0) continue;
 
-            WorldInfoEntryEntity copy = entry;
-            copy.delayUntilRecursion = false;
-            if (isMatch(copy, currentText,world_info_case_sensitive,world_info_match_whole_words)) {
+            // 与首轮用同一个判定：常量/关键词/次关键词/向量化都要一致。
+            // 旧实现只调 isMatch()，导致次关键字不满足的条目被递归激活、
+            // 标了向量化的条目也被关键词递归命中。
+            if (evaluateEntry(entry, currentText)) {
                 newActivated.append(entry);
                 activatedIds.insert(entry.id);
             }

@@ -83,6 +83,10 @@ ColumnLayout {
 
                     property var bodyData
 
+                    // 占位提示词（marker）：正文由运行时按角色卡/世界书/历史填充，
+                    // 用户改了也没用（下次请求会被覆盖），所以整块内容只读。
+                    readonly property bool isMarker: bodyData ? bodyData.marker === true : false
+
                     spacing: Theme.spaceSm
 
                     LabeledField {
@@ -116,14 +120,15 @@ ColumnLayout {
                     }
 
                     Label {
-                        text: "提示词内容"
+                        text: detailRoot.isMarker ? "系统占位，不可编辑" : "提示词内容"
                         font.pixelSize: Theme.fontBodySm
                         font.family: Theme.fontFamily
-                        color: Theme.textSecondary
+                        color: detailRoot.isMarker ? Theme.textDisabled : Theme.textSecondary
                     }
 
                     TextArea {
                         id: contentArea
+                        visible: !detailRoot.isMarker
                         TextContextMenu {}
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.max(Theme.controlLg * 5,

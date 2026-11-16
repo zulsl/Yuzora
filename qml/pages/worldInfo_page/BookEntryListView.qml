@@ -94,53 +94,63 @@ Flickable {
                 }
             }
 
-            // ---------- 关键字：主 → 次关键字逻辑 → 次 ----------
-            EntryKeywordList {
+            // ---------- 关键字相关：只有「关键词」触发才用得上 ----------
+            // 「始终」不看关键字，「向量化」靠向量命中，所以非关键词触发时整块收起。
+            // 用一个子 ColumnLayout 包住而不是逐个写 visible：条件只需写一次，
+            // 布局会把不可见的项连同它前后的 spacing 一起忽略（不会留下空档）。
+            ColumnLayout {
                 Layout.fillWidth: true
-                label: "主要关键字"
-                entryId: entryRoot.bodyData ? entryRoot.bodyData.id : ""
-                field: "keywords"
-                values: entryRoot.bodyData ? (entryRoot.bodyData.keywords || []) : []
-            }
-
-            // 触发策略是「关键词」却没有主关键字时，该条目永远不会命中
-            Label {
-                Layout.fillWidth: true
+                spacing: Theme.spaceSm
                 visible: !!entryRoot.bodyData
                          && entryRoot.bodyData.triggerControl === 1
-                         && (entryRoot.bodyData.keywords || []).length === 0
-                text: "主要关键字为空：触发策略为「关键词」，该条目不会被触发"
-                font.pixelSize: Theme.fontBodySm
-                font.family: Theme.fontFamily
-                color: Theme.warning
-                wrapMode: Text.WordWrap
-            }
 
-            EntrySelectiveLogicComboBox {
-                Layout.fillWidth: true
-                entryId: entryRoot.bodyData ? entryRoot.bodyData.id : ""
-                selective: entryRoot.bodyData ? entryRoot.bodyData.selective : true
-                logic: entryRoot.bodyData ? entryRoot.bodyData.selectiveLogic : 0
-            }
+                // 主 → 次关键字逻辑 → 次
+                EntryKeywordList {
+                    Layout.fillWidth: true
+                    label: "主要关键字"
+                    entryId: entryRoot.bodyData ? entryRoot.bodyData.id : ""
+                    field: "keywords"
+                    values: entryRoot.bodyData ? (entryRoot.bodyData.keywords || []) : []
+                }
 
-            EntryKeywordList {
-                Layout.fillWidth: true
-                label: "次要关键字"
-                entryId: entryRoot.bodyData ? entryRoot.bodyData.id : ""
-                field: "secondaryKeywords"
-                values: entryRoot.bodyData ? (entryRoot.bodyData.secondaryKeywords || []) : []
-            }
+                // 触发策略是「关键词」却没有主关键字时，该条目永远不会命中
+                Label {
+                    Layout.fillWidth: true
+                    visible: !!entryRoot.bodyData
+                             && (entryRoot.bodyData.keywords || []).length === 0
+                    text: "主要关键字为空：触发策略为「关键词」，请添加关键词"
+                    font.pixelSize: Theme.fontBodySm
+                    font.family: Theme.fontFamily
+                    color: Theme.warning
+                    wrapMode: Text.WordWrap
+                }
 
-            Label {
-                Layout.fillWidth: true
-                visible: !!entryRoot.bodyData
-                         && entryRoot.bodyData.selective
-                         && (entryRoot.bodyData.secondaryKeywords || []).length > 0
-                text: "次要关键字在主要关键字命中之后才判断，组合方式由上面的逻辑决定"
-                font.pixelSize: Theme.fontCaption
-                font.family: Theme.fontFamily
-                color: Theme.textSecondary
-                wrapMode: Text.WordWrap
+                EntrySelectiveLogicComboBox {
+                    Layout.fillWidth: true
+                    entryId: entryRoot.bodyData ? entryRoot.bodyData.id : ""
+                    selective: entryRoot.bodyData ? entryRoot.bodyData.selective : true
+                    logic: entryRoot.bodyData ? entryRoot.bodyData.selectiveLogic : 0
+                }
+
+                EntryKeywordList {
+                    Layout.fillWidth: true
+                    label: "次要关键字"
+                    entryId: entryRoot.bodyData ? entryRoot.bodyData.id : ""
+                    field: "secondaryKeywords"
+                    values: entryRoot.bodyData ? (entryRoot.bodyData.secondaryKeywords || []) : []
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: !!entryRoot.bodyData
+                             && entryRoot.bodyData.selective
+                             && (entryRoot.bodyData.secondaryKeywords || []).length > 0
+                    text: "次要关键字在主要关键字命中之后才判断，组合方式由上面的逻辑决定"
+                    font.pixelSize: Theme.fontCaption
+                    font.family: Theme.fontFamily
+                    color: Theme.textSecondary
+                    wrapMode: Text.WordWrap
+                }
             }
 
             // 内容区不内嵌滚动，高度随内容增长（最小约 4 行）。

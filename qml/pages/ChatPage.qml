@@ -20,8 +20,8 @@ PageScaffold {
         const parts = []
         if (ChatViewModel.currentSessionTitle.length > 0)
             parts.push(ChatViewModel.currentSessionTitle)
-        if (ChatViewModel.currentPresetName.length > 0)
-            parts.push(ChatViewModel.currentPresetName)
+        if (CompletionPresetViewModel.activePreset.name.length > 0)
+            parts.push(CompletionPresetViewModel.activePreset.name)
         return parts.join(" · ")
     }
     contentPadding: 0

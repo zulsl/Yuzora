@@ -25,6 +25,7 @@ public:
     // ========== 文集业务 ==========
     QList<WorldInfoBookEntity> getAllBooks();
     WorldInfoBookEntity getBookById(const QString& bookId);
+    QList<WorldInfoBookEntity> getEnabledBooks();//获取启用的书
     QList<WorldInfoBookEntity> getEffectiveBooksForCharacter(const QString& charId);
 
 
@@ -36,6 +37,7 @@ public:
 
     // ========== 条目业务 ==========
     QList<WorldInfoEntryEntity> getEntriesByBook(const QString& bookId);
+    QList<WorldInfoEntryEntity> getEntriesForEnabledByBookId(const QString& bookId);//(弃用)
 
     QString createEntry(const QString& bookId, const QString& name = "新条目");
     bool updateEntry(const WorldInfoEntryEntity& entry);

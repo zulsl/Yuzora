@@ -39,9 +39,24 @@ Item {
             }
         }
 
-        BookEntryListView {
+        // 列表区包一层 Item：空态占位要和列表互为兄弟才能 anchors.centerIn，
+        // 直接放进 Flickable 里会按"内容坐标"居中（没有条目时内容高 0，直接不见）。
+        Item {
+            id: listArea
             Layout.fillWidth: true
             Layout.fillHeight: true
+
+            BookEntryListView {
+                anchors.fill: parent
+            }
+
+            EmptyState {
+                anchors.centerIn: parent
+                visible: WorldInfoViewModel.currentBookId.length > 0
+                         && WorldInfoEntryViewModel.entryCount === 0
+                text: "当前无条目"
+                detail: "点右上角的 + 新建条目"
+            }
         }
     }
 

@@ -45,8 +45,6 @@ public:
     Q_PROPERTY(QString currentSessionId READ currentSessionId NOTIFY currentSessionIdChanged)
     //是否还有更早的历史消息
     Q_PROPERTY(bool hasMoreHistory READ hasMoreHistory NOTIFY hasMoreHistoryChanged)
-    //当前预设名称
-    Q_PROPERTY(QString currentPresetName READ currentPresetName NOTIFY currentPresetChanged)
     // Enter 是否发送；false 时 Ctrl+Enter 发送
     Q_PROPERTY(bool sendWithEnter READ sendWithEnter NOTIFY sendWithEnterChanged)
     //聊天列表数据源
@@ -71,7 +69,6 @@ public:
     QString currentSessionTitle() const;
     QString currentSessionId() const;
     bool hasMoreHistory() const;
-    QString currentPresetName() const;//预设名称
     bool sendWithEnter() const;
     QString currentCharAvatarPath();//角色头像
 
@@ -108,7 +105,6 @@ signals:
     void currentSessionTitleChanged();
     void currentSessionIdChanged();
     void hasMoreHistoryChanged();
-    void currentPresetChanged();
     void sendWithEnterChanged();
     void generationError(const QString& errorMsg);
 
@@ -143,7 +139,6 @@ private:
     QString m_currentCharAvatarPath;
     QString m_currentSessionTitle;
     QString m_currentSessionId;
-    QString m_currentPresetName;
     QDateTime m_oldestMessageTime;
     QString m_oldestMessageId;
     bool m_hasMoreHistory = false;

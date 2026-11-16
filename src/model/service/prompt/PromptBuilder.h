@@ -48,13 +48,18 @@ public:
 
 
     //构建完整聊天消息
+    //
+    // 提示词由调用方取好再传进来（不再在这里调 CompletionPresetService::instance()）：
+    // 这样 buildChatMessages 就是一串纯函数，单测里给一份 fixture 就能断言最终消息序列。
     QList<ChatMessage> buildChatMessages(
         const CharacterEntity& character,   //当前角色
         const QList<ChatMessageEntity>& history,    //历史消息(按时间升序，不包含 status != Normal 的)
-        const QString& userInput,   //最新用户输入（可选，用于在无历史时补一条）
-        const CompletionPresetEntity& preset = {},  //当前预设
-        const WorldInfoResult& wi = {}, //世界书匹配结果
-        const QString& personaDesc = QString()//用户 Persona 描述（可选）
+        const QString& userInput,   //最新用户输入（当前由历史承载，保留给"无历史时补一条"的未来用法）
+        const CompletionPresetEntity& preset,       //当前预设
+        const WorldInfoResult& wi,                  //世界书匹配结果
+        const QList<PromptEntity>& userPrompts,     //预设里的提示词表（DB 里那条 preset 的）
+        const QString& personaDesc = QString(),//用户 Persona 描述（可选）
+        const QString& generationType = QStringLiteral("normal")//normal/continue/regenerate/impersonate/quiet
         );
 
 
@@ -117,10 +122,12 @@ private:
     QList<PromptEntity> preparePromptCollection(
         const CompletionPresetEntity& preset,
         const WorldInfoResult & wi,
-        const CharacterEntity & character);
+        const CharacterEntity & character,
+        const QList<PromptEntity>& userPrompts);
 
     //============开始填充===================
-    void populateChatCompletion(
+    // 返回值就是最终消息序列（内部按提示词顺序扁平化）
+    QList<ChatMessage> populateChatCompletion(
         const QList<PromptEntity>& prompts,ChatCompletion& chatCompletion,
         const CompletionPresetEntity & preset,
         const QList<ChatMessageEntity> & history,const QString & userInput,
@@ -156,15 +163,18 @@ private:
     QList<ChatMessage> populationInjectionPrompts(
         const QList<PromptEntity>& absolutePrompts,
         const QList<ChatMessage>& messages,
-        const WorldInfoResult& wi);
-    //填充对话示例
+        const WorldInfoResult& wi,
+        const QVariantMap& vars);
+    //填充对话示例（组名 dialogueExamples，位置由 prompts 顺序决定）
     void populateDialogueExamples(const QList<QList<ChatMessage>>& messageExamples,
-        const QList<PromptEntity>& prompts,ChatCompletion& chatCompletion,
+        ChatCompletion& chatCompletion,
         const CompletionPresetEntity& preset,const CharacterEntity& character);
-    //填充聊天历史记录
+    //填充聊天历史记录（组名 chatHistory，位置由 prompts 顺序决定）
     void populateChatHistory(const QList<ChatMessage>& messages,
-        const QList<PromptEntity>& prompts,ChatCompletion& chatCompletion,
+        ChatCompletion& chatCompletion,
         const CompletionPresetEntity& preset);
+    //把角色卡的 example_dialogue 解析成 <START> 分隔的示例块（user/assistant 交替）
+    QList<QList<ChatMessage>> parseExampleDialogue(const CharacterEntity& character);
 
 
 

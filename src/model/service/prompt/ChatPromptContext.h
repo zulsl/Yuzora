@@ -17,8 +17,12 @@ class ChatMessageDao;
 //      WorldInfoMatcher / PromptBuilder 四个单例；
 //   2. 单测里用一份假实现替换这个函数，就能在没有预设、没有世界书、没有网络的情况下
 //      测"发送消息"这条链路。
+//
+// generationType: "normal" / "continue" / "regenerate" / "impersonate" / "quiet"，
+// 决定 PromptBuilder 走哪条分支（continue 的 nudge/prefill、impersonate 的模仿提示等）。
 QList<ChatMessage> buildChatPromptContext(
         const QString& characterId,const QString& sessionId,
-        const QString& userInput,ChatMessageDao* messageDao,CharacterService* characterService);
+        const QString& userInput,ChatMessageDao* messageDao,CharacterService* characterService,
+        const QString& generationType = QStringLiteral("normal"));
 
 #endif // CHATPROMPTCONTEXT_H

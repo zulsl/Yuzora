@@ -23,6 +23,7 @@ struct WorldInfoDepthGroup {//世界书深度组
 struct WorldInfoExample {//世界书对话示例
     QString content;
     int position;  // EMTop 或 EMBottom
+    int sortOrder = 0;  // 同位置内的排序键（EMTop/EMBottom 各排各的）
 };
 
 struct WorldInfoResult {
@@ -54,8 +55,7 @@ public:
     //构建扫描文本
     QString buildScanText(
         const QList<ChatMessageEntity>& history,
-        const QString& userInput,
-        const CharacterEntity& character);
+        const QString& userInput);
 
     // 按注入位置拼接成最终注入文本
     QString buildInjectedText(const QList<MatchedWorldInfo>& matched, InsertPosition position);
@@ -75,12 +75,15 @@ private:
 
 
     //辅助函数
+    // 单个条目"是否命中"的唯一判定入口：常驻 / 关键词 / 次关键词 / 向量化都在这里，
+    // 首轮匹配和递归扫描都必须走它，否则两轮的判定条件会不一致。
+    bool evaluateEntry(const WorldInfoEntryEntity& entry, const QString& scanText) const;
     bool isMatch(//是否匹配
         const WorldInfoEntryEntity& entry,const QString& scanText,
-        bool globalCaseSensitive,bool globalWholeWords);
+        bool globalCaseSensitive,bool globalWholeWords) const;
     bool checkSelective(//检查选择性
         const WorldInfoEntryEntity& entry,const QString& scanText,
-        bool globalCaseSensitive,bool globalWholeWords);
+        bool globalCaseSensitive,bool globalWholeWords) const;
     QList<WorldInfoEntryEntity> applyRecursion(//应用递归扫描
         QList<WorldInfoEntryEntity> firstPass,
         const QList<WorldInfoEntryEntity>& allEntries);

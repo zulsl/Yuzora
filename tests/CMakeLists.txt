@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Sql Test)
+﻿find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Sql Test)
 
 qt_add_executable(YuzoraTests
     WorldInfoEntryListModelTest.cpp
@@ -376,5 +376,95 @@ set_target_properties(YuzoraApiConfigViewModelTests PROPERTIES WIN32_EXECUTABLE 
 
 add_test(NAME YuzoraApiConfigViewModelTests COMMAND YuzoraApiConfigViewModelTests)
 set_tests_properties(YuzoraApiConfigViewModelTests PROPERTIES
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+)
+
+qt_add_executable(YuzoraPromptBuilderTests
+    PromptBuilderTest.cpp
+    ../src/model/service/prompt/PromptBuilder.cpp
+    ../src/model/service/prompt/PromptBuilder.h
+    ../src/model/service/prompt/ChatCompletion.h
+    ../src/model/service/prompt/ChatMessageGroup.h
+    ../src/model/network/ChatMessage.cpp
+    ../src/model/network/ChatMessage.h
+    ../src/model/service/WorldInfoMatcher.h
+    ../src/model/entity/CharacterEntity.h
+    ../src/model/entity/ChatMessageEntity.h
+    ../src/model/entity/CompletionPresetEntity.h
+    ../src/model/entity/WorldInfoEntryEntity.h
+    ../src/model/entity/PromptEntity.h
+    ../src/base/GlobalConstants.cpp
+    ../src/base/GlobalConstants.h
+)
+
+target_include_directories(YuzoraPromptBuilderTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/base
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/prompt
+)
+
+target_link_libraries(YuzoraPromptBuilderTests PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Test)
+set_target_properties(YuzoraPromptBuilderTests PROPERTIES WIN32_EXECUTABLE FALSE)
+
+add_test(NAME YuzoraPromptBuilderTests COMMAND YuzoraPromptBuilderTests)
+set_tests_properties(YuzoraPromptBuilderTests PROPERTIES
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+)
+
+qt_add_executable(YuzoraWorldInfoMatcherTests
+    WorldInfoMatcherTest.cpp
+    ../src/model/service/WorldInfoMatcher.cpp
+    ../src/model/service/WorldInfoMatcher.h
+    ../src/model/entity/WorldInfoEntryEntity.h
+    ../src/model/entity/ChatMessageEntity.h
+    ../src/model/entity/CharacterEntity.h
+    ../src/model/network/ChatMessage.h
+    ../src/base/GlobalConstants.cpp
+    ../src/base/GlobalConstants.h
+)
+
+target_include_directories(YuzoraWorldInfoMatcherTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/base
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+)
+
+target_link_libraries(YuzoraWorldInfoMatcherTests PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Test)
+set_target_properties(YuzoraWorldInfoMatcherTests PROPERTIES WIN32_EXECUTABLE FALSE)
+
+add_test(NAME YuzoraWorldInfoMatcherTests COMMAND YuzoraWorldInfoMatcherTests)
+set_tests_properties(YuzoraWorldInfoMatcherTests PROPERTIES
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+)
+
+qt_add_executable(YuzoraPresetPromptListModelTests
+    PresetPromptListModelTest.cpp
+    ../src/model/list/preset/PresetPromptListModel.cpp
+    ../src/model/list/preset/PresetPromptListModel.h
+    ../src/model/entity/PromptEntity.h
+    ../src/base/GlobalConstants.cpp
+    ../src/base/GlobalConstants.h
+)
+
+target_include_directories(YuzoraPresetPromptListModelTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/base
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/list/preset
+)
+
+target_link_libraries(YuzoraPresetPromptListModelTests PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Test)
+set_target_properties(YuzoraPresetPromptListModelTests PROPERTIES WIN32_EXECUTABLE FALSE)
+
+add_test(NAME YuzoraPresetPromptListModelTests COMMAND YuzoraPresetPromptListModelTests)
+set_tests_properties(YuzoraPresetPromptListModelTests PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
 )

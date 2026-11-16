@@ -85,8 +85,8 @@ struct WorldInfoEntryEntity {
 
 
     //未定义字段
-    bool caseSensitive = false;     //区分大小写(默认为空,使用全局设置)
-    bool matchWholeWords = false;   //完整单词--全词匹配(默认为空,使用全局设置)
+    bool caseSensitive = false;     //区分大小写(默认为否,使用全局设置)
+    bool matchWholeWords = false;   //完整单词--全词匹配(默认为否,使用全局设置)
     bool useGroupScoring = false;   //启用组评分
     //--null 使用全局;true 启用分组计分择优，同组只选高分条目；false 满足条件同组全注入
     QString automationId;          //自动化ID

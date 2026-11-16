@@ -89,7 +89,8 @@ QString WorldInfoService::importWorldBook(QJsonObject&) { return {}; }
 // 提示词装配整块替换：本测试不校验提示词内容，返回空列表即可。
 // 正因为 buildPromptContext 已经被抽成自由函数，这里才能这么替换。
 QList<ChatMessage> buildChatPromptContext(
-        const QString&, const QString&, const QString&, ChatMessageDao*, CharacterService*)
+        const QString&, const QString&, const QString&, ChatMessageDao*, CharacterService*,
+        const QString&)
 {
     return {};
 }

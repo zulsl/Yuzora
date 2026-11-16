@@ -96,22 +96,125 @@ QStringList CompletionPresetService::parsePromptOrder(
 void CompletionPresetService::CreateDefaultPromptEntries(const QString& presetId,QStringList & promptOrderList)
 {
     //提示词条目
-    PromptEntity item1;
-    item1.id=Utils::generateUuid();
-    item1.identifier = "main";
-    item1.presetId=presetId;
-    item1.name = "主提示词";
-    item1.system_prompt = true;
-    item1.marker = true;
-    item1.content = "推进剧情";
-    item1.injection_depth = 4;
-    item1.forbid_overrides = false;
-    createPrompt(item1);
+    PromptEntity main;
+    main.id=Utils::generateUuid();
+    main.identifier = "main";
+    main.presetId=presetId;
+    main.name = "主提示词";
+    main.system_prompt = true;
+    main.marker = false;
+    main.content = "Write {{char}}'s next reply in a fictional chat between {{char}} and {{user}}.";
+    main.injection_depth = 4;
+    main.forbid_overrides = false;
+
+    PromptEntity worldInfoAfter;
+    worldInfoAfter.id=Utils::generateUuid();
+    worldInfoAfter.identifier = "worldInfoAfter";
+    worldInfoAfter.presetId=presetId;
+    worldInfoAfter.name = "World Info (after)";
+    worldInfoAfter.system_prompt = true;
+    worldInfoAfter.marker = true;
+
+    PromptEntity personaDescription;
+    personaDescription.id=Utils::generateUuid();
+    personaDescription.identifier = "personaDescription";
+    personaDescription.presetId=presetId;
+    personaDescription.name = "persona Description(人物描述)";
+    personaDescription.system_prompt = true;
+    personaDescription.marker = true;
+
+    PromptEntity charDescription;
+    charDescription.id=Utils::generateUuid();
+    charDescription.identifier = "charDescription";
+    charDescription.presetId=presetId;
+    charDescription.name = "char Description(角色描述)";
+    charDescription.system_prompt = true;
+    charDescription.marker = true;
+
+    PromptEntity charPersonality;
+    charPersonality.id=Utils::generateUuid();
+    charPersonality.identifier = "charDescription";
+    charPersonality.presetId=presetId;
+    charPersonality.name = "char Description(角色性格)";
+    charPersonality.system_prompt = true;
+    charPersonality.marker = true;
+
+    PromptEntity scenario;
+    scenario.id=Utils::generateUuid();
+    scenario.identifier = "scenario";
+    scenario.presetId=presetId;
+    scenario.name = "Character Scenario";
+    scenario.system_prompt = true;
+    scenario.marker = true;
+
+    PromptEntity enhanceDefinitions;
+    enhanceDefinitions.id=Utils::generateUuid();
+    enhanceDefinitions.identifier = "enhanceDefinitions";
+    enhanceDefinitions.content = "If you have more knowledge of {{char}}, add to the character's lore and personality to enhance them but keep the Character Sheet's definitions absolute.";
+    enhanceDefinitions.presetId=presetId;
+    enhanceDefinitions.name = "enhance Definitions(增强定义)";
+    enhanceDefinitions.system_prompt = true;
+    enhanceDefinitions.marker = false;
+    enhanceDefinitions.isActive = false;
+
+    PromptEntity nsfw;
+    nsfw.id=Utils::generateUuid();
+    nsfw.identifier = "nsfw";
+    nsfw.presetId=presetId;
+    nsfw.name = "Auxiliary Prompt(辅助提示)";
+    nsfw.system_prompt = true;
+    nsfw.marker = false;
+
+    PromptEntity worldInfoBefore;
+    worldInfoBefore.id=Utils::generateUuid();
+    worldInfoBefore.identifier = "worldInfoAfter";
+    worldInfoBefore.presetId=presetId;
+    worldInfoBefore.name = "World Info (before)";
+    worldInfoBefore.system_prompt = true;
+    worldInfoBefore.marker = true;
+
+    PromptEntity dialogueExamples;
+    dialogueExamples.id=Utils::generateUuid();
+    dialogueExamples.identifier = "dialogueExamples";
+    dialogueExamples.presetId=presetId;
+    dialogueExamples.name = "Chat Examples";
+    dialogueExamples.system_prompt = true;
+    dialogueExamples.marker = true;
+
+    PromptEntity chatHistory;
+    chatHistory.id=Utils::generateUuid();
+    chatHistory.identifier = "chatHistory";
+    chatHistory.presetId=presetId;
+    chatHistory.name = "Chat History";
+    chatHistory.system_prompt = true;
+    chatHistory.marker = true;
+
+    PromptEntity jailbreak;
+    jailbreak.id=Utils::generateUuid();
+    jailbreak.identifier = "jailbreak";
+    jailbreak.presetId=presetId;
+    jailbreak.name = "Post-History Instructions";
+    jailbreak.system_prompt = true;
+
+
+    createPrompt(main);
+    createPrompt(worldInfoAfter);
+    createPrompt(personaDescription);
+    createPrompt(charDescription);
+    createPrompt(charPersonality);
+    createPrompt(scenario);
+    createPrompt(enhanceDefinitions);
+    createPrompt(nsfw);
+    createPrompt(worldInfoBefore);
+    createPrompt(dialogueExamples);
+    createPrompt(chatHistory);
+    createPrompt(jailbreak);
+
 
     //顺序条目
-    QString entity1;
-    entity1="main";
-    promptOrderList.append(entity1);
+    promptOrderList<<"main"<<"worldInfoAfter"<<"personaDescription"<<"charDescription"
+        <<"charPersonality"<<"scenario"<<"enhanceDefinitions"<<"nsfw"<<"worldInfoBefore"
+        <<"dialogueExamples"<<"chatHistory"<<"jailbreak";
 
 }
 
@@ -243,7 +346,17 @@ QList<PromptEntity> CompletionPresetService::getPromptsByPresetId(const QString 
 {
     if (id.isEmpty()) return {};
 
-    return m_promptDao->selectPromptsByPresetId(id);
+    QList<PromptEntity> prompts = m_promptDao->selectPromptsByPresetId(id);
+
+    // main 是"主提示词"，内容由用户编辑，不是系统占位。
+    // 早期建库时把它也打上了 marker=1，导致预设界面会把它当成占位锁住；
+    // 这里统一归一化，避免去改历史数据（marker 只影响编辑态，不影响提示词装配）。
+    for (PromptEntity& prompt : prompts) {
+        if (prompt.identifier == QStringLiteral("main"))
+            prompt.marker = false;
+    }
+
+    return prompts;
 }
 
 PromptEntity CompletionPresetService::getPromptById(const QString & id)

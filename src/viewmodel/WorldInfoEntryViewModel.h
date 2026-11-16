@@ -50,8 +50,13 @@ public:
 
     // 条目列表数据源（供 QML 使用）
     Q_PROPERTY(WorldInfoEntryListModel* entryModel READ entryModel CONSTANT)
+    // 当前文集的条目数（供 QML 判空态）
+    // 为什么不直接在 QML 里读 entryModel.count：QAbstractListModel 没有 count 属性，
+    // rowCount() 也不是 Q_INVOKABLE，QML 侧拿不到。这里显式暴露一个只读属性。
+    Q_PROPERTY(int entryCount READ entryCount NOTIFY entryCountChanged FINAL)
 
     WorldInfoEntryListModel* entryModel() const;
+    int entryCount() const;
 
     // ---- 供 C++（WorldInfoViewModel）使用，不是 QML 接口 ----
     void setCurrentBookId(const QString& bookId);
@@ -76,6 +81,7 @@ public:
 signals:
     // 供 QML 使用
     void operationError(const QString& errorMsg);
+    void entryCountChanged();
 
 private:
     // 构造函数必须 private：QML 单例只有在"无法默认构造"时才会调用 create()。

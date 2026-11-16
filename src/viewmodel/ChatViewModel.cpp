@@ -42,14 +42,12 @@ ChatViewModel::ChatViewModel(QObject* parent)
                     m_currentCharAvatarPath.clear();
                     m_currentSessionTitle.clear();
                     m_currentSessionId.clear();
-                    m_currentPresetName.clear();
                     m_oldestMessageTime = QDateTime();
                     m_oldestMessageId.clear();
                     m_hasMoreHistory = false;
                     emit currentCharNameChanged();
                     emit currentSessionTitleChanged();
                     emit currentSessionIdChanged();
-                    emit currentPresetChanged();
                     emit hasMoreHistoryChanged();
                 }
             });
@@ -146,11 +144,6 @@ bool ChatViewModel::sendWithEnter() const
 ChatMessageListModel* ChatViewModel::messageModel() const
 {
     return m_messageModel;
-}
-
-QString ChatViewModel::currentPresetName() const
-{
-    return m_completionPresetService->getActivePreset().name;
 }
 
 // ======================================
@@ -272,7 +265,6 @@ void ChatViewModel::onSessionSwitched(const QString& characterId, const QString&
     m_messageModel->clear();
     loadInitialMessages();
 
-    emit currentPresetChanged();
 }
 
 void ChatViewModel::onMessageAppended(const ChatMessageEntity& message)

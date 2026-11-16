@@ -68,6 +68,19 @@ WorldInfoBookEntity WorldInfoService::getBookById(const QString& bookId)
     return m_BookDao->selectById(bookId);
 }
 
+QList<WorldInfoBookEntity> WorldInfoService::getEnabledBooks()
+{
+    QList<WorldInfoBookEntity> books;
+
+    for (const WorldInfoBookEntity& book : m_BookDao->selectAll()) {
+        if (!book.isEnabled) {
+            continue;
+        }
+    }
+
+    return books;
+}
+
 QList<WorldInfoBookEntity> WorldInfoService::getEffectiveBooksForCharacter(const QString& charId)
 {
     // // 生效范围 = 全局文集 + 角色绑定文集
@@ -214,6 +227,19 @@ bool WorldInfoService::toggleBookEnabled(const QString& bookId)
 QList<WorldInfoEntryEntity> WorldInfoService::getEntriesByBook(const QString& bookId)
 {
     return m_EntryDao->selectEntriesByBookId(bookId);
+}
+
+QList<WorldInfoEntryEntity> WorldInfoService::getEntriesForEnabledByBookId(const QString &bookId)
+{
+    QList<WorldInfoEntryEntity> result;
+
+    QList<WorldInfoEntryEntity> entries=m_EntryDao->selectEntriesByBookId(bookId);
+    for (const WorldInfoEntryEntity& entry : entries) {
+        if (entry.isEnabled) {
+            result.append(entry);
+        }
+    }
+    return result;
 }
 
 QString WorldInfoService::createEntry(const QString& bookId, const QString& name)
