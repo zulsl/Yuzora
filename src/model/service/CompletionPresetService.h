@@ -16,9 +16,8 @@ public:
     ~CompletionPresetService() override;
 
     // 测试/组合根可注入 DAO；生产仍使用 instance()。
-    explicit CompletionPresetService(CompletionPresetDao* presetDao,
-                                     PromptDao* promptDao,
-                                     QObject* parent = nullptr);
+    explicit CompletionPresetService(
+            CompletionPresetDao* presetDao,PromptDao* promptDao,QObject* parent = nullptr);
 
     CompletionPresetService(const CompletionPresetService&) = delete;
     CompletionPresetService& operator=(const CompletionPresetService&) = delete;
@@ -52,10 +51,14 @@ public:
                             const PromptEntity& prompt);
     bool deletePrompt(const QString& presetId, const QString& promptId);
 
+    void CreateDefaultPromptEntries(const QString& presetId,QStringList & promptOrderList);//创建默认提示词条目
 
 
     // 导入导出（兼容 SillyTavern 原生格式）
     int importFromSillyTavern(const QString& filePath,const QString& fileName);
+    // 从已解析的 JSON 导入。同名预设存在时**覆盖更新**（保留 id / 激活状态 / 创建时间），
+    // 否则新建。返回 1 表示成功（新建或更新）。
+    int importFromSillyTavernJson(const QJsonObject& stJson, const QString& fileName);
     bool exportToSillyTavern(const QString& presetId, const QString& savePath);
     bool exportAllToSillyTavern(const QString& savePath);
 
@@ -70,7 +73,6 @@ private:
     explicit CompletionPresetService(QObject* parent = nullptr);
     void initBuiltinPresets();
     QStringList parsePromptOrder(const QJsonObject& cpJson,QHash<QString, bool>& h_isActive);
-    void CreateDefaultPromptEntries(const QString& presetId,QStringList & promptOrderList);//创建默认提示词条目
     bool validatePreset(const CompletionPresetEntity& preset, QString& outError);//验证预设(用处不大)
     QStringList normalizePromptOrder(const QStringList& order) const;
     bool writePromptChange(const CompletionPresetEntity& preset, const PromptEntity& prompt,

@@ -20,10 +20,18 @@ QString Utils::stringListToJson(const QStringList& values)
 }
 QStringList Utils::jsonToStringList(const QVariant& value)
 {
-    const QJsonArray array = value.value<QJsonArray>();
+    // 与生产实现一致：DAO 把列表存成 JSON 字符串（TEXT）。
     QStringList result;
-    for (const QJsonValue& item : array)
-        result.append(item.toString());
+    QByteArray jsonData = value.toByteArray();
+    if (jsonData.isEmpty()) {
+        const QString str = value.toString();
+        if (str.isEmpty()) return result;
+        jsonData = str.toUtf8();
+    }
+    const QJsonDocument doc = QJsonDocument::fromJson(jsonData);
+    if (!doc.isArray()) return result;
+    for (const QJsonValue& item : doc.array())
+        if (item.isString()) result.append(item.toString());
     return result;
 }
 QString Utils::variantMapToJson(const QVariantMap& map)
@@ -97,7 +105,44 @@ class CompletionPresetServiceTest : public QObject
 
 private slots:
     void presetAndPromptLifecycle();
+    void importSameNameUpdatesInPlace();
+    void importPreservesExplicitEmptyChatSettings();
+    void importFallsBackToStDefaultsWhenKeysMissing();
+    void nullColumnsFallBackToStDefaults();
 };
+
+// 最小 ST 预设 JSON：一条 main 提示词
+static QJsonObject makeSillyTavernPresetJson(const QString& mainContent)
+{
+    QJsonObject orderEntry;
+    orderEntry["identifier"] = QStringLiteral("main");
+    orderEntry["enabled"] = true;
+
+    QJsonObject orderList;
+    orderList["character_id"] = 100001;
+    orderList["order"] = QJsonArray{orderEntry};
+
+    QJsonObject prompt;
+    prompt["identifier"] = QStringLiteral("main");
+    prompt["name"] = QStringLiteral("Main");
+    prompt["content"] = mainContent;
+    prompt["role"] = QStringLiteral("system");
+    prompt["system_prompt"] = true;
+    prompt["marker"] = false;
+    prompt["enabled"] = true;
+    prompt["injection_position"] = 0;
+    prompt["injection_depth"] = 4;
+    prompt["injection_order"] = 100;
+    prompt["forbid_overrides"] = false;
+
+    QJsonObject preset;
+    preset["openai_max_context"] = 8192;
+    preset["openai_max_tokens"] = 512;
+    preset["temperature"] = 1.0;
+    preset["prompt_order"] = QJsonArray{orderList};
+    preset["prompts"] = QJsonArray{prompt};
+    return preset;
+}
 
 void CompletionPresetServiceTest::presetAndPromptLifecycle()
 {
@@ -133,6 +178,122 @@ void CompletionPresetServiceTest::presetAndPromptLifecycle()
     const PromptEntity created = service.getPromptsByPresetId(presetId).first();
     QVERIFY(service.deletePrompt(presetId, created.id));
     QVERIFY(service.getPromptsByPresetId(presetId).isEmpty());
+}
+
+// 从 ST 重新导出后再导入：同名预设应就地覆盖（保留 id 与激活状态），
+// 不能留下第二份旧数据——否则请求体里会多出 ST 已经关掉的提示词。
+void CompletionPresetServiceTest::importSameNameUpdatesInPlace()
+{
+    PresetTestProvider provider;
+    ConnectionProviderRegistry::setProvider(&provider);
+
+    CompletionPresetDao presetDao;
+    PromptDao promptDao;
+    presetDao.setConnectionProvider(&provider);
+    promptDao.setConnectionProvider(&provider);
+
+    CompletionPresetService service(&presetDao, &promptDao);
+
+    QCOMPARE(service.importFromSillyTavernJson(
+                 makeSillyTavernPresetJson(QStringLiteral("v1")),
+                 QStringLiteral("Fushin")),
+             1);
+    QCOMPARE(service.getAllPresets().size(), 1);
+    const QString presetId = service.getAllPresets().first().id;
+    QVERIFY(service.setActivePreset(presetId));
+    QCOMPARE(service.getPromptsByPresetId(presetId).first().content, QStringLiteral("v1"));
+
+    QCOMPARE(service.importFromSillyTavernJson(
+                 makeSillyTavernPresetJson(QStringLiteral("v2")),
+                 QStringLiteral("Fushin")),
+             1);
+
+    QCOMPARE(service.getAllPresets().size(), 1);                 // 没有产生第二份
+    QCOMPARE(service.getAllPresets().first().id, presetId);      // id 保留
+    QVERIFY(service.getPresetById(presetId).isActive);           // 激活状态保留
+    const QList<PromptEntity> prompts = service.getPromptsByPresetId(presetId);
+    QCOMPARE(prompts.size(), 1);                                 // 旧提示词被整体替换
+    QCOMPARE(prompts.first().content, QStringLiteral("v2"));
+}
+
+// 狐神抚这类预设显式写了 new_chat_prompt="" / new_example_chat_prompt=""：
+// 这是"不要标记"，导入后必须保持空，不能被 ST 默认值覆盖。
+void CompletionPresetServiceTest::importPreservesExplicitEmptyChatSettings()
+{
+    PresetTestProvider provider;
+    ConnectionProviderRegistry::setProvider(&provider);
+
+    CompletionPresetDao presetDao;
+    PromptDao promptDao;
+    presetDao.setConnectionProvider(&provider);
+    promptDao.setConnectionProvider(&provider);
+    CompletionPresetService service(&presetDao, &promptDao);
+
+    QJsonObject json = makeSillyTavernPresetJson(QStringLiteral("main"));
+    json["new_chat_prompt"] = QString();
+    json["new_example_chat_prompt"] = QString();
+    json["wi_format"] = QString();
+    json["scenario_format"] = QString();
+    json["personality_format"] = QString();
+    QCOMPARE(service.importFromSillyTavernJson(json, QStringLiteral("EmptySettings")), 1);
+
+    const CompletionPresetEntity preset = service.getAllPresets().first();
+    QVERIFY(preset.newChatPrompt.isEmpty());
+    QVERIFY(preset.newExampleChatPrompt.isEmpty());
+    QVERIFY(preset.wiFormat.isEmpty());
+    QVERIFY(preset.scenarioFormat.isEmpty());
+    QVERIFY(preset.personalityFormat.isEmpty());
+}
+
+// JSON 里根本没有这些字段（早期导出/局部预设）：用 ST 的 default_*。
+void CompletionPresetServiceTest::importFallsBackToStDefaultsWhenKeysMissing()
+{
+    PresetTestProvider provider;
+    ConnectionProviderRegistry::setProvider(&provider);
+
+    CompletionPresetDao presetDao;
+    PromptDao promptDao;
+    presetDao.setConnectionProvider(&provider);
+    promptDao.setConnectionProvider(&provider);
+    CompletionPresetService service(&presetDao, &promptDao);
+
+    QCOMPARE(service.importFromSillyTavernJson(
+                 makeSillyTavernPresetJson(QStringLiteral("main")),
+                 QStringLiteral("Defaults")),
+             1);
+
+    const CompletionPresetEntity preset = service.getAllPresets().first();
+    QCOMPARE(preset.newChatPrompt, QStringLiteral("[Start a new Chat]"));
+    QCOMPARE(preset.newExampleChatPrompt, QStringLiteral("[Example Chat]"));
+    QCOMPARE(preset.wiFormat, QStringLiteral("{0}"));
+    QCOMPARE(preset.scenarioFormat, QStringLiteral("{{scenario}}"));
+    QCOMPARE(preset.personalityFormat, QStringLiteral("{{personality}}"));
+}
+
+// 旧版本建的行这些列是 NULL（不是空串）：读出来要用 ST 默认，
+// 否则新建的预设会悄悄少掉 [Start a new Chat]。
+void CompletionPresetServiceTest::nullColumnsFallBackToStDefaults()
+{
+    PresetTestProvider provider;
+    ConnectionProviderRegistry::setProvider(&provider);
+
+    CompletionPresetDao presetDao;
+    PromptDao promptDao;
+    presetDao.setConnectionProvider(&provider);
+    promptDao.setConnectionProvider(&provider);
+    CompletionPresetService service(&presetDao, &promptDao);
+
+    QSqlQuery query(provider.connection());
+    QVERIFY(query.exec(QStringLiteral(
+        "INSERT INTO completion_presets (id, name) VALUES ('legacy', 'Legacy')")));
+
+    const CompletionPresetEntity preset = service.getPresetById(QStringLiteral("legacy"));
+    QCOMPARE(preset.name, QStringLiteral("Legacy"));
+    QCOMPARE(preset.newChatPrompt, QStringLiteral("[Start a new Chat]"));
+    QCOMPARE(preset.newExampleChatPrompt, QStringLiteral("[Example Chat]"));
+    QCOMPARE(preset.wiFormat, QStringLiteral("{0}"));
+    QCOMPARE(preset.scenarioFormat, QStringLiteral("{{scenario}}"));
+    QCOMPARE(preset.personalityFormat, QStringLiteral("{{personality}}"));
 }
 
 QTEST_GUILESS_MAIN(CompletionPresetServiceTest)

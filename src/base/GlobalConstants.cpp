@@ -9,7 +9,7 @@ namespace GlobalConstants
         case MessageType::User: return "user";
         case MessageType::Assistant: return "assistant";
         case MessageType::System: return "system";
-        default: return "User";
+        default: return "user";
         }
     }
 

@@ -156,7 +156,10 @@ void CompletionPresetViewModel::selectPreset(const QString& presetId)
 void CompletionPresetViewModel::createPreset()
 {
     CompletionPresetEntity newEntity;
-    newEntity.name="新预设";
+    newEntity.id = Utils::generateUuid();
+    newEntity.name = "新预设";
+    m_service->CreateDefaultPromptEntries(newEntity.id,newEntity.promptOrder);
+
     const QString newId = m_service->createPreset(newEntity);
     if (newId.isEmpty()) {
         return;

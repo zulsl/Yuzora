@@ -59,24 +59,27 @@ public:
     bool maxContextUnlocked=true;           //最大上下文解锁
     int namesBehavior=-1;                   //角色名称行为
     QString continuePostfix;               //继续后缀
-    bool continuePrefill;                  //继续预填充
-    bool squashSystemMessages;            //压缩系统消息
-    bool functionCalling;                  //启用函数调用
-    bool showThoughts;                     //请求思维链
+    bool continuePrefill=false;            //继续预填充
+    bool squashSystemMessages=false;       //压缩系统消息
+    bool functionCalling=false;            //启用函数调用
+    bool showThoughts=false;               //请求思维链
 
     // ========== 顺序列表(顺序条目) ==========
     // QList<PromptOrderEntry> promptOrder;
     QStringList promptOrder;
 
     // ========== 实用提示词 ==========
+    // 默认值必须和 ST 的 default_* 一致（openai.js:107-114,428）：
+    // 这些值只代表"没设置"，显式空串（比如狐神抚的 new_chat_prompt=""）导入后必须保持空，
+    // 所以 PromptBuilder 不再做"空 → 默认"的回退，回退放在这里和 DAO 里。
     QString impersonationPrompt;                //ai帮答提示词
-    QString wiFormat;                           //世界信息格式模板
-    QString scenarioFormat;                     //场景格式模板
-    QString personalityFormat;                  //角色设定格式模板
+    QString wiFormat = QStringLiteral("{0}");   //世界信息格式模板
+    QString scenarioFormat = QStringLiteral("{{scenario}}");    //场景格式模板
+    QString personalityFormat = QStringLiteral("{{personality}}"); //角色设定格式模板
     QString groupNudgePrompt;                   //群聊推进提示词模板
-    QString newChatPrompt;                      //新聊天
-    QString newGroupChatPrompt;                 //新群聊
-    QString newExampleChatPrompt;               //新示例聊天
+    QString newChatPrompt = QStringLiteral("[Start a new Chat]");      //新聊天
+    QString newGroupChatPrompt = QStringLiteral("[Start a new group Chat]"); //新群聊
+    QString newExampleChatPrompt = QStringLiteral("[Example Chat]");   //新示例聊天
     QString continueNudgePrompt;                //继续推进
     // QString//替换空消息
 

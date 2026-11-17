@@ -2,11 +2,66 @@
 #include "WorldInfoBookDao.h"
 #include "Utils.h"
 #include "CharacterService.h"
+#include <QDateTime>
+#include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QSet>
+#include <algorithm>
 #include "ExceptionHandler.h"
+
+namespace {
+
+// ST world 文件（worlds/*.json）的 entries 是 {uid: entry} 对象，
+// 而角色卡 character_book / 我们自己导出的文件是数组。两种都接受。
+// 对象按 uid 数值排序还原插入顺序：条目 order 相同时，稳定排序的结果取决于插入顺序。
+QJsonArray entriesToArray(const QJsonValue& value)
+{
+    if (value.isArray()) return value.toArray();
+
+    QJsonArray result;
+    if (!value.isObject()) return result;
+
+    const QJsonObject obj = value.toObject();
+    QStringList keys = obj.keys();
+    std::sort(keys.begin(), keys.end(), [](const QString& a, const QString& b) {
+        bool okA = false;
+        bool okB = false;
+        const int ia = a.toInt(&okA);
+        const int ib = b.toInt(&okB);
+        if (okA && okB) return ia < ib;
+        return a < b;
+    });
+    for (const QString& key : keys) result.append(obj.value(key));
+    return result;
+}
+
+QStringList jsonStrings(const QJsonValue& value)
+{
+    QStringList out;
+    if (value.isArray()) {
+        for (const QJsonValue& v : value.toArray()) {
+            if (v.isString()) out.append(v.toString());
+            else if (v.isDouble()) out.append(QString::number(v.toInt()));
+        }
+    } else if (value.isString() && !value.toString().isEmpty()) {
+        out.append(value.toString());
+    }
+    return out;
+}
+
+// 角色卡 V2 的字段大多藏在 extensions 里，world 文件则放在顶层。
+// ST 的 convertCharacterBook 就是 "extensions 优先、顶层兜底"，这里保持一致。
+QJsonValue pickValue(const QJsonObject& extensions, const QJsonObject& json,
+                     const char* extKey, const char* key)
+{
+    const QLatin1String ext(extKey);
+    if (extensions.contains(ext)) return extensions.value(ext);
+    return json.value(QLatin1String(key));
+}
+
+} // namespace
 
 // ======================================
 // 单例实例
@@ -426,7 +481,28 @@ int WorldInfoService::importBookFromSillyTavern(const QString& filePath)
         return 0;
     }
 
-    QJsonObject bookData=doc.object().value("originalData").toObject();
+    const QJsonObject root = doc.object();
+    if (root.isEmpty()) {
+        emit operationError("文件读取失败或格式无效");
+        return 0;
+    }
+
+    // ST 的 world 文件长这样：{ "entries": {uid: entry}, "originalData": {角色卡原始书} }
+    // - entries 是内部格式（key / 数字 position / depth），字段最准，优先用；
+    // - originalData 是角色卡 V2 格式（keys / "before_char" / extensions.depth），
+    //   只作为没有 entries 时的兜底。
+    // 我们自己导出的文件是 { name, isEnabled, entries: [...] }。
+    const QJsonObject original = root.value("originalData").toObject();
+    QJsonArray entries = entriesToArray(root.value("entries"));
+    if (entries.isEmpty()) entries = entriesToArray(original.value("entries"));
+
+    QJsonObject bookData;
+    const QString name =
+        original.value("name").toString(root.value("name").toString()).trimmed();
+    bookData["name"] = name.isEmpty() ? QFileInfo(filePath).completeBaseName() : name;
+    if (root.contains("isEnabled")) bookData["isEnabled"] = root.value("isEnabled");
+    else if (original.contains("isEnabled")) bookData["isEnabled"] = original.value("isEnabled");
+    bookData["entries"] = entries;
 
     const QString bookId = importWorldBook(bookData);
     if (bookId.isEmpty()) {
@@ -482,19 +558,72 @@ bool WorldInfoService::exportAllBooksToSillyTavern(const QString& savePath)
 
 QString WorldInfoService::importWorldBook(QJsonObject &bookData)
 {
-    //导入书
     WorldInfoBookEntity book = parseJsonToBook(bookData);
-    if (book.name.isEmpty() || !m_BookDao->insert(book)) {
+    if (book.name.isEmpty()) {
+        emit operationError("导入世界书失败：书名为空");
+        return {};
+    }
+
+    // entries 既可能是数组（角色卡 / 我们的导出），也可能是 {uid: entry} 对象（ST world 文件）
+    const QJsonArray entries = entriesToArray(bookData.value("entries"));
+    if (entries.isEmpty()) {
+        emit operationError("导入世界书失败：没有条目");
+        return {};
+    }
+
+    // 先全部解析，再落库：避免"书插进去了、条目解析失败"留下空壳。
+    // bookId 先留空，确定 book id 之后再回填。
+    QList<WorldInfoEntryEntity> parsed;
+    for (const QJsonValue& e : entries) {
+        if (!e.isObject()) continue;
+        parsed.append(parseJsonToEntry(e.toObject(), QString()));
+    }
+    if (parsed.isEmpty()) {
+        emit operationError("导入世界书失败：条目格式无效");
+        return {};
+    }
+
+    // 同名书就地覆盖：保留 id（角色的 world_book_ids 链接不会断）与启用状态。
+    // 以前每次导入都新建一本，用户想"重新导入修数据"时会得到第二本书、角色还指着旧的。
+    WorldInfoBookEntity existing;
+    for (const WorldInfoBookEntity& b : m_BookDao->selectAll()) {
+        if (b.name == book.name) {
+            existing = b;
+            break;
+        }
+    }
+
+    if (!existing.id.isEmpty()) {
+        book.id = existing.id;
+        book.isEnabled = existing.isEnabled;
+        book.createdAt = existing.createdAt;
+        book.updatedAt = QDateTime::currentDateTime();
+
+        if (!m_BookDao->update(book)) {
+            emit operationError("更新世界书失败");
+            return {};
+        }
+        for (WorldInfoEntryEntity& entry : parsed) entry.bookId = book.id;
+        if (!m_EntryDao->replaceForBook(book.id, parsed)) {
+            emit operationError("替换世界书条目失败");
+            return {};
+        }
+
+        emit bookUpdated(book.id);
+        emit entryListChanged(book.id);
+        emit bookListChanged();
+        qInfo() << "[WorldInfoService] 同名世界书已覆盖更新:" << book.name << "id:" << book.id
+                << "条目数:" << parsed.size();
+        return book.id;
+    }
+
+    if (!m_BookDao->insert(book)) {
         emit operationError("导入世界书失败");
         return {};
     }
 
-    // 导入条目(json数组)
-    QJsonArray entries = bookData.value("entries").toArray();
-    for(const QJsonValue& e : entries)
-    {
-        if (!e.isObject()) continue;
-        WorldInfoEntryEntity entry = parseJsonToEntry(e.toObject(), book.id);
+    for (WorldInfoEntryEntity& entry : parsed) entry.bookId = book.id;
+    for (const WorldInfoEntryEntity& entry : parsed) {
         if (!m_EntryDao->insert(entry)) {
             emit operationError("导入世界书条目失败");
             // 回滚已插入的书，避免留下空壳
@@ -504,7 +633,6 @@ QString WorldInfoService::importWorldBook(QJsonObject &bookData)
     }
 
     emit bookListChanged();
-
     return book.id;
 }
 
@@ -532,6 +660,9 @@ QJsonObject WorldInfoService::bookToStJson(
         entryObj["position"] = static_cast<int>(entry.position);
         entryObj["role"] = static_cast<int>(entry.insertRole);
         entryObj["order"] = entry.sortOrder;
+        entryObj["depth"] = entry.insertDepth;
+        // 内部格式用 disable（取反）；不写的话导出再导入会丢掉"条目被禁用"这个状态
+        entryObj["disable"] = !entry.isEnabled;
         entryObj["probability"] = entry.probability;
         entryObj["selective"] = entry.selective;
         entryObj["selectiveLogic"] = static_cast<int>(entry.selectiveLogic);
@@ -551,7 +682,12 @@ WorldInfoBookEntity WorldInfoService::parseJsonToBook(const QJsonObject& json)
     WorldInfoBookEntity book;
     book.id = Utils::generateUuid();
     book.name = json.value("name").toString().trimmed();
-    book.isEnabled = json.value("isEnabled").toBool(false);
+    // ST 世界书文件本身没有 isEnabled 字段；只有我们自己导出的文件有。
+    book.isEnabled = json.contains("isEnabled")
+        ? json.value("isEnabled").toBool(false)
+        : json.value("is_enabled").toBool(false);
+    book.createdAt = QDateTime::currentDateTime();
+    book.updatedAt = book.createdAt;
     return book;
 }
 
@@ -562,36 +698,94 @@ WorldInfoEntryEntity WorldInfoService::parseJsonToEntry(const QJsonObject& json,
     // entry.CompatibleId;//原版有个兼容id
     entry.bookId = bookId;
 
-    // 关键词转换
-    entry.keywords = Utils::jsonToStringList(json.value("key").toArray());
-    entry.secondaryKeywords = Utils::jsonToStringList(json.value("keysecondary").toArray());
+    // 角色卡 V2 与 ST world 文件是两套字段名：
+    //   V2（character_book）: keys / secondary_keys / position:"before_char" /
+    //                        insertion_order / enabled / extensions.depth ...
+    //   world（worlds/*.json）: key / keysecondary / position:0 / order / disable / depth ...
+    // ST 的 convertCharacterBook 是「extensions 优先、顶层兜底」，这里照做。
+    const QJsonObject ext = json.value("extensions").toObject();
 
-    entry.name = json.value("comment").toString("未命名条目").trimmed();
-    entry.content = json.value("content").toString("");
-    entry.isEnabled = !json.value("disable").toBool(false);
+    entry.keywords = jsonStrings(json.contains("key") ? json.value("key") : json.value("keys"));
+    entry.secondaryKeywords = jsonStrings(json.contains("keysecondary")
+        ? json.value("keysecondary") : json.value("secondary_keys"));
 
-    entry.constant = json.value("constant").toBool();
-    entry.vectorized = json.value("vectorized").toBool();
-    entry.position = static_cast<WorldInfoEntryEntity::Position>(json.value("position").toInt());
-    QJsonValue role = json.value("role");
-    entry.insertRole = role.isNull()
-        ?GlobalConstants::MessageType::Other
-        :static_cast<GlobalConstants::MessageType>(role.toInt());
-    entry.insertDepth = json.value("depth").toInt(4);
-    entry.sortOrder = json.value("order").toInt();
-    entry.useProbability = json.value("useProbability").toBool(false);
-    entry.probability = json.value("probability").toInt(100);
+    entry.name = json.value("comment").toString(json.value("name").toString()).trimmed();
+    if (entry.name.isEmpty()) entry.name = QStringLiteral("未命名条目");
+    entry.content = json.value("content").toString();
 
-    entry.selective = json.value("selective").toBool();
-    entry.selectiveLogic = static_cast<WorldInfoEntryEntity::SelectiveLogic>(json.value("selectiveLogic").toInt());
-    QJsonValue scanDepth = json.value("scanDepth");  entry.scanDepth = scanDepth.isNull()?-1:scanDepth.toInt();
-    //区分大小写（未设置）
-    //全词匹配（未设置）
-    entry.useGroupScoring = json.value("useGroupScoring").toBool(false);
-    entry.automationId = json.value("automationId").toString();
+    // 启用：world 文件用 disable（取反），角色卡用 enabled（缺省 true）
+    if (json.contains("disable"))
+        entry.isEnabled = !json.value("disable").toBool(false);
+    else
+        entry.isEnabled = json.value("enabled").toBool(true);
 
+    entry.constant = json.value("constant").toBool(false);
+    entry.vectorized = pickValue(ext, json, "vectorized", "vectorized").toBool(false);
 
+    // 位置：extensions.position（数字）优先；V2 的 position 是 "before_char"/"after_char"；
+    // world 文件的 position 是数字。ST 对未知字符串按 after 处理。
+    int position = static_cast<int>(WorldInfoEntryEntity::BeforeChar);
+    const QJsonValue extPosition = ext.value("position");
+    const QJsonValue rawPosition = json.value("position");
+    if (!extPosition.isUndefined() && !extPosition.isNull()) {
+        position = extPosition.toInt();
+    } else if (rawPosition.isString()) {
+        position = rawPosition.toString() == QLatin1String("before_char")
+            ? static_cast<int>(WorldInfoEntryEntity::BeforeChar)
+            : static_cast<int>(WorldInfoEntryEntity::AfterChar);
+    } else if (!rawPosition.isUndefined() && !rawPosition.isNull()) {
+        position = rawPosition.toInt();
+    }
+    entry.position = static_cast<WorldInfoEntryEntity::Position>(position);
 
-    entry.extensions = Utils::jsonObjectToVariantMap(json.value("extensions").toObject());
+    const QJsonValue role = pickValue(ext, json, "role", "role");
+    entry.insertRole = (role.isUndefined() || role.isNull())
+        ? GlobalConstants::MessageType::System
+        : static_cast<GlobalConstants::MessageType>(role.toInt());
+
+    const QJsonValue depth = pickValue(ext, json, "depth", "depth");
+    entry.insertDepth = (depth.isUndefined() || depth.isNull()) ? 4 : depth.toInt(4);
+
+    // 角色卡是 insertion_order，world 文件是 order；缺省 100（与实体默认一致）
+    entry.sortOrder = json.contains("order")
+        ? json.value("order").toInt(100)
+        : json.value("insertion_order").toInt(100);
+
+    entry.selective = json.value("selective").toBool(false);
+    entry.selectiveLogic = static_cast<WorldInfoEntryEntity::SelectiveLogic>(
+        pickValue(ext, json, "selectiveLogic", "selectiveLogic").toInt(0));
+
+    entry.useProbability = pickValue(ext, json, "useProbability", "useProbability").toBool(false);
+    entry.probability = pickValue(ext, json, "probability", "probability").toInt(100);
+
+    const QJsonValue scanDepth = pickValue(ext, json, "scan_depth", "scanDepth");
+    entry.scanDepth = (scanDepth.isUndefined() || scanDepth.isNull()) ? -1 : scanDepth.toInt(-1);
+    entry.useGroupScoring = pickValue(ext, json, "use_group_scoring", "useGroupScoring").toBool(false);
+    entry.automationId = pickValue(ext, json, "automation_id", "automationId").toString();
+
+    entry.group = pickValue(ext, json, "group", "group").toString();
+    entry.groupOverride = pickValue(ext, json, "group_override", "groupOverride").toBool(false);
+    entry.groupWeight = pickValue(ext, json, "group_weight", "groupWeight").toInt(0);
+
+    entry.excludeRecursion = pickValue(ext, json, "exclude_recursion", "excludeRecursion").toBool(false);
+    entry.preventRecursion = pickValue(ext, json, "prevent_recursion", "preventRecursion").toBool(false);
+    entry.delayUntilRecursion =
+        pickValue(ext, json, "delay_until_recursion", "delayUntilRecursion").toBool(false);
+    entry.ignoreBudget = pickValue(ext, json, "ignore_budget", "ignoreBudget").toBool(false);
+
+    entry.matchCharacterDescription = ext.value("match_character_description").toBool(false);
+    entry.matchCharacterPersonality = ext.value("match_character_personality").toBool(false);
+    entry.matchScenario = ext.value("match_scenario").toBool(false);
+    entry.matchPersonaDescription = ext.value("match_persona_description").toBool(false);
+    entry.matchCharacterDepthPrompt = ext.value("match_character_depth_prompt").toBool(false);
+    entry.matchCreatorNotes = ext.value("match_creator_notes").toBool(false);
+
+    entry.displayIndex = ext.value("display_index").toInt(0);
+    entry.uid = json.value("uid").toInt(ext.value("uid").toInt(0));
+    entry.sticky = ext.value("sticky").toInt(0);
+    entry.cooldown = ext.value("cooldown").toInt(0);
+    entry.delay = ext.value("delay").toInt(0);
+
+    entry.extensions = Utils::jsonObjectToVariantMap(ext);
     return entry;
 }

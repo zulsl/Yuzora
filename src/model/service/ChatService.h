@@ -128,6 +128,13 @@ private:
     bool insertUserMessage(const QString& content, QString& outMessageId);//追加聊天记录
     bool insertPlaceholderAssistantMessage(QString& outMessageId);//追加助手占位符
 
+    // 构建提示词 → 启动补全。
+    // 提示词构建失败（如固定提示词超出上下文预算，对应 ST 的 TokenBudgetExceededError）
+    // 时把占位消息标记为失败并发 generationFailed，不再把空消息丢给补全器。
+    bool startGeneration(const QString& userInput, const QString& generationType,
+                         const QString& assistantMsgId);
+    void failGeneration(const QString& assistantMsgId, const QString& error);
+
 // DAO依赖
     CharacterDao* m_characterDao = nullptr;
     ChatMessageDao* m_messageDao = nullptr;

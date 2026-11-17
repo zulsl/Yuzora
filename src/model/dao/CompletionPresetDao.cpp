@@ -2,6 +2,19 @@
 #include "DatabaseManager.h"
 #include "Utils.h"
 
+namespace {
+
+// DB 的 NULL 表示"从未设置"（旧版本建的行），此时用 ST 的 default_*；
+// 显式空串是有效值（狐神抚的 new_chat_prompt="" 表示"不要 New Chat 标记"），必须保持空。
+QString pickString(const QSqlQuery& query, const char* column, const QString& fallback)
+{
+    return query.isNull(QLatin1String(column))
+        ? fallback
+        : query.value(QLatin1String(column)).toString();
+}
+
+} // namespace
+
 CompletionPresetDao::CompletionPresetDao(QObject* parent)
     : QObject(parent)
 {
@@ -161,13 +174,15 @@ CompletionPresetEntity CompletionPresetDao::parseFromQuery(const QSqlQuery &quer
     entity.showThoughts = query.value("show_thoughts").toBool();
     entity.promptOrder = Utils::jsonToStringList(query.value("prompt_order"));
     entity.impersonationPrompt = query.value("impersonation_Prompt").toString();
-    entity.wiFormat = query.value("wi_Format").toString();
-    entity.scenarioFormat = query.value("scenario_Format").toString();
-    entity.personalityFormat = query.value("personality_Format").toString();
+    entity.wiFormat = pickString(query, "wi_Format", QStringLiteral("{0}"));
+    entity.scenarioFormat = pickString(query, "scenario_Format", QStringLiteral("{{scenario}}"));
+    entity.personalityFormat = pickString(query, "personality_Format", QStringLiteral("{{personality}}"));
     entity.groupNudgePrompt = query.value("group_nudge_prompt").toString();
-    entity.newChatPrompt = query.value("new_chat_prompt").toString();
-    entity.newGroupChatPrompt = query.value("new_group_chat_prompt").toString();
-    entity.newExampleChatPrompt = query.value("new_example_chat_prompt").toString();
+    entity.newChatPrompt = pickString(query, "new_chat_prompt", QStringLiteral("[Start a new Chat]"));
+    entity.newGroupChatPrompt = pickString(query, "new_group_chat_prompt",
+                                          QStringLiteral("[Start a new group Chat]"));
+    entity.newExampleChatPrompt = pickString(query, "new_example_chat_prompt",
+                                            QStringLiteral("[Example Chat]"));
     entity.continueNudgePrompt = query.value("continue_nudge_prompt").toString();
 
     return entity;

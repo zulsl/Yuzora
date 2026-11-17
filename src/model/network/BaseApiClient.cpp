@@ -1,5 +1,7 @@
 // BaseApiClient.cpp
 #include "BaseApiClient.h"
+#include <QDir>
+#include <QFile>
 #include <QNetworkProxy>
 #include <QNetworkReply>
 #include <QJsonDocument>
@@ -33,7 +35,25 @@ void BaseApiClient::sendChatCompletion(const QList<ChatMessage> &messages)
     QJsonObject bodyJson = buildRequestBody(messages);
     QByteArray payload = QJsonDocument(bodyJson).toJson();
     qDebug() << "发送请求至:" << m_apiConfig.baseDomain;
-    qDebug().noquote() << "请求负载:\n" << payload;
+    qDebug().noquote() << "请求负载(UTF-8):\n" << payload;
+
+
+    // 请求体是 UTF-8 的 QByteArray，这里**不要**包成 QString 再打：
+    // Qt 把 QString 写日志时会先转成本地 8 位编码（中文 Windows 是 GBK），
+    // 在 Qt Creator 的 Application Output（按 UTF-8 解码）里就全是乱码。
+    // 直接打 QByteArray 才是原始 UTF-8 字节；控制台里要正常看就先 chcp 65001。
+    // 想百分之百确认发出去的字节：设 YUZORA_DUMP_REQUEST=1
+    // <数据目录>/logs/request_last.json，用 UTF-8 编辑器打开即可。
+    if (payload.contains("\xEF\xBF\xBD")) {
+        qWarning() << "[BaseApiClient] 请求体里出现 U+FFFD，说明上游文本已损坏（不是编码显示问题）";
+    }
+    if (qEnvironmentVariableIsSet("YUZORA_DUMP_REQUEST")) {//设 YUZORA_DUMP_REQUEST=1，会落盘到
+        // 落在当前工作目录（Qt Creator 里就是构建目录）
+        QFile dumpFile(QDir::current().filePath(QStringLiteral("request_last.json")));
+        if (dumpFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
+            dumpFile.write(payload);
+    }
+
 
     //接收post响应
     m_currentReply = m_networkManager->post(request, payload);
@@ -41,12 +61,17 @@ void BaseApiClient::sendChatCompletion(const QList<ChatMessage> &messages)
     // 连接信号
     connect(m_currentReply, &QNetworkReply::readyRead, this, &BaseApiClient::onReadyRead);
     connect(m_currentReply, &QNetworkReply::finished, this, &BaseApiClient::onFinished);
-    // 错误信号仅用于日志，实际处理在 finished 中
+    // 错误信号仅用于日志，实际处理和上报在 onFinished 里做。
+    // 以前这里也 emit requestFailed(...)，一次失败会走两遍 error 流程：
+    // 第二次进来时 runner 已经 deleteLater + cancelAllRequests()，
+    // 于是对已经出错的 reply 再 abort()，Qt 报
+    // "QNetworkReplyImplPrivate::error: Internal problem, this method must only be called once."
     connect(m_currentReply, QOverload<QNetworkReply::NetworkError>::of(&QNetworkReply::errorOccurred),
         this, [this](QNetworkReply::NetworkError err) {
             Q_UNUSED(err);
-            qDebug() << "发生网络错误（将在完成时处理）:" << m_currentReply->errorString();
-            emit requestFailed(m_currentReply->errorString());
+            if (!m_currentReply) return;
+            qDebug() << "发生网络错误（将在完成时处理）:"
+                     << int(m_currentReply->error()) << m_currentReply->errorString();
         });
 }
 
@@ -103,7 +128,10 @@ void BaseApiClient::cancelAllRequests()
     if (m_currentReply) {
         // 断开所有连接，避免槽被触发
         disconnect(m_currentReply, nullptr, this, nullptr);
-        m_currentReply->abort();
+        // 已经结束（尤其是已经出错的 reply）不要再 abort：
+        // Qt 会报 "Internal problem, this method must only be called once."
+        if (!m_currentReply->isFinished())
+            m_currentReply->abort();
         m_currentReply->deleteLater();
         m_currentReply = nullptr;
         // 清空缓冲区
@@ -214,8 +242,7 @@ void BaseApiClient::onReadyRead()
 
 void BaseApiClient::onFinished()
 {
-    qDebug()<<"当前m_finishedHandled:"<<m_finishedHandled;
-    qDebug()<<"当前m_cancelled:"<<m_finishedHandled;
+    qDebug() << "onFinished, 已处理过:" << m_finishedHandled;
 
     if (m_finishedHandled || !m_currentReply) return;
     m_finishedHandled = true;
@@ -231,20 +258,44 @@ void BaseApiClient::onFinished()
 
     //请求错误
     if (err != QNetworkReply::NoError) {
-        // 尝试读取错误响应体
-        QByteArray errorBody = reply->readAll();
+        // 错误响应体可能已经被 onReadyRead 读进 m_streamBuffer 了，
+        // 此时 reply->readAll() 是空的——两个都要看，否则永远显示"（响应体为空）"。
+        QByteArray errorBody = m_streamBuffer;
+        errorBody += reply->readAll();
+        m_streamBuffer.clear();
         QString errorMsg = reply->errorString();
+
+        // HTTP/2 没有 reason phrase，Qt 的 errorString 会变成
+        // "server replied: \"\""，看不出到底是 400 还是 401。把状态码和
+        // 响应体里的 error.message 都补进去。
+        const QVariant statusVar = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+        const int status = statusVar.isValid() ? statusVar.toInt() : 0;
+
         if (!errorBody.isEmpty()) {
             QJsonDocument doc = QJsonDocument::fromJson(errorBody);
             if (doc.isObject()) {
                 QJsonObject obj = doc.object();
                 if (obj.contains("error")) {
                     QJsonObject errObj = obj.value("error").toObject();
-                    errorMsg = errObj.value("message").toString(errorMsg);
+                    const QString message = errObj.value("message").toString();
+                    if (!message.isEmpty()) errorMsg = message;
                 }
             }
         }
-        // cancelAllRequests();
+
+        if (status > 0) {
+            errorMsg = QStringLiteral("HTTP %1：%2").arg(status).arg(errorMsg);
+        }
+        if (errorBody.isEmpty()) {
+            errorMsg += QStringLiteral("（响应体为空）");
+        } else {
+            Utils::writeLog("ERROR", "BaseApiClient",
+                            QStringLiteral("请求失败 status=%1 body=%2")
+                                .arg(status)
+                                .arg(QString::fromUtf8(errorBody.left(2000))));
+        }
+
+        qWarning().noquote() << "请求失败:" << errorMsg;
         emit requestFailed(errorMsg);
         return;
     }

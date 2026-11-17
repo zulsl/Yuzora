@@ -94,7 +94,7 @@ QML_ELEMENT
 
     // 聊天消息类型枚举
     enum MessageType {//聊天角色
-        System = 0,         //系统提示词
+        System = 0,     //系统提示词
         User,           //用户
         Assistant,      //ai回复
         ToolCall,       //工具调用
@@ -130,7 +130,7 @@ QML_ELEMENT
     // 提示词模板类型枚举
     enum class PromptTemplateType {
         Alpaca,     //Alpaca 模型专用提示词格式(老旧 7B 老模型)
-        ChatML,     //OpenAI 通用聊天模板格式(包括:通义千问、Qwen、文心一言、智谱、DeepSeek、百川)
+        ChatML,     //OpenAI 通用聊天模板格式(包括:通义千问、文心一言、智谱、DeepSeek、百川)
         Llama2,     //Meta LLaMA 2 模型专用格式(老式)
         Mistral,    //Mistral 模型专用格式
         GeminiPrompt,     //Gemini

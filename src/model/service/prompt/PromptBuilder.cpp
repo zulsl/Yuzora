@@ -1,11 +1,36 @@
 #include "PromptBuilder.h"
 #include "Utils.h"
 #include <QDateTime>
+#include <QCryptographicHash>
 #include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <algorithm>
 #include <limits>
 #include "GlobalConstants.h"
-#include "AppException.h".h"
+#include "AppException.h"
+
+namespace {
+
+// ST openai.js:789-801 formatWorldInfo(value, {wiFormat})：
+//   - value 为空 → ''
+//   - format 去空白后为空 → value 原样（默认 '{0}' 等价于不包装）
+//   - 否则把所有 {0} 替换成 value；format 里没有 {0} 时就只剩 format 本身，
+//     ST 的 stringFormat 也是这个行为，不要自作聪明改成"没占位符就不包"。
+QString formatWorldInfo(const QString& value, const QString& format)
+{
+    if (value.isEmpty()) return {};
+    if (format.trimmed().isEmpty()) return value;
+
+    QString out = format;
+    out.replace(QStringLiteral("{0}"), value);
+    return out;
+}
+
+} // namespace
 
 // ======================================
 // 单例实现
@@ -45,105 +70,88 @@ QList<ChatMessage> PromptBuilder::buildChatMessages(
     const WorldInfoResult & wi,
     const QList<PromptEntity> & allPrompts,
     const QString & personaDesc,
-    const QString & generationType)
+    const QString & generationType,
+    const QString & userName)
 {
     // Persona 还没有落到设置里，变量表先按 "User" 走；接入 persona 后改 getPromptVariables
     Q_UNUSED(personaDesc)
 
-    //准备提示词
-    QList<PromptEntity> prompts=preparePromptCollection(preset,wi,character,allPrompts);
+    const QString type = generationType.trimmed().isEmpty()
+        ? QStringLiteral("normal") : generationType.trimmed();
+
+    // 变量表：角色字段 + 用户 + 聊天级宏（lastUserMessage …）。
+    // 只算一次，下面所有步骤共用同一份，避免各函数各自 getPromptVariables 得到不一致的变量表。
+    QVariantMap vars = getPromptVariables(character, userName);
+    const QVariantMap chatMacros = getChatMacros(history, userInput);
+    for (auto it = chatMacros.cbegin(); it != chatMacros.cend(); ++it)
+        vars.insert(it.key(), it.value());
+
+    //准备提示词（generationType 参与 injection_trigger 过滤）
+    QList<PromptEntity> prompts = preparePromptCollection(
+        preset, wi, character, allPrompts, type, vars);
 
     ChatCompletion cc(preset.maxContextToken, preset.maxResponseToken);
 
-    //填充聊天消息
+    //打包填充数据
     PopulateContext pCtx;
     pCtx.wi = &wi;
-    pCtx.userInput = userInput;
-    pCtx.type = generationType.trimmed().isEmpty()
-        ? QStringLiteral("normal") : generationType.trimmed();
-    pCtx.messageExamples = parseExampleDialogue(character);
+    pCtx.userInput = userInput;//已添加至聊天历史
+    pCtx.type = type;
+    pCtx.userName = userName;//可扩展为用户实体
+    // 示例区：角色卡示例 + 世界书 EMTop/EMBottom（ST 把 EM 条目并进示例文本再一起解析）
+    pCtx.messageExamples = parseExampleDialogue(character, wi, vars);
 
-    return populateChatCompletion(prompts,cc,preset,history,userInput,character,wi,pCtx);
-    //废弃
-    // QList<ChatMessage> result;
-    // addFixedMessage(result, budget, wi.worldInfoBefore);
-    // addFixedMessage(result, budget, resolvePromptContent(preset, "main", character.systemPrompt));
-    // addFixedMessage(result, budget, wi.worldInfoAfter);
-    // addFixedMessage(result, budget, character.description);
-    // addFixedMessage(result, budget, character.personality);
-    // addFixedMessage(result, budget, character.scenario);
-    // addFixedMessage(result, budget, personaDesc);
-    // ============================================================
-    // 阶段 2：nsfw
-    // ============================================================
-    // addFixedMessage(result, budget, resolvePromptContent(preset, "nsfw"));
-    // ============================================================
-    // 阶段 3：用户自定义的相对位置提示（systemPrompt=false 且 Relative）
-    // ============================================================
-    // QSet<QString> builtinIds = {"main", "nsfw", "jailbreak"};
-    // for (const auto& p : m_prompts) {
-    //     if (p.system_prompt) continue;
-    //     if (!p.isActive) continue;
-    //     if (p.injection_position == 1) continue;
-    //     if (builtinIds.contains(p.identifier)) continue;
-    //     addFixedMessage(result, budget, p.content, p.role, QString());
-    // }
-    // for (const auto& p : preset.prompts) {
-    // ============================================================
-    // 阶段 4：对话示例（可选，放历史前）
-    // ============================================================
-    // if (!character.exampleDialogue.isEmpty()) {
-    //     addDialogueExamples(result, budget,character.exampleDialogue,character.name,"User");
-    // }
-    // ============================================================
-    // 阶段 5：对话历史（带预算，从新到旧填充）
-    // ============================================================
-    // 有 userInput 且最后一条不是 user 时，补一条 user 消息
-    // bool needSyntheticUser = !userInput.isEmpty() && (history.isEmpty() || history.last().type
-    //     != GlobalConstants::MessageType::User);
-    // addChatHistory(result, budget, history, userInput, /*addNewChatPrompt=*/false);
-    // // 若历史被裁剪、最后一条不是 user，则补上 userInput
-    // if (needSyntheticUser && budget.canAfford(estimateTokens(userInput) + PER_MESSAGE_OVERHEAD)) {
-    //     ChatMessage um;
-    //     um.role = GlobalConstants::MessageType::User;
-    //     um.appendText(userInput);
-    //     int t = estimateTokens(um.parts.first().data) + PER_MESSAGE_OVERHEAD;
-    //     result.append(um);
-    //     budget.consume(t);
-    // }
-    // // ============================================================
-    // // 阶段 6：in-chat 绝对注入（预设 Absolute + 世界书 depth）
-    // // ============================================================
-    // applyInChatInjections(result, budget, preset, wi);
-    // // ============================================================
-    // // 阶段 7：jailbreak（默认最后）
-    // // ============================================================
-    // addFixedMessage(result, budget,
-    //     resolvePromptContent(preset, "jailbreak",character.postHistoryInstructions));
-    // return result;
+    QStringList messageIdentifiers;
+    QList<ChatMessage> built = populateChatCompletion(
+        prompts, cc, preset, history, userInput, character, wi, pCtx, vars,
+        &messageIdentifiers);
+
+    writePromptTrace(preset, allPrompts, type, built, messageIdentifiers);
+    return built;
 }
 
 
 QList<PromptEntity> PromptBuilder::preparePromptCollection(
     const CompletionPresetEntity & preset,
     const WorldInfoResult & wi,const CharacterEntity & character,
-    const QList<PromptEntity> & uPrompts)
+    const QList<PromptEntity> & uPrompts,
+    const QString & generationType,const QVariantMap & vars)
 {
     QList<PromptEntity> systemPrompts;//临时系统提示词集合
 
     // ============================================================
     // 构造 systemPrompts 数组
     // ============================================================
-    appendToCollection(systemPrompts,wi.worldInfoBefore,"worldInfoBefore");
-    appendToCollection(systemPrompts,wi.worldInfoAfter,"worldInfoAfter");
+    // ST openai.js:1420-1421：worldInfoBefore/After 会先过 formatWorldInfo(wi_format)。
+    // 本预设的 wi_format 是 "<World_Lore_Database>\n{0}\n</World_Lore_Database>"，
+    // 且 order 里 before/after 紧挨着 → ST 请求里就是两个 <World_Lore_Database> 块。
+    appendToCollection(systemPrompts,formatWorldInfo(wi.worldInfoBefore,preset.wiFormat),"worldInfoBefore");
+    appendToCollection(systemPrompts,formatWorldInfo(wi.worldInfoAfter,preset.wiFormat),"worldInfoAfter");
     appendToCollection(systemPrompts,character.description,"charDescription");
-    appendToCollection(systemPrompts,character.personality,"charPersonality");//个性
-    appendToCollection(systemPrompts,character.scenario,"scenario");//场景
+    // ST openai.js:1410-1411：scenario/personality 有格式模板时，正文用模板
+    //（模板里的 {{scenario}} / {{personality}} 由下面的统一宏替换解析）。
+    const QString charPersonalityText =
+        !character.personality.isEmpty() && !preset.personalityFormat.trimmed().isEmpty()
+            ? preset.personalityFormat : character.personality;
+    const QString scenarioText =
+        !character.scenario.isEmpty() && !preset.scenarioFormat.trimmed().isEmpty()
+            ? preset.scenarioFormat : character.scenario;
+    appendToCollection(systemPrompts,charPersonalityText,"charPersonality");//个性
+    appendToCollection(systemPrompts,scenarioText,"scenario");//场景
 
-    appendToCollection(systemPrompts,"","impersonate");//(模仿)
+    // ST openai.js:1417-1431：这几个锚点的正文来自 oai_settings，不是提示词表里的 content
+    appendToCollection(systemPrompts,preset.impersonationPrompt,"impersonate");//(模仿)
     appendToCollection(systemPrompts,"","quietPrompt");//(静默提示)
-    appendToCollection(systemPrompts,"","groupNudge");//
+    appendToCollection(systemPrompts,preset.groupNudgePrompt,"groupNudge");//群聊 nudge
     appendToCollection(systemPrompts,"","bias",GlobalConstants::MessageType::Assistant);//偏置
+
+    // 两个运行时占位锚点：正文由 populateChatHistory / populateDialogueExamples 填。
+    // 这里等价地在装配时按 canonical 位置补上——否则这两个组不在 order 里，
+    // build() 只能按"创建顺序"把它们追加到末尾（历史和示例会跑到 controlPrompts 后面）。
+    appendToCollection(systemPrompts,"","dialogueExamples",
+                       GlobalConstants::MessageType::System,QString(),false);
+    appendToCollection(systemPrompts,"","chatHistory",
+                       GlobalConstants::MessageType::System,QString(),false);
 
 
     // ============================================================
@@ -175,65 +183,31 @@ QList<PromptEntity> PromptBuilder::preparePromptCollection(
         promptEntityMap[pe.identifier] = pe;
     }
 
-    // ST 的默认顺序。顺序表里缺的系统锚点按这个顺序**插到对应位置**，
-    // 而不是一律追加到末尾——否则 worldInfoAfter 会跑到角色描述前面、
-    // jailbreak 会跑到聊天记录前面（都不是 ST 的语义）。
-    static const QStringList kCanonicalOrder = {
-        QStringLiteral("main"),
-        QStringLiteral("worldInfoBefore"),
-        QStringLiteral("personaDescription"),
-        QStringLiteral("charDescription"),
-        QStringLiteral("charPersonality"),
-        QStringLiteral("scenario"),
-        QStringLiteral("enhanceDefinitions"),
-        QStringLiteral("nsfw"),
-        QStringLiteral("worldInfoAfter"),
-        QStringLiteral("dialogueExamples"),
-        QStringLiteral("chatHistory"),
-        QStringLiteral("jailbreak"),
-    };
-    auto canonicalIndex = [](const QString& id) {
-        const int idx = kCanonicalOrder.indexOf(id);
-        return idx < 0 ? std::numeric_limits<int>::max() : idx;
-    };
-
     QList<PromptEntity> result;//排序完毕的提示词列表
-    QSet<QString> seenIds;
+    QSet<QString> seenIds;//已处理的条目
 
     // 按顺序表取出用户配置的提示词。
     // 顺序表里出现、但预设里没有对应提示词的项（系统锚点/未知项）先跳过，
     // 交给下面的 systemPrompts / mandatory 补齐——否则会留下 identifier 为空的
     // 空壳，并把 seenIds 占掉，让真正的锚点永远补不进来。
     QStringList promptOrder = preset.promptOrder;
-    // 如果 order 为空，用 prompts 的原始顺序作为 后备方案
+    // ST：prompt_order 为空时由 sanitizeServiceSettings 补默认顺序（PromptManager.js），
+    // 这里退化成"提示词表原始顺序"，不再抛异常把整条发送链路打断。
     if (promptOrder.isEmpty()) {
-        THROW(UnknownError,"promptOrder为空");
         for (const PromptEntity & pe : uPrompts) promptOrder.append(pe.identifier);
     }
+    //按顺序取出Prompt
     for (const QString& po : promptOrder) {
         if (seenIds.contains(po)) continue;
         if (!promptEntityMap.contains(po)) continue;
-        result.append(promptEntityMap.value(po));
+        const PromptEntity& pe = promptEntityMap.value(po);
+        // ST getPromptCollection：injection_trigger 非空时，只在列出的生成类型下生效
+        if (!pe.injection_trigger.isEmpty() && !pe.injection_trigger.contains(generationType)) {
+            continue;
+        }
+        result.append(pe);
         seenIds.insert(po);
     }
-
-    // 按 canonical 顺序插入一条提示词：插到"最后一个 canonical 不比它靠后"的项之后。
-    // 这样即使用户在顺序表里插了自定义提示词（canonical 未知），锚点也会落在
-    // 它应该挨着的那条附近，而不是一律跑到末尾。
-    auto insertByCanonical = [&](const PromptEntity& p) {
-        const int myIdx = canonicalIndex(p.identifier);
-        int insertAt = 0;
-        bool found = false;
-        for (int i = 0; i < result.size(); ++i) {
-            if (canonicalIndex(result[i].identifier) <= myIdx) {
-                insertAt = i + 1;
-                found = true;
-            }
-        }
-        if (!found) insertAt = 0;
-        result.insert(insertAt, p);
-        seenIds.insert(p.identifier);
-    };
 
     // systemPrompts：顺序表里已配同名提示词的只覆盖内容（角色卡字段以实体为准），
     // 没配过的按 canonical 位置补进去。
@@ -251,34 +225,34 @@ QList<PromptEntity> PromptBuilder::preparePromptCollection(
             }
             continue;
         }
-        insertByCanonical(sysP);
+        insertByCanonical(result,seenIds,sysP);
     }
 
-    //补齐 mandatory
-    const QStringList mandatory = {
-        "main", "nsfw", "jailbreak", "chatHistory", "dialogueExamples"
-    };
-    for (const QString& id : mandatory) {
-        if (seenIds.contains(id)) continue;
-        PromptEntity p;
-        p.identifier = id;
-        p.system_prompt = true;
-        if (id == "chatHistory" || id == "dialogueExamples") {
-            p.marker = true;
-        } else if (promptEntityMap.contains(id)) {
-            const auto& pe = promptEntityMap[id];
-            p.content = pe.content;
-            p.role = pe.role;
-        } else if (id == "main") {
-            p.content = QStringLiteral(
-                "Write {{char}}'s next reply in a fictional chat between {{char}} and {{user}}.");
-        }
-        // enabled 默认 true
-        insertByCanonical(p);
-    }
+    //补齐 强制提示词,强制注入预设提示词条目
+    // const QStringList mandatory = {
+    //     "main", "nsfw", "jailbreak", "chatHistory", "dialogueExamples"
+    // };
+    // for (const QString& id : mandatory) {
+    //     if (seenIds.contains(id)) continue;
+    //     PromptEntity p;
+    //     p.identifier = id;
+    //     p.system_prompt = true;
+    //     if (id == "chatHistory" || id == "dialogueExamples") {
+    //         p.marker = true;
+    //     } else if (promptEntityMap.contains(id)) {
+    //         const auto& pe = promptEntityMap[id];
+    //         p.content = pe.content;
+    //         p.role = pe.role;
+    //     } else if (id == "main") {
+    //         p.content = QStringLiteral(
+    //             "Write {{char}}'s next reply in a fictional chat between {{char}} and {{user}}.");
+    //     }
+    //     // enabled 默认 true
+    //     insertByCanonical(result,seenIds,p);
+    // }
 
 
-    //== 应用角色卡覆盖（main 和 jailbreak）==
+    // ===== 应用角色卡覆盖（main 和 jailbreak）=====
     if (!character.systemPrompt.isEmpty()) {
         for (auto& p : result) {
             if (p.identifier == "main" && !p.forbid_overrides) {
@@ -296,33 +270,17 @@ QList<PromptEntity> PromptBuilder::preparePromptCollection(
         }
     }
 
-    // 主提示词兜底：顺序表里有 main、但内容是空串（或被禁用）时，用 ST 的默认文案。
-    // 否则模型收到的系统区里完全没有"你扮演谁、怎么回复"的指令。
-    {
-        bool hasMainContent = false;
-        for (const PromptEntity& p : result) {
-            if (p.identifier == QStringLiteral("main") && !p.content.trimmed().isEmpty()) {
-                hasMainContent = true;
-                break;
-            }
-        }
-        if (!hasMainContent) {
-            for (PromptEntity& p : result) {
-                if (p.identifier != QStringLiteral("main")) continue;
-                p.content = QStringLiteral(
-                    "Write {{char}}'s next reply in a fictional chat between {{char}} and {{user}}.");
-                p.isActive = true;
-                break;
-            }
-        }
-    }
 
-    // 宏替换（{{char}} / {{user}} / {{description}} …）。
-    // ST 对系统区、角色卡字段、世界书内容都做同样的替换；这里统一收口在返回前。
-    const QVariantMap vars = getPromptVariables(character);
+    // 宏替换（{{char}} / {{user}} / {{description}} / {{setvar}} …）。
+    // 关键：ST 只为「集合里的提示词」调用 preparePrompt（PromptManager.js:1537-1556），
+    // 而被禁用的提示词**不在集合里**——它们既不发送，也**不执行 {{setvar}}**。
+    // 以前这里无条件替换所有 order 条目，导致「关掉的提示词」里的 setvar 仍然生效，
+    // 把 {{getvar}} 渲染出 ST 根本不会有的文本（实测：actingsystem / hugou / huying / kill1）。
+    // main 是特例：ST 即使它被禁用也会保留一个空壳条目。
     for (PromptEntity& p : result) {
-        if (!p.content.isEmpty())
-            p.content = substituteParams(p.content, vars);
+        if (p.content.isEmpty()) continue;
+        if (!p.isActive && p.identifier != QLatin1String("main")) continue;
+        p.content = substituteParams(p.content, vars);
     }
 
     return result;
@@ -334,12 +292,16 @@ QList<ChatMessage> PromptBuilder::populateChatCompletion(
     const QList<ChatMessageEntity> & history,const QString & userInput,
     const CharacterEntity & character,
     const WorldInfoResult& wi,
-    const PopulateContext& pCtx)
+    const PopulateContext& pCtx,
+    const QVariantMap& vars,
+    QStringList* outIdentifiers)
 {
     Q_UNUSED(userInput)
+    Q_UNUSED(character)
 
-    // 变量表：世界书深度注入里的 {{char}} 之类也要替换
-    const QVariantMap vars = getPromptVariables(character);
+    // 变量表由 buildChatMessages 统一算好传进来（角色字段 + 聊天宏）；
+    // absolute 提示词在 preparePromptCollection 里已经替换过一次，这里不重复替换（ST 同样只替换一次）。
+    // 世界书深度注入的条目仍要用当前（含 setvar 结果）的变量表替换。
 
     // ============================================================
     // 步骤 1：按 prompts 的顺序把内容填进同名组
@@ -349,7 +311,7 @@ QList<ChatMessage> PromptBuilder::populateChatCompletion(
     // 导致 worldInfoBefore 被 main 顶掉、dialogueExamples 顶掉别人的提示词。
     QStringList order;
     QMap<QString, PromptEntity> promptMap;
-    QList<PromptEntity> absolutePrompts;
+    QList<PromptEntity> absolutePrompts;//(聊天中)注入列表
 
     for (const PromptEntity& p : prompts) {
         if (p.identifier.isEmpty()) continue;
@@ -362,11 +324,26 @@ QList<ChatMessage> PromptBuilder::populateChatCompletion(
             continue;
         }
 
-        // 被禁用的提示词不发送（main 也在内：空内容时下面有默认文案兜底）
+        // ST 的 control 提示不按集合位置发：
+        //   impersonate / quietPrompt → controlPrompts（always last）
+        //   bias → 作为 assistant 消息追加在最后
+        //   groupNudge → 群聊时并进 chatHistory
+        // 这里统一跳过，交给下面步骤 2 处理，避免同一条发两遍。
+        if (p.identifier == QLatin1String("impersonate")
+            || p.identifier == QLatin1String("quietPrompt")
+            || p.identifier == QLatin1String("groupNudge")
+            || p.identifier == QLatin1String("bias")) {
+            continue;
+        }
+
+        // 被禁用的提示词不发送
         if (!p.isActive) continue;
 
-        const QString content = p.content.trimmed();
-        if (content.isEmpty()) continue;
+        // 内容按原样进组（ST 不 trim prompt 正文：预设里用 " " 占位的条目
+        // 在 ST 里真的会发出去，squash 之后表现为一条消息里的空行）
+        const QString& content = p.content;
+        // 空的 system 提示直接丢；空的 user/assistant 提示要留着当合并屏障（ST 语义）
+        if (content.isEmpty() && p.role == GlobalConstants::MessageType::System) continue;
 
         SMessage msg;
         msg.identifier = p.identifier;
@@ -385,10 +362,11 @@ QList<ChatMessage> PromptBuilder::populateChatCompletion(
         order.append(QStringLiteral("controlPrompts"));
 
     // 2.1 impersonate(模仿)
+    // ST 从集合里取 impersonate（openai.js:1240）：被禁用时集合里没有它 → 不发。
     if (pCtx.type == QStringLiteral("impersonate")
         && promptMap.contains(QStringLiteral("impersonate"))) {
         const PromptEntity& p = promptMap[QStringLiteral("impersonate")];
-        const QString content = p.content.trimmed();
+        const QString content = p.isActive ? p.content.trimmed() : QString();
         if (!content.isEmpty()) {
             SMessage m;
             m.identifier = p.identifier;
@@ -423,14 +401,12 @@ QList<ChatMessage> PromptBuilder::populateChatCompletion(
     QList<ChatMessage> historyAsMessages = convertHistoryToMessages(history);
 
     // ============================================================
-    // 步骤 4：continue 相关（nudge / prefill）
+    // 步骤 4：continue 相关（prefill / nudge）
     // ============================================================
     if (pCtx.type == QStringLiteral("continue")) {
-        // continuePrefill：把最后一条 assistant 消息移出历史，作为 assistant 角色预填。
-        // 旧实现直接 takeLast()，最后一条可能是用户消息，等于把用户发言伪装成 AI 的续写。
-        if (preset.continuePrefill
-            && !historyAsMessages.isEmpty()
-            && historyAsMessages.last().role == GlobalConstants::MessageType::Assistant) {
+        // prefill：把**最新一条**消息（不限角色，ST 就是 messages.shift()）移出历史，
+        // 作为预填追加到 controlPrompts 末尾。旧实现要求必须是 assistant，用户消息时行为不同。
+        if (preset.continuePrefill && !historyAsMessages.isEmpty()) {
             const ChatMessage lastMsg = historyAsMessages.takeLast();
             SMessage m;
             m.identifier = QStringLiteral("continuePrefill");
@@ -439,14 +415,47 @@ QList<ChatMessage> PromptBuilder::populateChatCompletion(
             m.tokens = estimateTokens(m.content) + PER_MESSAGE_OVERHEAD;
             chatCompletion.insert(m, QStringLiteral("controlPrompts"));
         } else if (!preset.continueNudgePrompt.trimmed().isEmpty()) {
-            // 非 prefill 模式：用 continue nudge 提示模型接着写
+            // 非 prefill：ST 把最新一条消息从历史里摘出来，和 nudge 一起放进独立的
+            // continueNudge 集合，整体排在 controlPrompts 之前（openai.js:911-931）。
+            const ChatMessage lastMsg = historyAsMessages.isEmpty()
+                ? ChatMessage() : historyAsMessages.takeLast();
+            const QString lastText = lastMsg.textContent().trimmed();
+
+            chatCompletion.ensureGroup(QStringLiteral("continueNudge"));
+            if (!lastText.isEmpty()) {
+                SMessage lm;
+                lm.identifier = QStringLiteral("continueNudge-last");
+                lm.role = lastMsg.role;
+                lm.content = lastText;
+                lm.tokens = estimateTokens(lm.content) + PER_MESSAGE_OVERHEAD;
+                chatCompletion.insert(lm, QStringLiteral("continueNudge"));
+            }
+
+            // ST 支持 {{lastChatMessage}}
+            QVariantMap nudgeVars = vars;
+            nudgeVars.insert(QStringLiteral("lastChatMessage"), lastText);
             SMessage m;
             m.identifier = QStringLiteral("continueNudge");
             m.role = GlobalConstants::MessageType::System;
-            m.content = preset.continueNudgePrompt.trimmed();
+            m.content = substituteParams(preset.continueNudgePrompt.trimmed(), nudgeVars).trimmed();
             m.tokens = estimateTokens(m.content) + PER_MESSAGE_OVERHEAD;
-            chatCompletion.insert(m, QStringLiteral("controlPrompts"));
+            chatCompletion.insert(m, QStringLiteral("continueNudge"));
+
+            const int controlIdx = order.indexOf(QStringLiteral("controlPrompts"));
+            order.insert(controlIdx < 0 ? order.size() : controlIdx,
+                         QStringLiteral("continueNudge"));
         }
+    }
+
+    // 在"固定提示词本身装不进预算"时直接中止本次生成
+    //（openai.js add() → checkTokenBudget() → TokenBudgetExceededError），
+    // 这里对齐成抛异常，由 ChatService 转成 generationFailed。
+    if (chatCompletion.isOverBudget()) {
+        THROW(PromptBuilderError, QStringLiteral(
+            "提示词超出上下文预算：固定提示词占 %1 tokens，预算只有 %2 tokens。"
+            "请调大上下文长度，或禁用部分提示词。")
+                  .arg(chatCompletion.totalTokens())
+                  .arg(chatCompletion.budget()));
     }
 
     // ============================================================
@@ -456,44 +465,193 @@ QList<ChatMessage> PromptBuilder::populateChatCompletion(
         absolutePrompts, historyAsMessages, wi, vars);
 
     // ============================================================
-    // 步骤 6：示例 + 历史（各自填自己的组，相对顺序由 prompts 决定）
+    // 步骤 6：历史 + 示例（各自填自己的组，相对顺序由 prompts 决定）
+    // ST 的顺序：默认先历史后示例（pin_examples 时反过来，这里还没实现那个开关）。
+    // 某一段对应的提示词被禁用时整段不发送（ST 的两个 populate 函数开头就 return）。
+    // 提示词表里完全没有这两条时按"没配"处理、仍然发送，避免残破预设把整段历史丢掉。
     // ============================================================
-    populateChatHistory(injectedMessages, chatCompletion, preset);
-    populateDialogueExamples(pCtx.messageExamples, chatCompletion, preset, character);
+    const auto sectionEnabled = [&promptMap](const QString& identifier) {
+        const auto it = promptMap.constFind(identifier);
+        return it == promptMap.constEnd() || it->isActive;
+    };
 
-    // 世界书里位置是"示例消息之前/之后"的条目：旧实现匹配出来后无人消费，直接丢了。
-    // 这里把它们塞进示例区（EMTop 前插、EMBottom 后插）。
-    for (const WorldInfoExample& example : wi.worldInfoExamples) {
-        const QString content = substituteParams(example.content, vars).trimmed();
-        if (content.isEmpty()) continue;
-
-        SMessage m;
-        m.identifier = QStringLiteral("worldInfoExample");
-        m.role = GlobalConstants::MessageType::System;
-        m.content = content;
-        m.tokens = estimateTokens(content) + PER_MESSAGE_OVERHEAD;
-
-        chatCompletion.ensureGroup(QStringLiteral("dialogueExamples"));
-        if (!order.contains(QStringLiteral("dialogueExamples")))
-            order.append(QStringLiteral("dialogueExamples"));
-        chatCompletion.insert(
-            m, QStringLiteral("dialogueExamples"),
-            example.position == WorldInfoEntryEntity::EMTop ? ChatCompletion::Pos::Start
-                                                            : ChatCompletion::Pos::End);
-    }
+    if (sectionEnabled(QStringLiteral("chatHistory")))
+        populateChatHistory(injectedMessages, chatCompletion, preset, vars);
+    if (sectionEnabled(QStringLiteral("dialogueExamples")))
+        populateDialogueExamples(pCtx.messageExamples, chatCompletion, preset, character, vars);
 
     // ============================================================
     // 步骤 7：扁平化
     // ============================================================
-    return chatCompletion.build(order);
+    // ST 默认 squash_system_messages=true（预设里的字段），把连续的 system 消息
+    // 用 '\n' 拼成一条。A.U.T.O. 这类"一条提示拆成几十条 prompt"的预设全靠它。
+    return chatCompletion.build(order, preset.squashSystemMessages, outIdentifiers);
 }
 
 // ============================================================
-// 变量替换
+// 变量替换（SillyTavern 宏语义，见 MacroEngine.h / docs/MACRO_ENGINE.md）
 // ============================================================
-QString PromptBuilder::substituteParams(const QString& input, const QVariantMap& vars) const
+QString PromptBuilder::substituteParams(const QString& input, const QVariantMap& vars)
 {
-    return Utils::replacePromptVariables(input, vars);
+    if (input.isEmpty()) return input;
+
+    MacroEnv env;
+    env.userName = vars.value(QStringLiteral("user")).toString();
+    env.charName = vars.value(QStringLiteral("char")).toString();
+
+    for (auto it = vars.cbegin(); it != vars.cend(); ++it)
+        env.values.insert(it.key().toLower(), it.value().toString());
+
+    // 局部变量按会话分桶；会话 id 没设时退化成一个空 key 的桶（单测/预览场景）
+    env.localVars = &m_localVariables[m_variableSession];
+    env.globalVars = &m_globalVariables;
+
+    return MacroEngine::evaluate(input, env);
+}
+
+// ======================================
+// 聊天级宏（ST scripts/macros/definitions/chat-macros.js:103-116）
+//   lastMessage      = 聊天里最后一条消息的正文（任意角色）
+//   lastUserMessage  = 最后一条 user 消息（is_user && !is_system）
+//   lastCharMessage  = 最后一条非 user / 非 system 消息
+// ST 读的是聊天数组里的 mes（原始文本），这里以 history 为准；
+// history 为空时（预览/单测）退回本轮用户输入。
+// ======================================
+QVariantMap PromptBuilder::getChatMacros(const QList<ChatMessageEntity>& history,
+                                         const QString& userInput) const
+{
+    QString lastMessage;
+    QString lastUserMessage;
+    QString lastCharMessage;
+    bool hasHistory = false;
+    bool sawUser = false;
+
+    for (const ChatMessageEntity& msg : history) {
+        if (msg.isHidden) continue;
+        if (msg.status != GlobalConstants::MessageGenerationStatus::Normal) continue;
+        hasHistory = true;
+        lastMessage = msg.content;
+        if (msg.type == GlobalConstants::MessageType::User) {
+            lastUserMessage = msg.content;
+            sawUser = true;
+        } else if (msg.type == GlobalConstants::MessageType::Assistant) {
+            lastCharMessage = msg.content;
+        }
+    }
+
+    if (!hasHistory && !userInput.isEmpty()) lastMessage = userInput;
+    if (!sawUser && !userInput.isEmpty()) lastUserMessage = userInput;
+
+    QVariantMap vars;
+    vars.insert(QStringLiteral("lastMessage"), lastMessage);
+    vars.insert(QStringLiteral("lastUserMessage"), lastUserMessage);
+    vars.insert(QStringLiteral("lastCharMessage"), lastCharMessage);
+    return vars;
+}
+
+// ======================================
+// Prompt trace：YUZORA_TRACE_PROMPT=1 时把本次装配落成 JSON
+// （identifiers 是我们和 ST 唯一能逐条对齐的东西；ST 的预设里也用同一批 identifier）
+// ======================================
+void PromptBuilder::writePromptTrace(const CompletionPresetEntity& preset,
+                                     const QList<PromptEntity>& allPrompts,
+                                     const QString& generationType,
+                                     const QList<ChatMessage>& messages,
+                                     const QStringList& messageIdentifiers) const
+{
+    if (!qEnvironmentVariableIsSet("YUZORA_TRACE_PROMPT")) return;
+
+    const bool full = qEnvironmentVariableIsSet("YUZORA_TRACE_FULL");
+    const auto sha1 = [](const QString& text) {
+        return QString::fromLatin1(
+            QCryptographicHash::hash(text.toUtf8(), QCryptographicHash::Sha1).toHex());
+    };
+    const auto roleName = [](GlobalConstants::MessageType role) {
+        switch (role) {
+        case GlobalConstants::MessageType::User: return QStringLiteral("user");
+        case GlobalConstants::MessageType::Assistant: return QStringLiteral("assistant");
+        default: return QStringLiteral("system");
+        }
+    };
+
+    QMap<QString, const PromptEntity*> lookup;
+    for (const PromptEntity& p : allPrompts) lookup.insert(p.identifier, &p);
+
+    QJsonArray orderArr;
+    QJsonArray entries;
+    for (int i = 0; i < preset.promptOrder.size(); ++i) {
+        const QString id = preset.promptOrder.at(i);
+        orderArr.append(id);
+
+        QJsonObject entry;
+        entry["index"] = i;
+        entry["identifier"] = id;
+        const PromptEntity* p = lookup.value(id, nullptr);
+        if (!p) {
+            entry["missing"] = true;
+        } else {
+            entry["name"] = p->name;
+            entry["role"] = roleName(p->role);
+            entry["active"] = p->isActive;
+            entry["rawLen"] = static_cast<int>(p->content.size());
+            // 原始内容的哈希：用来对比「库里的预设 vs ST 现在的预设文件」有没有漂移
+            entry["rawSha1"] = sha1(p->content);
+        }
+        entries.append(entry);
+    }
+
+    QJsonObject presetObj;
+    presetObj["id"] = preset.id;
+    presetObj["name"] = preset.name;
+    presetObj["squashSystemMessages"] = preset.squashSystemMessages;
+    presetObj["maxContextToken"] = preset.maxContextToken;
+    presetObj["maxResponseToken"] = preset.maxResponseToken;
+    // 这些字段决定"空标记要不要发"和"世界书包不包格式"，
+    // tools/st_preset_diff.py --trace 靠它们核对 ST 的 new_chat_prompt / wi_format。
+    presetObj["wiFormat"] = preset.wiFormat;
+    presetObj["scenarioFormat"] = preset.scenarioFormat;
+    presetObj["personalityFormat"] = preset.personalityFormat;
+    presetObj["newChatPrompt"] = preset.newChatPrompt;
+    presetObj["newExampleChatPrompt"] = preset.newExampleChatPrompt;
+
+    QJsonArray msgs;
+    for (int i = 0; i < messages.size(); ++i) {
+        const ChatMessage& m = messages.at(i);
+        const QString text = m.textContent();
+
+        QJsonObject obj;
+        obj["index"] = i;
+        obj["identifier"] = messageIdentifiers.value(i);
+        obj["role"] = roleName(m.role);
+        if (!m.senderName.isEmpty()) obj["name"] = m.senderName;
+        obj["len"] = static_cast<int>(text.size());
+        obj["sha1"] = sha1(text);
+        obj["containsMacro"] = text.contains(QStringLiteral("{{"));
+        obj["head"] = text.left(120);
+        obj["tail"] = text.right(120);
+        if (full) obj["content"] = text;
+        msgs.append(obj);
+    }
+
+    QJsonObject root;
+    root["version"] = 1;
+    root["preset"] = presetObj;
+    root["generationType"] = generationType;
+    root["promptOrder"] = orderArr;
+    root["entries"] = entries;
+    root["messages"] = msgs;
+
+    const QString path = QDir::current().filePath(QStringLiteral("prompt_trace_last.json"));
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        qWarning() << "[PromptBuilder] prompt trace 写入失败:" << path << file.errorString();
+        return;
+    }
+    file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
+    file.close();
+
+    qInfo().noquote() << "[PromptBuilder] prompt trace 已写入:" << path
+                      << "消息数:" << messages.size();
 }
 
 // ======================================
@@ -539,7 +697,9 @@ QString PromptBuilder::getPromptTemplate(GlobalConstants::PromptTemplateType typ
     return m_templates.value(type);
 }
 
-QVariantMap PromptBuilder::getPromptVariables(const CharacterEntity& character)
+
+QVariantMap PromptBuilder::getPromptVariables(const CharacterEntity& character,
+                                             const QString& userName)
 {
     QVariantMap vars;
     vars.insert("char", character.name);
@@ -550,7 +710,28 @@ QVariantMap PromptBuilder::getPromptVariables(const CharacterEntity& character)
     vars.insert("first_mes", character.firstMessage);
     vars.insert("example_dialogue", character.exampleDialogue);
 
-    vars.insert("user", "User");
+    // ST 一侧的宏名（script.js:2924-2954 的 environment）：
+    // 角色卡字段有专门的名字，不要和上面这几个自造名混用
+    vars.insert("charprompt", character.systemPrompt);
+    vars.insert("charinstruction", character.postHistoryInstructions);
+    vars.insert("charjailbreak", character.postHistoryInstructions);
+    vars.insert("chardepthprompt", QString());
+    vars.insert("mesexamples", character.exampleDialogue);
+    vars.insert("mesexamplesraw", character.exampleDialogue);
+    vars.insert("creatornotes", character.creatorNotes);
+    vars.insert("charversion", character.characterVersion);
+    vars.insert("char_version", character.characterVersion);
+    vars.insert("persona", QString());   // Persona 还没入库
+
+    // {{user}} 由调用方注入（ChatPromptContext 从 SettingsService 取 USER_NAME）。
+    // PromptBuilder 保持无单例/无 DB 依赖，单测里一份 fixture 就能断言消息序列。
+    const QString trimmedUser = userName.trimmed();
+    const QString finalUser = trimmedUser.isEmpty() ? QStringLiteral("User") : trimmedUser;
+    vars.insert("user", finalUser);
+    vars.insert("notchar", finalUser);
+    vars.insert("group", character.name);
+    vars.insert("charifnotgroup", character.name);
+    vars.insert("groupnotmuted", character.name);
     vars.insert("date", QDateTime::currentDateTime().toString("yyyy-MM-dd"));
     vars.insert("time", QDateTime::currentDateTime().toString("HH:mm:ss"));
     vars.insert("weekday", QDateTime::currentDateTime().toString("dddd"));
@@ -679,80 +860,88 @@ QList<ChatMessage> PromptBuilder::populationInjectionPrompts(
     const WorldInfoResult &wi,
     const QVariantMap &vars)
 {
-    // 收集所有需要 in-chat 注入的条目
-    struct Injection {
-        int depth;
-        int order;
-        GlobalConstants::MessageType role;
-        QString content;
-    };
-    QList<Injection> injections;
+    // 与 ST openai.js:814-879 populationInjectionPrompts 对齐：
+    //  - depth 0 = 最新一条之后，depth 越大越靠近历史开头；插入位置 = size - depth，
+    //    从深到浅插，索引不会漂移。
+    //  - 同一 depth 内先按 injection_order 分桶，再按 role 合并成一条：
+    //    预设 absolute 提示词（按顺序表顺序）在前，世界书 depth 条目在后 ——
+    //    后者在 ST 里是 extension prompt，只并进 order=100 那一桶（openai.js:859-862）。
+    //  - ST 把 [system, user, assistant] 追加进 newest-first 数组后整体 reverse，
+    //    最终自上而下是 assistant → user → system，且 order 小的桶在上面；
+    //    这里直接按"order 升序、role = Assistant/User/System"落位，结果等价。
+    using Role = GlobalConstants::MessageType;
 
-    // 1. 预设的 absolute(绝对) 条目
+    //禁止多余角色,只有 system/user/assistant 三种注入角色
+    auto normalizeRole = [](Role role) {
+        if (role == Role::User || role == Role::Assistant) return role;
+        return Role::System;
+    };
+
+    struct RoleParts {
+        QStringList preset;      // absolute 提示词正文（按顺序表顺序）
+        QStringList extension;   // 世界书 depth 条目
+    };
+    // depth -> order -> role -> parts
+    QMap<int, QMap<int, QMap<Role, RoleParts>>> byDepth;
+
+    // 1. 预设的 absolute(绝对) 条目：内容在 preparePromptCollection 里已做过宏替换
     for (const PromptEntity & p : absolutePrompts) {
         if (!p.isActive) continue;
-        if (p.content.trimmed().isEmpty()) continue;
-        injections.append(
-            {p.injection_depth, p.injection_order,
-            p.role, substituteParams(p.content, vars).trimmed()});
+        const QString content = p.content.trimmed();
+        if (content.isEmpty()) continue;
+        byDepth[p.injection_depth][p.injection_order][normalizeRole(p.role)].preset.append(content);
     }
 
-    // 2. 世界书 depth 条目（每项 (depth, role) 独立）
+    // 2. 世界书 depth 条目：ST 把它们当 order=100 的 extension prompt
     for (const WorldInfoDepthGroup & g : wi.worldInfoDepth) {
         if (g.entries.isEmpty()) continue;
         QStringList parts;
-        for (const QString& entry : g.entries)
-            parts.append(substituteParams(entry, vars).trimmed());
-        injections.append({g.depth, 100, g.insertRole, parts.join('\n')});
+        for (const QString& entry : g.entries) {
+            const QString content = substituteParams(entry, vars).trimmed();
+            if (!content.isEmpty()) parts.append(content);
+        }
+        if (parts.isEmpty()) continue;
+        // 即使这一桶只有世界书条目，也要把 order=100 建出来（下面按桶遍历）
+        byDepth[g.depth][100];
+        byDepth[g.depth][100][normalizeRole(g.insertRole)].extension.append(parts.join('\n'));
     }
 
-    if (injections.isEmpty()) return messages;
-
-    // 3. 按 depth 分组
-    QMap<int, QList<Injection>> byDepth;
-    for (const Injection& inj : injections) byDepth[inj.depth].append(inj);
-
-    // 4. 从深到浅插入（避免索引漂移）
-    QList<int> depths = byDepth.keys();
-    std::sort(depths.begin(), depths.end(), std::greater<int>());
+    if (byDepth.isEmpty()) return messages;
 
     QList<ChatMessage> result = messages;
 
-    for (int depth : depths) {
-        QList<Injection> & list = byDepth[depth];
-        std::sort(list.begin(), list.end(),
-            [](const Injection& a, const Injection& b) {
-                return a.order < b.order;});
+    // 3. 从深到浅插入，索引不会因为前面的插入而漂移
+    for (auto depthIt = byDepth.end(); depthIt != byDepth.begin();) {
+        --depthIt;
+        const int depth = depthIt.key();
+        const QMap<int, QMap<Role, RoleParts>> & orders = depthIt.value();
 
-        // 同 depth 同 role 合并
-        QMap<GlobalConstants::MessageType, QString> byRole;
-        for (const Injection & inj : list) {
-            if (!byRole[inj.role].isEmpty()) byRole[inj.role] += '\n';
-            byRole[inj.role] += inj.content;
+        QList<ChatMessage> block;
+        for (auto orderIt = orders.cbegin(); orderIt != orders.cend(); ++orderIt) {
+            const int order = orderIt.key();
+            const QMap<Role, RoleParts> & roles = orderIt.value();
+            const QList<Role> roleOrder = {Role::Assistant, Role::User, Role::System};
+            for (const Role role : roleOrder) {
+                const auto roleIt = roles.constFind(role);
+                if (roleIt == roles.constEnd()) continue;
+                QStringList parts = roleIt->preset;
+                if (order == 100 && !roleIt->extension.isEmpty())
+                    parts += roleIt->extension;
+                const QString content = parts.join('\n').trimmed();
+                if (content.isEmpty()) continue;
+                ChatMessage m;
+                m.role = role;
+                m.appendText(content);
+                block.append(m);
+            }
         }
+        if (block.isEmpty()) continue;
 
-        // 插入位置：正序下 size - depth
         int insertIdx = result.size() - depth;
         if (insertIdx < 0) insertIdx = 0;
         if (insertIdx > result.size()) insertIdx = result.size();
-
-        // 按 role 顺序插入：ST 的规则是同 depth 同 role 的组按 User → Assistant → System
-        // 自上而下排列（见 Prompt Manager 文档 "Order" 一节），旧实现是反的。
-        const QList<GlobalConstants::MessageType> roles = {
-            GlobalConstants::MessageType::User,
-            GlobalConstants::MessageType::Assistant,
-            GlobalConstants::MessageType::System,
-        };
-
-        int offset = 0;
-        for (const GlobalConstants::MessageType & role : roles) {
-            if (!byRole.contains(role)) continue;
-            ChatMessage m;
-            m.role = role;
-            m.appendText(byRole[role]);
-            result.insert(insertIdx + offset, m);
-            offset++;
-        }
+        for (int i = 0; i < block.size(); ++i)
+            result.insert(insertIdx + i, block[i]);
     }
 
     return result;
@@ -762,7 +951,8 @@ QList<ChatMessage> PromptBuilder::populationInjectionPrompts(
 void PromptBuilder::populateDialogueExamples(
     const QList<QList<ChatMessage>> &messageExamples,
     ChatCompletion &chatCompletion,
-    const CompletionPresetEntity &preset, const CharacterEntity &character)
+    const CompletionPresetEntity &preset, const CharacterEntity &character,
+    const QVariantMap& vars)
 {
     Q_UNUSED(character)
 
@@ -771,27 +961,31 @@ void PromptBuilder::populateDialogueExamples(
     chatCompletion.ensureGroup(QStringLiteral("dialogueExamples"));
 
     // ST：每个示例块前面单独插一条 New Example Chat 提示。
-    // 旧实现把这条标记放在 block 循环内部，多块时会重复插入多份。
-    const QString markerText = preset.newExampleChatPrompt.trimmed().isEmpty()
-        ? QStringLiteral("[Example Chat]")
-        : preset.newExampleChatPrompt.trimmed();
+    // ST openai.js:1108：内容只过 substituteParams，空串时该 Message 会被 getChat() 丢掉，
+    // 但块里的示例消息照发。所以这里不再把空串回退成 "[Example Chat]"。
+    const QString markerText = substituteParams(preset.newExampleChatPrompt, vars);
+    const bool hasMarker = !markerText.isEmpty();
 
     for (int b = 0; b < messageExamples.size(); ++b) {
         QList<SMessage> block;
 
-        SMessage marker;
-        marker.identifier = QStringLiteral("newExampleChat");
-        marker.role = GlobalConstants::MessageType::System;
-        marker.content = markerText;
-        marker.tokens = estimateTokens(markerText) + PER_MESSAGE_OVERHEAD;
-        block.append(marker);
+        if (hasMarker) {
+            SMessage marker;
+            // ST 的 identifier 是 'newChat'（openai.js:1108），并且在 squashSystemMessages 的
+            // 例外名单里——换了名字就会被并进上一条 system 消息。
+            marker.identifier = QStringLiteral("newChat");
+            marker.role = GlobalConstants::MessageType::System;
+            marker.content = markerText;
+            marker.tokens = estimateTokens(markerText) + PER_MESSAGE_OVERHEAD;
+            block.append(marker);
+        }
 
         for (int i = 0; i < messageExamples[b].size(); ++i) {
             const ChatMessage& cm = messageExamples[b][i];
             SMessage m;
             m.identifier = QStringLiteral("dialogueExamples-%1-%2").arg(b).arg(i);
-            // 示例自身的角色要保留（user/assistant 交替），旧实现一律当 system
-            m.role = cm.role;
+            // ST：示例一律以 system 角色发送，说话人靠 name 字段区分（openai.js:1119-1125）
+            m.role = GlobalConstants::MessageType::System;
             m.content = cm.textContent().trimmed();
             if (m.content.isEmpty()) continue;
             m.name = cm.senderName;
@@ -799,8 +993,8 @@ void PromptBuilder::populateDialogueExamples(
             block.append(m);
         }
 
-        // 只有标记、没有实际内容就跳过
-        if (block.size() <= 1) continue;
+        // 既没标记也没示例正文，这一块就什么都不发
+        if (block.isEmpty()) continue;
         if (!chatCompletion.canAffordAll(block)) break;
 
         for (const SMessage& m : block)
@@ -812,22 +1006,27 @@ void PromptBuilder::populateDialogueExamples(
 void PromptBuilder::populateChatHistory(
     const QList<ChatMessage>& messages,
     ChatCompletion& chatCompletion,
-    const CompletionPresetEntity& preset)
+    const CompletionPresetEntity& preset,
+    const QVariantMap& vars)
 {
     chatCompletion.ensureGroup(QStringLiteral("chatHistory"));
 
     // New Chat 提示：ST 把它放在聊天记录的**开头**
     //（"sent before the chat history …where background information ends and chat history begins"）。
     // 旧实现用 "end" 插在最新一条之后，等于每轮都在告诉模型"这是新对话的开头"。
-    const QString newChatPrompt =
-        preset.newChatPrompt.trimmed().isEmpty()
-            ? QStringLiteral("[Start a new Chat]")
-            : preset.newChatPrompt.trimmed();
+    // ST openai.js:893-895：内容只过 substituteParams，**不 trim、不补默认值**；
+    // 空串时 Message 内容是空，getChat()（openai.js:4186）会把它丢掉 ——
+    // 也就是说预设里显式写 "" 时 ST 根本不发这条。
+    // 默认值属于"没设置"的语义，放在 CompletionPresetEntity/DAO 那一层；
+    // 这里若把显式空串回退成 [Start a new Chat]，狐神抚这类预设就会凭空多一条。
+    const QString newChatPrompt = substituteParams(preset.newChatPrompt, vars);
     SMessage newChatMsg;
     newChatMsg.identifier = QStringLiteral("newMainChat");
-    newChatMsg.role = GlobalConstants::MessageType::System;
+    newChatMsg.role = GlobalConstants::System;
     newChatMsg.content = newChatPrompt;
-    newChatMsg.tokens = estimateTokens(newChatMsg.content) + PER_MESSAGE_OVERHEAD;
+    newChatMsg.tokens = newChatPrompt.isEmpty()
+        ? 0
+        : estimateTokens(newChatPrompt) + PER_MESSAGE_OVERHEAD;
 
     // 历史可用预算 = 其它组占用后剩下的，再扣掉 New Chat 标记本身
     int budget = chatCompletion.remaining() - newChatMsg.tokens;
@@ -841,9 +1040,11 @@ void PromptBuilder::populateChatHistory(
         SMessage m;
         m.identifier = QStringLiteral("chatHistory-%1").arg(i);
         m.role = cm.role;
-        m.content = cm.textContent().trimmed();
+        // ST 的 populateChatHistory 对每条历史消息都调 preparePrompt（openai.js:955），
+        // 历史里的 {{user}} / {{char}} / {{getvar}} 同样要被替换。
+        m.content = substituteParams(cm.textContent(), vars).trimmed();
         if (m.content.isEmpty()) continue;
-        m.name = cm.senderName;
+        // ST 默认不给历史消息带 name（只有示例区带）；命名行为属于 names_behavior，尚未实现
         m.tokens = estimateTokens(m.content) + PER_MESSAGE_OVERHEAD;
 
         if (m.tokens > budget) {
@@ -860,25 +1061,59 @@ void PromptBuilder::populateChatHistory(
         picked.prepend(m);
     }
 
-    chatCompletion.insert(newChatMsg, QStringLiteral("chatHistory"), ChatCompletion::Pos::Start);
+    // 空内容不插：ST 端 Message.createAsync('system', '') 会被 getChat() 丢掉。
+    // 这里显式跳过，预算与 trace/outIdentifiers 都不再出现 newMainChat。
+    if (!newChatPrompt.isEmpty())
+        chatCompletion.insert(newChatMsg, QStringLiteral("chatHistory"), ChatCompletion::Pos::Start);
     for (const auto& m : picked)
         chatCompletion.insert(m, QStringLiteral("chatHistory"), ChatCompletion::Pos::End);
 }
 
-// 角色卡 example_dialogue → <START> 分隔的示例块
-QList<QList<ChatMessage>> PromptBuilder::parseExampleDialogue(const CharacterEntity& character)
+// 角色卡 example_dialogue + 世界书 EMTop/EMBottom → <START> 分隔的示例块
+QList<QList<ChatMessage>> PromptBuilder::parseExampleDialogue(
+        const CharacterEntity& character, const WorldInfoResult& wi,
+         const QVariantMap& vars)
 {
     QList<QList<ChatMessage>> blocks;
 
-    const QString raw = character.exampleDialogue;
+    // ST：世界书 EMTop/EMBottom 条目会先并进"示例对话"文本、再一起解析
+    //（script.js:4638-4658）。EMTop 用 unshift，后出现的条目排更前；EMBottom 用 push。
+    for (const WorldInfoExample& example : wi.worldInfoExamples) {
+        if (example.position != WorldInfoEntryEntity::EMTop) continue;
+        const QList<QList<ChatMessage>> parsed =
+            parseExampleText(substituteParams(example.content, vars), character, vars);
+        if (parsed.isEmpty()) continue;
+        QList<QList<ChatMessage>> merged = parsed;
+        merged.append(blocks);
+        blocks = merged;
+    }
+
+    blocks.append(parseExampleText(character.exampleDialogue, character, vars));
+
+    for (const WorldInfoExample& example : wi.worldInfoExamples) {
+        if (example.position != WorldInfoEntryEntity::EMBottom) continue;
+        blocks.append(parseExampleText(substituteParams(example.content, vars), character, vars));
+    }
+
+    return blocks;
+}
+
+// 解析一段示例文本（ST：<START> 分块，行首 "{{user}}:" / "{{char}}:" 切分说话人）。
+// 保留 user/assistant 角色只为了记录说话人；发送时统一按 system + name。
+QList<QList<ChatMessage>> PromptBuilder::parseExampleText(const QString& raw,
+                                                          const CharacterEntity& character,
+                                                          const QVariantMap& vars)
+{
+    QList<QList<ChatMessage>> blocks;
+
     if (raw.trimmed().isEmpty()) return blocks;
 
-    const QVariantMap vars = getPromptVariables(character);
+    const QString userName = vars.value(QStringLiteral("user")).toString();
 
-    // ST 的示例对话格式：<START> 分块，每行以 "{{user}}:" / "{{char}}:" 开头
     const QStringList userPrefixes = {
         QStringLiteral("{{user}}"),
         QStringLiteral("user"),
+        userName,
     };
     const QStringList charPrefixes = {
         QStringLiteral("{{char}}"),
@@ -914,13 +1149,17 @@ QList<QList<ChatMessage>> PromptBuilder::parseExampleDialogue(const CharacterEnt
 
         QString rest;
         if (matchPrefix(line, userPrefixes, rest)) {
-            current.append(ChatMessage::makeText(GlobalConstants::MessageType::User,
-                                                 substituteParams(rest, vars)));
+            ChatMessage msg = ChatMessage::makeText(GlobalConstants::MessageType::User,
+                                                    substituteParams(rest, vars));
+            msg.senderName = userName;
+            current.append(msg);
             continue;
         }
         if (matchPrefix(line, charPrefixes, rest)) {
-            current.append(ChatMessage::makeText(GlobalConstants::MessageType::Assistant,
-                                                 substituteParams(rest, vars)));
+            ChatMessage msg = ChatMessage::makeText(GlobalConstants::MessageType::Assistant,
+                                                    substituteParams(rest, vars));
+            msg.senderName = character.name;
+            current.append(msg);
             continue;
         }
 
@@ -988,6 +1227,23 @@ void PromptBuilder::loadDefaultTemplates()
 // ============================================================
 void PromptBuilder::loadDefaultPromptsAndOrder()
 {
+    m_guaranteedPrompts = {
+        QStringLiteral("main"),
+        QStringLiteral("worldInfoBefore"),
+        QStringLiteral("personaDescription"),
+        QStringLiteral("charDescription"),
+        QStringLiteral("charPersonality"),
+        QStringLiteral("scenario"),
+        QStringLiteral("enhanceDefinitions"),
+        QStringLiteral("nsfw"),
+        QStringLiteral("worldInfoAfter"),
+        QStringLiteral("dialogueExamples"),
+        QStringLiteral("chatHistory"),
+        QStringLiteral("jailbreak"),
+    };
+
+
+
     // // 1. 定义默认提示词库
     // m_prompts = {
     //     { "main", "Main Prompt", "system",
@@ -1032,123 +1288,31 @@ void PromptBuilder::loadDefaultPromptsAndOrder()
     // };
 }
 
-QList<ChatMessage> PromptBuilder::buildChatMessages(
-    const CharacterEntity& character,
-    const QList<ChatMessageEntity>& history,
-    const QString& userInput,
-    GlobalConstants::PromptTemplateType templateType,
-    int maxContextToken,
-    const QString& customTemplate,
-    const QString& worldInfoSection,
-    const QString& memorySection,
-    const QString& generationType,//生成类型："normal", "continue", "impersonate", "quiet"
-    const QString& systemPromptOverride,
-    const QString& jailbreakPromptOverride,
-    const QList<ExtensionPrompt>& extensionPrompts,//扩展提示列表（来自插件）
-    const QString& cyclePrompt,
-    const QList<ChatMessageEntity>& messageExamples
-    )
+void PromptBuilder::insertByCanonical(
+        QList<PromptEntity> & result,QSet<QString> &seenIds,const PromptEntity& p)
 {
-    Q_UNUSED(templateType);
-    Q_UNUSED(customTemplate);
-    return QList<ChatMessage>{};
-
-    // 1. 设置当前生成类型（用于过滤 injection_trigger）(废弃)
-    // m_currentGenerationType = generationType.isEmpty() ? "normal" : generationType;
-
-    // 2. 提取角色信息
-    // QString charDesc = character.description;
-    // QString charPers = character.personality;
-    // QString scenarioText = character.scenario;
-    // QString personaDesc = ""; // 可扩展
-
-    // // 3. 准备提示集合（合并系统提示与用户配置，应用覆盖）
-    // QList<Prompt> promptList = preparePromptCollection(
-    //     character,
-    //     worldInfoSection,     // worldInfoBefore
-    //     "",                   // worldInfoAfter (暂不使用)
-    //     charDesc,
-    //     charPers,
-    //     scenarioText,
-    //     personaDesc,
-    //     extensionPrompts,
-    //     systemPromptOverride,
-    //     jailbreakPromptOverride,
-    //     generationType
-    //     );
-
-    // // 4. 获取变量映射
-    // QVariantMap vars = getPromptVariables(character);
-
-    // // 5. 分离系统提示（injection_position == 0）和注入提示（injection_position == 1）
-    // QList<ChatMessage> systemMessages;
-    // QList<Prompt> injectionPrompts;
-    // for (const Prompt& p : promptList) {
-    //     if (p.content.isEmpty()) continue;
-    //     if (p.injection_position == 1) {
-    //         injectionPrompts.append(p);
-    //     } else {
-    //         QString content = substituteParams(p.content, vars);
-    //         systemMessages.append(ChatMessage::makeText(mapRole(p.role), content));
-    //     }
-    // }
-
-    // // 6. 计算系统提示和注入提示的总 Token（用于截断历史时预留）
-    // int systemTokens = 0;
-    // for (const auto& msg : systemMessages) {
-    //     systemTokens += Utils::calculateToken(msg.textContent(), GlobalConstants::ModelType::OpenAI) + 4;
-    // }
-    // // 注入提示的 Token 也要计入，因为它们会插入到历史中
-    // for (const auto& p : injectionPrompts) {
-    //     QString content = substituteParams(p.content, vars);
-    //     systemTokens += Utils::calculateToken(content, GlobalConstants::ModelType::OpenAI) + 4;
-    // }
-
-    // // 7. 处理用户输入（变量替换）
-    // QString processedInput = substituteParams(userInput, vars);
-    // int inputTokens = Utils::calculateToken(processedInput, GlobalConstants::ModelType::OpenAI) + 4;
-
-    // // 8. 截断原始历史消息（只截断 context，不考虑注入提示，因为注入提示会单独插入）
-    // QList<ChatMessageEntity> trimmedContext = truncateContext(
-    //     context, systemTokens, inputTokens, maxContextToken, templateType);
-
-    // // 9. 构建历史消息列表（从截断后的 context）
-    // QList<ChatMessage> historyMessages;
-    // for (const auto& entity : trimmedContext) {
-    //     if (entity.isHidden) continue;
-    //     historyMessages.append(entityToMessage(entity));
-    // }
-
-    // // 10. 将注入提示按深度插入到历史消息中
-    // applyInjectionPrompts(historyMessages, injectionPrompts, vars);
-
-    // // 11. 插入示例对话（如果有），放在历史消息最前面（酒馆行为）
-    // if (!messageExamples.isEmpty()) {
-    //     QList<ChatMessage> exampleMessages;
-    //     for (const auto& entity : messageExamples) {
-    //         if (entity.isHidden) continue;
-    //         exampleMessages.append(entityToMessage(entity));
-    //     }
-    //     // 可以在示例前加一个标记（如 "Example Chat"），但这里省略
-    //     historyMessages = exampleMessages + historyMessages;
-    // }
-
-    // // 12. 处理继续生成（type == "continue"）
-    // if (m_currentGenerationType == "continue" && !cyclePrompt.isEmpty()) {
-    //     // 酒馆中 continue 会将最后一条 assistant 消息的内容替换为原始内容 + 续写提示
-    //     // 但这里我们简单处理：如果最后一条是 assistant，则追加一条 assistant 消息（内容为 cyclePrompt）
-    //     // 更准确的做法是找到最后一条 assistant，修改其内容并添加后缀
-    //     // 我们实现一个简化版：追加 assistant 消息
-    //     historyMessages.append(ChatMessage::makeText(ChatMessage::Role::Assistant, cyclePrompt));
-    // }
-
-    // // 13. 组装最终消息：系统消息 + 历史消息（含注入和示例） + 用户输入
-    // QList<ChatMessage> finalMessages;
-    // finalMessages.append(systemMessages);
-    // finalMessages.append(historyMessages);
-    // finalMessages.append(ChatMessage::makeText(ChatMessage::Role::User, processedInput));
-
-    // return finalMessages;
-
+    // ST 的默认顺序。顺序表里缺的系统锚点按这个顺序**插到对应位置**，
+    // 而不是一律追加到末尾——否则 worldInfoAfter 会跑到角色描述前面、
+    // jailbreak 会跑到聊天记录前面（都不是 ST 的语义）。
+    // 按 canonical 顺序插入一条提示词：插到"最后一个 canonical 不比它靠后"的项之后。
+    // 这样即使用户在顺序表里插了自定义提示词（canonical 未知），锚点也会落在
+    // 它应该挨着的那条附近，而不是一律跑到末尾。
+    auto canonicalIndex = [this](const QString& id) {
+        const int idx = m_guaranteedPrompts.indexOf(id);
+        return idx < 0 ? std::numeric_limits<int>::max() : idx;
+    };
+    const int myIdx = canonicalIndex(p.identifier);
+    int insertAt = 0;
+    bool found = false;
+    for (int i = 0; i < result.size(); ++i) {
+        if (canonicalIndex(result[i].identifier) <= myIdx) {
+            insertAt = i + 1;
+            found = true;
+        }
+    }
+    if (!found) insertAt = 0;
+    result.insert(insertAt, p);
+    seenIds.insert(p.identifier);
 }
+
 

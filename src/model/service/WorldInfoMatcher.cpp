@@ -103,8 +103,9 @@ WorldInfoResult WorldInfoMatcher::matchAndResolve(
     auto joinContents = [](const QList<WorldInfoEntryEntity>& list) {
         QStringList parts;
         for (const auto& e : list) {
-            const QString content = e.content.trimmed();
-            if (!content.isEmpty()) parts << content;
+            // ST world-info.js:5205-5266 把条目内容**原样** push 进数组再 join('\n')，
+            // 不做 trim。这里的 trim 会让"条目尾部空行/缩进"和 ST 产生字节差异。
+            if (!e.content.isEmpty()) parts << e.content;
         }
         return parts.join('\n');
     };
@@ -119,8 +120,7 @@ WorldInfoResult WorldInfoMatcher::matchAndResolve(
             group.depth = depthIt.key();
             group.insertRole = roleIt.key();
             for (const auto& e : roleIt.value()) {
-                const QString content = e.content.trimmed();
-                if (!content.isEmpty()) group.entries << content;
+                if (!e.content.isEmpty()) group.entries << e.content;
             }
             if (!group.entries.isEmpty())
                 result.worldInfoDepth.append(group);

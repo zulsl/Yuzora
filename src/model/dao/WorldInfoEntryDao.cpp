@@ -33,6 +33,56 @@ QString WorldInfoEntryDao::tableName() const
     return "world_info_entries";
 }
 
+bool WorldInfoEntryDao::removeByBookId(const QString &bookId)
+{
+    QSqlDatabase db = connection();
+    QSqlQuery query(db);
+
+    QString sql = QString("DELETE FROM %1 WHERE book_id = ?").arg(tableName());
+    query.prepare(sql);
+    query.addBindValue(bookId);
+
+    if (!query.exec()) {
+        DatabaseError("removeByBookId error:", query.lastError(), sql, query);
+        return false;
+    }
+    return true;
+}
+
+bool WorldInfoEntryDao::replaceForBook(const QString &bookId,
+                                       const QList<WorldInfoEntryEntity> &entries)
+{
+    QSqlDatabase db = connection();
+    if (!db.isValid()) return false;
+
+    // 重新导入同名世界书是"整体替换"：删一半再失败会把书变成半残，
+    // 所以放在事务里。SQLite 驱动不支持事务时退化成顺序执行（行为与旧导入一致）。
+    const bool inTransaction = db.transaction();
+
+    QSqlQuery del(db);
+    del.prepare(QString("DELETE FROM %1 WHERE book_id = ?").arg(tableName()));
+    del.addBindValue(bookId);
+    if (!del.exec()) {
+        DatabaseError("replaceForBook/delete error:", del.lastError(), del.lastQuery(), del);
+        if (inTransaction) db.rollback();
+        return false;
+    }
+
+    for (const WorldInfoEntryEntity &entry : entries) {
+        if (!insert(entry)) {
+            if (inTransaction) db.rollback();
+            return false;
+        }
+    }
+
+    if (inTransaction && !db.commit()) {
+        DatabaseError("replaceForBook/commit error:", db.lastError());
+        db.rollback();
+        return false;
+    }
+    return true;
+}
+
 QString WorldInfoEntryDao::primaryKey() const
 {
     return "id";

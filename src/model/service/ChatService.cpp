@@ -320,6 +320,58 @@ void ChatService::switchGreeting(int delta)
 }
 
 
+// 构建提示词上下文 → 启动补全。
+// ST 在固定提示词装不进上下文预算时会中止本次生成（openai.js TokenBudgetExceededError）；
+// 这里把 AppException 转成 generationFailed，避免把空/超长提示词直接发给模型。
+bool ChatService::startGeneration(const QString& userInput, const QString& generationType,
+                                  const QString& assistantMsgId)
+{
+    QList<ChatMessage> messages;
+    try {
+        messages = buildChatPromptContext(
+            m_sessions->currentCharacterId(), m_sessions->currentSessionId(),
+            userInput, m_messageDao, m_characterService, generationType);
+    }
+    catch (const AppException& ex) {
+        Utils::writeLog("ERROR", "ChatService",
+                        QStringLiteral("构建提示词失败: %1").arg(ex.getMessage()));
+        failGeneration(assistantMsgId, ex.getMessage());
+        return false;
+    }
+    catch (const QString& err) {
+        Utils::writeLog("ERROR", "ChatService",
+                        QStringLiteral("构建提示词失败: %1").arg(err));
+        failGeneration(assistantMsgId, err);
+        return false;
+    }
+
+    m_generatingMessageId = assistantMsgId;
+    m_fullResponse.clear();
+    m_isGenerating = true;
+    emit generationStarted(assistantMsgId);
+
+    if (m_completion) m_completion->start(messages);
+    return true;
+}
+
+void ChatService::failGeneration(const QString& assistantMsgId, const QString& error)
+{
+    if (assistantMsgId.isEmpty()) {
+        emit operationError(error);
+        return;
+    }
+
+    m_messageDao->updateStatus(assistantMsgId,
+        GlobalConstants::MessageGenerationStatus::Failed);
+
+    emit messageStatusChanged(assistantMsgId,
+        static_cast<int>(GlobalConstants::MessageGenerationStatus::Failed));
+    emit generationFailed(assistantMsgId,
+        static_cast<int>(AppException::ErrorCode::ModelError), error);
+
+    m_sessions->touch(m_sessions->currentSessionId());
+}
+
 // ======================================
 // AI生成核心接口
 // ======================================
@@ -366,19 +418,8 @@ void ChatService::sendMessage(const QString& userInput)
         return;
     }
 
-// 构建提示词上下文
-    QList<ChatMessage> messages = buildChatPromptContext(
-            m_sessions->currentCharacterId(),
-            m_sessions->currentSessionId(),
-            userInput, m_messageDao, m_characterService);
-
-// 启动生成
-    m_generatingMessageId = assistantMsgId;
-    m_fullResponse.clear();
-    m_isGenerating = true;
-    emit generationStarted(assistantMsgId);
-
-    if (m_completion) m_completion->start(messages);
+// 构建提示词上下文并启动生成
+    startGeneration(userInput, QStringLiteral("normal"), assistantMsgId);
 }
 
 void ChatService::regenerateLastMessage()
@@ -436,16 +477,7 @@ void ChatService::regenerateLastMessage()
     }
 
     // 重新构建上下文（无新用户输入）
-    QList<ChatMessage> messages = buildChatPromptContext(
-        m_sessions->currentCharacterId(), m_sessions->currentSessionId(), QString(), m_messageDao, m_characterService,
-        QStringLiteral("regenerate"));
-
-    m_generatingMessageId = newAssistantMsgId;
-    m_fullResponse.clear();
-    m_isGenerating = true;
-    emit generationStarted(newAssistantMsgId);
-
-    if (m_completion) m_completion->start(messages);
+    startGeneration(QString(), QStringLiteral("regenerate"), newAssistantMsgId);
 }
 
 void ChatService::continueGeneration()
@@ -460,16 +492,7 @@ void ChatService::continueGeneration()
 
     emit messageAppended(m_messageDao->selectById(assistantMsgId));
 
-    QList<ChatMessage> messages = buildChatPromptContext(
-        m_sessions->currentCharacterId(), m_sessions->currentSessionId(), QString(), m_messageDao, m_characterService,
-        QStringLiteral("continue"));
-
-    m_generatingMessageId = assistantMsgId;
-    m_fullResponse.clear();
-    m_isGenerating = true;
-    emit generationStarted(assistantMsgId);
-
-    if (m_completion) m_completion->start(messages);
+    startGeneration(QString(), QStringLiteral("continue"), assistantMsgId);
 }
 
 void ChatService::cancelGeneration()

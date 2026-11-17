@@ -16,12 +16,6 @@ Item {
 
     property completionPresetEntity editingPreset: CompletionPresetViewModel.currentPreset
 
-    // 基础参数使用 VM 草稿，QML 不再直接修改实体。
-    function draftValue(field) {
-        const draft = CompletionPresetViewModel.presetDraft
-        return draft ? draft.fieldValue(field) : undefined
-    }
-
     signal exportRequested()
 
     Component.onCompleted: {

@@ -88,10 +88,16 @@ QString WorldInfoService::importWorldBook(QJsonObject&) { return {}; }
 
 // 提示词装配整块替换：本测试不校验提示词内容，返回空列表即可。
 // 正因为 buildPromptContext 已经被抽成自由函数，这里才能这么替换。
+// 打开开关后模拟"提示词构建失败"（等价 ST 的 TokenBudgetExceededError）。
+static bool g_promptBuildThrows = false;
+
 QList<ChatMessage> buildChatPromptContext(
         const QString&, const QString&, const QString&, ChatMessageDao*, CharacterService*,
         const QString&)
 {
+    if (g_promptBuildThrows) {
+        THROW(OperationError, QStringLiteral("提示词超出上下文预算：固定提示词占 999 tokens，预算只有 100 tokens。"));
+    }
     return {};
 }
 
@@ -286,6 +292,7 @@ private slots:
     void deleteCurrentSessionFallsBackToRemaining();
     void renameSessionTrimsAndClamps();
     void sendMessageAppendsUserBeforeAssistantAndStartsGeneration();
+    void promptBuildFailureMarksMessageFailed();
     void finishingGenerationWritesContentAndAutoTitles();
     void failingGenerationMarksMessageFailed();
     void sessionSwitchPersistsLastActiveCharacterAndSession();
@@ -478,6 +485,29 @@ void ChatServiceTest::sendMessageAppendsUserBeforeAssistantAndStartsGeneration()
     QCOMPARE(f.transaction.commits, 1);
     QCOMPARE(f.completion.starts, 1);
     QVERIFY(f.chatService.isGenerating());
+}
+
+// 提示词构建失败（如固定提示词超出上下文预算）：
+// 不把请求发给补全器，占位消息置 Failed，生成中标志复位（ST 的 TokenBudgetExceededError 语义）
+void ChatServiceTest::promptBuildFailureMarksMessageFailed()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QString(), {});
+    QVERIFY(f.characterDao.insert(character));
+    const QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    g_promptBuildThrows = true;
+    f.chatService.sendMessage(QStringLiteral("你好"));
+    g_promptBuildThrows = false;
+
+    const QList<ChatMessageEntity> messages = f.chatService.loadLatestMessages(sessionId, 10);
+    QCOMPARE(messages.size(), 2);
+    QCOMPARE(static_cast<int>(messages.last().status),
+             static_cast<int>(GlobalConstants::MessageGenerationStatus::Failed));
+    QCOMPARE(f.completion.starts, 0);
+    QVERIFY(!f.chatService.isGenerating());
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("新对话"));
 }
 
 // 完成：内容落库、状态转 Normal、会话标题按前 10 个字符自动生成

@@ -1,0 +1,1472 @@
+{
+  "source": "SillyTavern 1.19.0 tests/frontend/MacroEngine.e2e.js",
+  "cases": [
+    {
+      "name": "should evaluate multiple macros in order",
+      "input": "A {{setvar::test::4}}{{getvar::test}} B {{setvar::test::2}}{{getvar::test}} C",
+      "expected": "A 4 B 2 C"
+    },
+    {
+      "name": "should handle normal double-colon separated unnamed argument",
+      "input": "Reversed: {{reverse::abc}}!",
+      "expected": "Reversed: cba!"
+    },
+    {
+      "name": "should handle (legacy) colon separated unnamed argument",
+      "input": "Reversed: {{reverse:abc}}!",
+      "expected": "Reversed: cba!"
+    },
+    {
+      "name": "should handle (legacy) colon separated argument as only one, even with more separators (double colon)",
+      "input": "Reversed: {{reverse:abc::def}}!",
+      "expected": "Reversed: fed::cba!"
+    },
+    {
+      "name": "should handle (legacy) colon separated argument as only one, even with more separators (single colon)",
+      "input": "Reversed: {{reverse:abc:def}}!",
+      "expected": "Reversed: fed:cba!"
+    },
+    {
+      "name": "should handle (legacy) whitespace separated unnamed argument as only one, even with more separators (space)",
+      "input": "Values: {{reverse abc def}}!",
+      "expected": "Values: fed cba!"
+    },
+    {
+      "name": "should resolve nested macros inside arguments inside-out",
+      "input": "Result: {{setvar::test::0}}{{reverse::{{addvar::test::100}}{{getvar::test}}}}{{setvar::test::0}}",
+      "expected": "Result: 001"
+    },
+    {
+      "name": "should resolve nested macros across multiple arguments",
+      "input": "Result: {{setvar::addvname::test}}{{addvar::{{getvar::addvname}}::{{setvar::test::5}}{{getvar::test}}}}{{getvar::test}}",
+      "expected": "Result: 10"
+    },
+    {
+      "name": "should remove single-line comments with simple body",
+      "input": "Hello{{// comment}}World",
+      "expected": "HelloWorld"
+    },
+    {
+      "name": "should accept non-word characters immediately after //",
+      "input": "A{{//!@#$%^&*()_+}}B",
+      "expected": "AB"
+    },
+    {
+      "name": "should ignore additional // sequences inside the comment body",
+      "input": "X{{//comment with // extra // slashes}}Y",
+      "expected": "XY"
+    },
+    {
+      "name": "should support multi-line comment bodies",
+      "input": "Start{{// line one\nline two\nline three}}End",
+      "expected": "StartEnd"
+    },
+    {
+      "name": "should remove scoped comment block (basic)",
+      "input": "Before{{//}}This entire block is a comment.{{///}}After",
+      "expected": "BeforeAfter"
+    },
+    {
+      "name": "should remove scoped comment block spanning multiple lines",
+      "input": "Start\n{{//}}\n  This entire block is a comment.\n  It can span multiple lines.\n{{///}}\nEnd",
+      "expected": "Start\n\nEnd"
+    },
+    {
+      "name": "should remove scoped comment block with extra slashes in closing tag",
+      "input": "A{{//}}ignored{{////}}B",
+      "expected": "AB"
+    },
+    {
+      "name": "should remove scoped comment block with macros inside (macros not evaluated)",
+      "input": "X{{//}}{{user}} should be ignored{{///}}Y",
+      "expected": "XY"
+    },
+    {
+      "name": "should not treat bare {{//}} without matching closer as scoped",
+      "input": "A{{// just a comment}}B",
+      "expected": "AB"
+    },
+    {
+      "name": "should handle scoped comment adjacent to other text and macros",
+      "input": "{{user}}{{//}}ignored block{{///}}{{user}}",
+      "expected": "UserUser"
+    },
+    {
+      "name": "should trim content inside scoped trim macro",
+      "input": "{{trim}}  hello world  {{/trim}}",
+      "expected": "hello world"
+    },
+    {
+      "name": "should trim leading whitespace in scoped trim",
+      "input": "{{trim}}\n\n  content{{/trim}}",
+      "expected": "content"
+    },
+    {
+      "name": "should trim trailing whitespace in scoped trim",
+      "input": "{{trim}}content  \n\n{{/trim}}",
+      "expected": "content"
+    },
+    {
+      "name": "should handle scoped trim with macros inside",
+      "input": "{{trim}}  Hello {{user}}  {{/trim}}",
+      "expected": "Hello User"
+    },
+    {
+      "name": "should handle nested scoped trim",
+      "input": "{{trim}}  outer {{trim}}  inner  {{/trim}} outer  {{/trim}}",
+      "expected": "outer inner outer"
+    },
+    {
+      "name": "should strip trim macro and surrounding newlines (legacy behavior)",
+      "input": "foo\n\n{{trim}}\n\nbar",
+      "expected": "foobar"
+    },
+    {
+      "name": "should handle multiple trim macros in a single string",
+      "input": "A\n\n{{trim}}\n\nB\n\n{{trim}}\n\nC",
+      "expected": "ABC"
+    },
+    {
+      "name": "should allow single opening brace inside macro arguments",
+      "input": "Test§ {{reverse::my { test}}",
+      "expected": "Test§ tset { ym"
+    },
+    {
+      "name": "should allow single closing brace inside macro arguments",
+      "input": "Test§ {{reverse::my } test}}",
+      "expected": "Test§ tset } ym"
+    },
+    {
+      "name": "should treat dangling macro start as text and still evaluate subsequent macro",
+      "input": "Test {{ hehe {{user}}",
+      "expected": "Test {{ hehe User"
+    },
+    {
+      "name": "should ignore invalid macro start but still evaluate following valid macro",
+      "input": "Test {{&& hehe {{user}}",
+      "expected": "Test {{&& hehe User"
+    },
+    {
+      "name": "should allow single opening brace immediately before a macro",
+      "input": "{{{char}}",
+      "expected": "{Character"
+    },
+    {
+      "name": "should allow single closing brace immediately after a macro",
+      "input": "{{char}}}",
+      "expected": "Character}"
+    },
+    {
+      "name": "should allow single braces around a macro",
+      "input": "{{{char}}}",
+      "expected": "{Character}"
+    },
+    {
+      "name": "should allow double opening braces immediately before a macro",
+      "input": "{{{{char}}",
+      "expected": "{{Character"
+    },
+    {
+      "name": "should allow double closing braces immediately after a macro",
+      "input": "{{char}}}}",
+      "expected": "Character}}"
+    },
+    {
+      "name": "should allow double braces around a macro",
+      "input": "{{{{char}}}}",
+      "expected": "{{Character}}"
+    },
+    {
+      "name": "should resolve nested macro inside argument with surrounding braces",
+      "input": "Result: {{reverse::pre-{ {{user}} }-post}}",
+      "expected": "Result: tsop-} resU {-erp"
+    },
+    {
+      "name": "should handle adjacent macros with no separator",
+      "input": "{{char}}{{user}}",
+      "expected": "CharacterUser"
+    },
+    {
+      "name": "should handle macros separated only by surrounding braces",
+      "input": "{{char}}{ {{user}} }",
+      "expected": "Character{ User }"
+    },
+    {
+      "name": "should handle Windows newlines with braces near macros",
+      "input": "Line1 {{char}}\r\n{Line2}",
+      "expected": "Line1 Character\r\n{Line2}"
+    },
+    {
+      "name": "should keep stray closing braces and still evaluate following macro",
+      "input": "Foo }} {{user}}",
+      "expected": "Foo }} User"
+    },
+    {
+      "name": "should handle stray closing braces before macros as plain text",
+      "input": "Foo {{user}} }}",
+      "expected": "Foo User }}"
+    },
+    {
+      "name": "should resolve nested macros in arguments, even though the outer macro has wrong number of arguments",
+      "input": "Result: {{user Something {{char}}}}",
+      "expected": "Result: {{user Something Character}}"
+    },
+    {
+      "name": "should resolve macro with legacy hash flag (no effect)",
+      "input": "Hello {{#user}}!",
+      "expected": "Hello User!"
+    },
+    {
+      "name": "should keep unmatched closing block macro as raw text",
+      "input": "{{/unknown}}",
+      "expected": "{{/unknown}}"
+    },
+    {
+      "name": "should keep unmatched closing block macro for existing macro as raw text",
+      "input": "{{/user}}",
+      "expected": "{{/user}}"
+    },
+    {
+      "name": "should keep unmatched closing block macro with arguments as raw text",
+      "input": "{{/getvar::test}}",
+      "expected": "{{/getvar::test}}"
+    },
+    {
+      "name": "should keep closing macro raw when surrounded by other content",
+      "input": "Hello {{user}}, this {{/char}} is raw, bye {{char}}!",
+      "expected": "Hello User, this {{/char}} is raw, bye Character!"
+    },
+    {
+      "name": "should resolve scoped macro while keeping unrelated closing raw",
+      "input": "{{setvar::x}}value{{/setvar}}{{/user}}{{getvar::x}}",
+      "expected": "{{/user}}value"
+    },
+    {
+      "name": "should handle flags with arguments correctly",
+      "input": "{{!reverse::hello}}",
+      "expected": "olleh"
+    },
+    {
+      "name": "should merge scoped content as last unnamed argument",
+      "input": "{{setvar::myvar}}Hello World{{/setvar}}{{getvar::myvar}}",
+      "expected": "Hello World"
+    },
+    {
+      "name": "should resolve nested macros inside scoped content",
+      "input": "{{setvar::myvar}}Hello {{user}}!{{/setvar}}{{getvar::myvar}}",
+      "expected": "Hello User!"
+    },
+    {
+      "name": "should handle nested scoped macros with same name",
+      "input": "{{setvar::outer}}before {{setvar::inner}}nested{{/setvar}} after{{/setvar}}{{getvar::outer}} | {{getvar::inner}}",
+      "expected": "before  after | nested"
+    },
+    {
+      "name": "should handle multiple independent scoped macros",
+      "input": "{{setvar::a}}first{{/setvar}}{{setvar::b}}second{{/setvar}}[{{getvar::a}}][{{getvar::b}}]",
+      "expected": "[first][second]"
+    },
+    {
+      "name": "should keep unmatched closing tag as raw text",
+      "input": "Before {{/setvar}} After",
+      "expected": "Before {{/setvar}} After"
+    },
+    {
+      "name": "should keep second closing tag as raw when already closed",
+      "input": "{{setvar::myvar}}content{{/setvar}}{{/setvar}}{{getvar::myvar}}",
+      "expected": "{{/setvar}}content"
+    },
+    {
+      "name": "should work with empty scoped content",
+      "input": "{{setvar::empty}}{{/setvar}}[{{getvar::empty}}]",
+      "expected": "[]"
+    },
+    {
+      "name": "should work with multi-line scoped content",
+      "input": "{{setvar::multi}}Line 1\nLine 2\nLine 3{{/setvar}}{{getvar::multi}}",
+      "expected": "Line 1\nLine 2\nLine 3"
+    },
+    {
+      "name": "should preserve plaintext around scoped macros",
+      "input": "Before {{setvar::x}}value{{/setvar}} After {{getvar::x}}",
+      "expected": "Before  After value"
+    },
+    {
+      "name": "should handle deeply nested scoped macros",
+      "input": "{{setvar::l1}}A{{setvar::l2}}B{{setvar::l3}}C{{/setvar}}B{{/setvar}}A{{/setvar}}{{getvar::l1}}|{{getvar::l2}}|{{getvar::l3}}",
+      "expected": "AA|BB|C"
+    },
+    {
+      "name": "should handle scoped macro with existing arguments",
+      "input": "{{reverse}}hello{{/reverse}}",
+      "expected": "olleh"
+    },
+    {
+      "name": "should not match closing tag for different macro name",
+      "input": "{{setvar::x}}content{{/getvar}}{{getvar::x}}",
+      "expected": "{{setvar::x}}content{{/getvar}}"
+    },
+    {
+      "name": "should handle scoped content with special characters",
+      "input": "{{setvar::special}}Hello { world } :: test{{/setvar}}{{getvar::special}}",
+      "expected": "Hello { world } :: test"
+    },
+    {
+      "name": "should keep scoped macro raw when macro accepts no arguments",
+      "input": "{{user}}Hello {{char}}!{{/user}}",
+      "expected": "{{user}}Hello Character!{{/user}}"
+    },
+    {
+      "name": "should keep scoped macro raw when argument count exceeds maximum",
+      "input": "{{setvar::myvar::existing}}extra{{/setvar}}{{getvar::myvar}}",
+      "expected": "{{setvar::myvar::existing}}extra{{/setvar}}"
+    },
+    {
+      "name": "should handle scoped macro inside another scoped macro content",
+      "input": "{{setvar::outer}}A{{setvar::inner}}B{{/setvar}}C{{/setvar}}{{getvar::outer}}|{{getvar::inner}}",
+      "expected": "AC|B"
+    },
+    {
+      "name": "should auto-trim whitespace-only scoped content to empty",
+      "input": "{{setvar::ws}}   {{/setvar}}[{{getvar::ws}}]",
+      "expected": "[]"
+    },
+    {
+      "name": "should preserve whitespace-only scoped content with # flag",
+      "input": "{{#setvar::ws}}   {{/setvar}}[{{getvar::ws}}]",
+      "expected": "[   ]"
+    },
+    {
+      "name": "should handle scoped macro at start of input",
+      "input": "{{setvar::x}}value{{/setvar}}result:{{getvar::x}}",
+      "expected": "result:value"
+    },
+    {
+      "name": "should handle scoped macro at end of input",
+      "input": "prefix {{setvar::x}}value{{/setvar}}",
+      "expected": "prefix "
+    },
+    {
+      "name": "should handle consecutive scoped macros",
+      "input": "{{setvar::a}}1{{/setvar}}{{setvar::b}}2{{/setvar}}{{setvar::c}}3{{/setvar}}{{getvar::a}}{{getvar::b}}{{getvar::c}}",
+      "expected": "123"
+    },
+    {
+      "name": "should handle scoped macro with only macro content (no plaintext)",
+      "input": "{{setvar::x}}{{user}}{{/setvar}}{{getvar::x}}",
+      "expected": "User"
+    },
+    {
+      "name": "should not match closing tag across different macro instances",
+      "input": "{{setvar::a}}first{{/setvar}}middle{{setvar::b}}second{{/setvar}}[{{getvar::a}}][{{getvar::b}}]",
+      "expected": "middle[first][second]"
+    },
+    {
+      "name": "should resolve scoped macro inside another macro argument",
+      "input": "{{setvar::testvar::{{reverse}}hello{{/reverse}}}} {{getvar::testvar}}",
+      "expected": " olleh"
+    },
+    {
+      "name": "should resolve scoped if macro inside setvar argument",
+      "input": "{{setvar::testvar::{{if true}}true branch{{/if}}}} {{getvar::testvar}}",
+      "expected": " true branch"
+    },
+    {
+      "name": "should resolve scoped if/else macro inside setvar argument",
+      "input": "{{setvar::testvar::{{if 0}}wrong{{else}}correct{{/if}}}} {{getvar::testvar}}",
+      "expected": " correct"
+    },
+    {
+      "name": "should resolve multiple scoped macros inside single argument",
+      "input": "{{setvar::testvar::{{reverse}}ab{{/reverse}}-{{reverse}}cd{{/reverse}}}} {{getvar::testvar}}",
+      "expected": " ba-dc"
+    },
+    {
+      "name": "should resolve deeply nested scoped macros in arguments",
+      "input": "{{setvar::outer::{{setvar::inner::{{reverse}}xyz{{/reverse}}}}{{getvar::inner}}}} {{getvar::outer}}",
+      "expected": " zyx"
+    },
+    {
+      "name": "should resolve scoped macro with text before and after in argument",
+      "input": "{{setvar::testvar::before {{reverse}}mid{{/reverse}} after}} {{getvar::testvar}}",
+      "expected": " before dim after"
+    },
+    {
+      "name": "should handle scoped macro inside first argument when macro has multiple args",
+      "input": "{{setvar::myvar::prefix-{{reverse}}abc{{/reverse}}-suffix}}{{getvar::myvar}}",
+      "expected": "prefix-cba-suffix"
+    },
+    {
+      "name": "should handle multiline scoped content inside argument",
+      "input": "{{setvar::testvar::{{if true}}\ntrue\nbranch\n{{/if}}}} {{getvar::testvar}}",
+      "expected": " true\nbranch"
+    },
+    {
+      "name": "should return content when condition is truthy string",
+      "input": "{{if::hello::shown}}",
+      "expected": "shown"
+    },
+    {
+      "name": "should return empty when condition is empty string",
+      "input": "{{if::::hidden}}",
+      "expected": ""
+    },
+    {
+      "name": "should return empty when condition is \"false\"",
+      "input": "{{if::false::hidden}}",
+      "expected": ""
+    },
+    {
+      "name": "should return empty when condition is \"off\"",
+      "input": "{{if::off::hidden}}",
+      "expected": ""
+    },
+    {
+      "name": "should return empty when condition is \"0\"",
+      "input": "{{if::0::hidden}}",
+      "expected": ""
+    },
+    {
+      "name": "should return content when condition is \"true\"",
+      "input": "{{if::true::shown}}",
+      "expected": "shown"
+    },
+    {
+      "name": "should return content when condition is \"1\"",
+      "input": "{{if::1::shown}}",
+      "expected": "shown"
+    },
+    {
+      "name": "should resolve macro name and return content when macro returns truthy",
+      "input": "{{if char}}Name: {{char}}{{/if}}",
+      "expected": "Name: Character"
+    },
+    {
+      "name": "should resolve macro name and return empty when macro returns empty",
+      "input": "{{if noop}}should not show{{/if}}[end]",
+      "expected": "[end]"
+    },
+    {
+      "name": "should not resolve non-existent macro names (treat as literal)",
+      "input": "{{if::notamacro::shown}}",
+      "expected": "shown"
+    },
+    {
+      "name": "should resolve user macro and show content",
+      "input": "{{if user}}Hello {{user}}{{/if}}",
+      "expected": "Hello User"
+    },
+    {
+      "name": "should evaluate nested macro in condition (truthy)",
+      "input": "{{setvar::flag::yes}}{{if {{getvar::flag}}}}shown{{/if}}",
+      "expected": "shown"
+    },
+    {
+      "name": "should evaluate nested macro in condition (falsy)",
+      "input": "{{setvar::flag::}}{{if {{getvar::flag}}}}hidden{{/if}}[end]",
+      "expected": "[end]"
+    },
+    {
+      "name": "should evaluate nested macro in condition (false string)",
+      "input": "{{setvar::flag::false}}{{if {{getvar::flag}}}}hidden{{/if}}[end]",
+      "expected": "[end]"
+    },
+    {
+      "name": "should work with scoped content (truthy)",
+      "input": "{{if yes}}This is the content{{/if}}",
+      "expected": "This is the content"
+    },
+    {
+      "name": "should work with scoped content (falsy)",
+      "input": "{{if::}}This should not show{{/if}}[after]",
+      "expected": "[after]"
+    },
+    {
+      "name": "should handle macros inside scoped content",
+      "input": "{{if yes}}Hello {{user}}!{{/if}}",
+      "expected": "Hello User!"
+    },
+    {
+      "name": "should handle nested if macros",
+      "input": "{{if yes}}outer{{if yes}}inner{{/if}}{{/if}}",
+      "expected": "outerinner"
+    },
+    {
+      "name": "should handle nested if with outer false",
+      "input": "{{if::}}outer{{if yes}}inner{{/if}}{{/if}}[end]",
+      "expected": "[end]"
+    },
+    {
+      "name": "should handle nested if with inner false",
+      "input": "{{if yes}}outer{{if::}}inner{{/if}}end{{/if}}",
+      "expected": "outerend"
+    },
+    {
+      "name": "should work with space-separated condition (truthy)",
+      "input": "{{if something}}content{{/if}}",
+      "expected": "content"
+    },
+    {
+      "name": "should resolve macro name with space-separated syntax",
+      "input": "{{if char}}{{char}} exists{{/if}}",
+      "expected": "Character exists"
+    },
+    {
+      "name": "should return then-branch when condition is truthy",
+      "input": "{{if yes}}then{{else}}else{{/if}}",
+      "expected": "then"
+    },
+    {
+      "name": "should return else-branch when condition is falsy",
+      "input": "{{if::}}then{{else}}else{{/if}}",
+      "expected": "else"
+    },
+    {
+      "name": "should return else-branch when condition is \"false\"",
+      "input": "{{if::false}}yes{{else}}no{{/if}}",
+      "expected": "no"
+    },
+    {
+      "name": "should handle macros in both branches",
+      "input": "{{if yes}}Hello {{user}}{{else}}Goodbye {{char}}{{/if}}",
+      "expected": "Hello User"
+    },
+    {
+      "name": "should handle macros in else branch when falsy",
+      "input": "{{if::}}Hello {{user}}{{else}}Goodbye {{char}}{{/if}}",
+      "expected": "Goodbye Character"
+    },
+    {
+      "name": "should handle nested if-else in then-branch",
+      "input": "{{if yes}}outer-then{{if yes}}inner-then{{else}}inner-else{{/if}}{{else}}outer-else{{/if}}",
+      "expected": "outer-theninner-then"
+    },
+    {
+      "name": "should handle nested if-else in else-branch",
+      "input": "{{if::}}outer-then{{else}}outer-else{{if yes}}inner-then{{else}}inner-else{{/if}}{{/if}}",
+      "expected": "outer-elseinner-then"
+    },
+    {
+      "name": "should handle deeply nested if-else",
+      "input": "{{if::}}A{{else}}B{{if::}}C{{else}}D{{/if}}{{/if}}",
+      "expected": "BD"
+    },
+    {
+      "name": "should return empty else-branch if not provided",
+      "input": "{{if::}}content{{/if}}[end]",
+      "expected": "[end]"
+    },
+    {
+      "name": "should trim whitespace from branches",
+      "input": "{{if yes}}  then  {{else}}  else  {{/if}}",
+      "expected": "then"
+    },
+    {
+      "name": "should trim newlines from branches",
+      "input": "{{if yes}}\n  then\n{{else}}\n  else\n{{/if}}",
+      "expected": "then"
+    },
+    {
+      "name": "should trim else branch when selected",
+      "input": "{{if::}}\n  then\n{{else}}\n  else\n{{/if}}",
+      "expected": "else"
+    },
+    {
+      "name": "should resolve macro name in condition with else branch",
+      "input": "{{if char}}Has char{{else}}No char{{/if}}",
+      "expected": "Has char"
+    },
+    {
+      "name": "should handle empty macro returning else branch",
+      "input": "{{if noop}}Has value{{else}}Empty{{/if}}",
+      "expected": "Empty"
+    },
+    {
+      "name": "should invert truthy condition to falsy",
+      "input": "{{if !yes}}shown{{/if}}[end]",
+      "expected": "[end]"
+    },
+    {
+      "name": "should invert falsy condition to truthy",
+      "input": "{{if !false}}shown{{/if}}",
+      "expected": "shown"
+    },
+    {
+      "name": "should invert empty string to truthy",
+      "input": "{{if::!}}not shown{{else}}shown{{/if}}",
+      "expected": "not shown"
+    },
+    {
+      "name": "should work with ! prefix and macro name",
+      "input": "{{if !noop}}No value{{/if}}",
+      "expected": "No value"
+    },
+    {
+      "name": "should work with ! prefix and truthy macro",
+      "input": "{{if !char}}No char{{else}}Has char{{/if}}",
+      "expected": "Has char"
+    },
+    {
+      "name": "should work with ! prefix and nested macro",
+      "input": "{{setvar::emptyVar::}}{{if !{{getvar::emptyVar}}}}Empty var{{/if}}",
+      "expected": "Empty var"
+    },
+    {
+      "name": "should NOT invert when ! comes from resolved value",
+      "input": "{{setvar::bangVar::!hello}}{{if {{getvar::bangVar}}}}Has value{{else}}No value{{/if}}",
+      "expected": "Has value"
+    },
+    {
+      "name": "should work with else branch on inverted condition",
+      "input": "{{if !yes}}then{{else}}else{{/if}}",
+      "expected": "else"
+    },
+    {
+      "name": "should work with separator syntax",
+      "input": "{{if::!something}}shown{{/if}}[end]",
+      "expected": "[end]"
+    },
+    {
+      "name": "should auto-trim scoped content by default",
+      "input": "{{setvar::myvar}}\n  content with whitespace  \n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[content with whitespace]"
+    },
+    {
+      "name": "should auto-trim leading newlines in scoped content",
+      "input": "{{setvar::myvar}}\n\n\ntext{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[text]"
+    },
+    {
+      "name": "should auto-trim trailing newlines in scoped content",
+      "input": "{{setvar::myvar}}text\n\n\n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[text]"
+    },
+    {
+      "name": "should dedent consistent indentation when auto-trimming",
+      "input": "{{setvar::myvar}}\n  line1\n  line2  \n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[line1\nline2]"
+    },
+    {
+      "name": "should preserve whitespace with # flag",
+      "input": "{{#setvar::myvar}}\n  content  \n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[\n  content  \n]"
+    },
+    {
+      "name": "should preserve leading newlines with # flag",
+      "input": "{{#setvar::myvar}}\n\ntext{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[\n\ntext]"
+    },
+    {
+      "name": "should preserve trailing newlines with # flag",
+      "input": "{{#setvar::myvar}}text\n\n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[text\n\n]"
+    },
+    {
+      "name": "should work with # flag and nested macros",
+      "input": "{{#setvar::myvar}}\n  {{char}}  \n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[\n  Character  \n]"
+    },
+    {
+      "name": "should auto-trim with nested macros by default",
+      "input": "{{setvar::myvar}}\n  {{char}}  \n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[Character]"
+    },
+    {
+      "name": "should auto-trim {{if}} scoped content",
+      "input": "{{if yes}}\n  trimmed  \n{{/if}}",
+      "expected": "trimmed"
+    },
+    {
+      "name": "should preserve {{if}} whitespace with # flag",
+      "input": "{{#if yes}}\n  preserved  \n{{/if}}",
+      "expected": "\n  preserved  \n"
+    },
+    {
+      "name": "should auto-trim {{reverse}} scoped content",
+      "input": "{{reverse}}\n  abc  \n{{/reverse}}",
+      "expected": "cba"
+    },
+    {
+      "name": "should preserve {{reverse}} whitespace with # flag",
+      "input": "{{#reverse}}\n  abc  \n{{/reverse}}",
+      "expected": "\n  cba  \n"
+    },
+    {
+      "name": "should dedent consistent indentation from multiline content",
+      "input": "{{setvar::myvar}}\n  # Heading\n  Content here\n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[# Heading\nContent here]"
+    },
+    {
+      "name": "should dedent based on first non-empty line indentation",
+      "input": "{{setvar::myvar}}\n    line1\n    line2\n    line3\n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[line1\nline2\nline3]"
+    },
+    {
+      "name": "should preserve relative indentation when dedenting",
+      "input": "{{setvar::myvar}}\n  parent\n    child\n  sibling\n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[parent\n  child\nsibling]"
+    },
+    {
+      "name": "should handle mixed indentation levels correctly",
+      "input": "{{setvar::myvar}}\n  # Header\n    - item1\n    - item2\n  Paragraph\n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[# Header\n  - item1\n  - item2\nParagraph]"
+    },
+    {
+      "name": "should dedent {{if}} branches with indentation",
+      "input": "{{if yes}}\n  # Title\n  Body text\n{{/if}}",
+      "expected": "# Title\nBody text"
+    },
+    {
+      "name": "should dedent {{if}} else branch with indentation",
+      "input": "{{if false}}\n  Then branch\n{{else}}\n  # Else Title\n  Else body\n{{/if}}",
+      "expected": "# Else Title\nElse body"
+    },
+    {
+      "name": "should not dedent when # flag is set",
+      "input": "{{#setvar::myvar}}\n  # Heading\n  Content\n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[\n  # Heading\n  Content\n]"
+    },
+    {
+      "name": "should handle single line content without dedent issues",
+      "input": "{{setvar::myvar}}\n  single line\n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[single line]"
+    },
+    {
+      "name": "should handle empty lines in multiline content",
+      "input": "{{setvar::myvar}}\n  line1\n\n  line2\n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[line1\n\nline2]"
+    },
+    {
+      "name": "should dedent based on first non-empty line and preserve relative indentation",
+      "input": "{{setvar::myvar}}\n  First Line\n    Second Line, more indented\n  Third line\n    Fourth line, also more indented\n{{/setvar}}[{{getvar::myvar}}]",
+      "expected": "[First Line\n  Second Line, more indented\nThird line\n  Fourth line, also more indented]"
+    }
+  ],
+  "skipped": [
+    {
+      "name": "should return input unchanged when there are no macros",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should evaluate a simple macro without arguments",
+      "why": "依赖随机数/时间/聊天状态",
+      "input": "Start {{newline}} end."
+    },
+    {
+      "name": "should handle (legacy) whitespace separated unnamed argument",
+      "why": "依赖随机数/时间/聊天状态",
+      "input": "Values: {{roll 1d1}}!"
+    },
+    {
+      "name": "should support multi-line arguments for macros",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should keep unknown macro syntax but resolve nested macros inside it",
+      "why": "依赖随机数/时间/聊天状态",
+      "input": "Test: {{unknown::{{newline}}}}"
+    },
+    {
+      "name": "should keep surrounding text inside unknown macros intact",
+      "why": "依赖随机数/时间/聊天状态",
+      "input": "Test: {{unknown::my {{newline}} example}}"
+    },
+    {
+      "name": "should support legacy time macro with positive offset via pre-processing",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should support legacy time macro with negative offset via pre-processing",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should support legacy <USER> marker via pre-processing",
+      "why": "测试框架自定义处理器/自定义宏"
+    },
+    {
+      "name": "should support legacy <BOT> and <CHAR> markers via pre-processing",
+      "why": "测试框架自定义处理器/自定义宏"
+    },
+    {
+      "name": "should support legacy <GROUP> and <CHARIFNOTGROUP> markers via pre-processing (non-group fallback)",
+      "why": "测试框架自定义处理器/自定义宏"
+    },
+    {
+      "name": "should treat unterminated macro with identifier at end of input as plain text",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should treat invalid macro start as plain text when followed by non-identifier characters",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should treat unterminated macro in the middle of the string as plain text",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should treat stray closing braces outside macros as plain text",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should not resolve macro without arguments when called with arguments",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should not resolve reverse when called without arguments",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should not resolve reverse when called with too many arguments",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should not resolve list-bounded macro when called outside list bounds",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should not resolve strict typed macro when argument type is invalid",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should resolve non-strict typed macro when argument type is invalid but still log warning",
+      "why": "测试框架自定义宏",
+      "input": "Value: {{test-int-nonstrict::abc}}"
+    },
+    {
+      "name": "should expose original content as env.content to macro handlers",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should return stable results for the same chat and content",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should use different seeds for identical picks at different positions",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should use different seeds for identical picks inside different scoped macros at the same offset",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should use different seeds for identical picks in inline arguments",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should maintain stability across evaluations for picks in scoped content",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should use different seeds for identical picks inside different if blocks (delayArgResolution)",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should maintain stability for picks inside if blocks across evaluations",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should resolve dynamic macro with string value",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should resolve dynamic macro with numeric value converted to string",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should not resolve string dynamic macro when called with arguments",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should resolve dynamic macro with handler function",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should pass execution context to handler function",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should not resolve handler dynamic macro when called with arguments due to strict arity",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should resolve dynamic macro with MacroDefinitionOptions",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should support unnamed arguments in dynamic macro with options",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should support multiple unnamed arguments in dynamic macro",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should support optional arguments in dynamic macro",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should support list arguments in dynamic macro",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should enforce type validation in dynamic macro with options",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should respect strictArgs: false in dynamic macro with options",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should fail arity check in dynamic macro with options when too few args",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should fail arity check in dynamic macro with options when too many args",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should handle invalid MacroDefinitionOptions gracefully",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should override registered macro with dynamic macro of same name",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should match dynamic macro names case-insensitively",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should resolve multiple different dynamic macros in same evaluation",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should pass flags to macro handler",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should correctly identify individual flags in handler",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle multiple flags with whitespace",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should be equivalent to inline argument syntax",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should set isScoped to true for scoped macro invocation",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should set isScoped to false for inline argument syntax",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should keep scoped macro raw when argument count is below minimum",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate inner macros before outer macro in scoped content",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should run custom pre-processor before macro evaluation",
+      "why": "测试框架自定义处理器/自定义宏"
+    },
+    {
+      "name": "should run custom post-processor after macro evaluation",
+      "why": "测试框架自定义处理器/自定义宏"
+    },
+    {
+      "name": "should execute pre-processors in priority order (lower first)",
+      "why": "测试框架自定义处理器/自定义宏"
+    },
+    {
+      "name": "should execute post-processors in priority order (lower first)",
+      "why": "测试框架自定义处理器/自定义宏"
+    },
+    {
+      "name": "should successfully remove a registered pre-processor",
+      "why": "期望值不是单引号字面量（模板/变量/JS 计算）"
+    },
+    {
+      "name": "should return false when removing non-existent processor",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should pass env to pre-processor handlers",
+      "why": "测试框架自定义处理器/自定义宏"
+    },
+    {
+      "name": "should pass env to post-processor handlers",
+      "why": "测试框架自定义处理器/自定义宏"
+    },
+    {
+      "name": "should get local variable with . shorthand",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should get global variable with $ shorthand",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should set local variable with = shorthand",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should increment local variable with ++ shorthand",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should decrement global variable with -- shorthand",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should add to local variable with += shorthand",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should support nested macro in variable value",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle whitespace in variable shorthand",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle variable name with hyphens",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle variable name with underscores",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return empty string for non-existent variable",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should increment non-existent variable starting from 0",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle multiple variable operations in sequence",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should subtract from local variable with -= shorthand",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should subtract from global variable with -= shorthand",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return default value with || when variable is falsy (empty)",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return default value with || when variable is falsy (zero)",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return variable value with || when truthy",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return default value with || when variable does not exist",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return default value with ?? when variable does not exist",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return empty string with ?? when variable exists but is empty",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return zero with ?? when variable exists and is zero",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return variable value with ?? when it exists",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should set and return default with ||= when variable is falsy",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should not set and return current with ||= when variable is truthy",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should set and return default with ||= when variable does not exist",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should set and return default with ??= when variable does not exist",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should not set and return current with ??= when variable exists but is empty",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should not set and return current with ??= when variable exists and is zero",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when variable equals value with ==",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false when variable does not equal value with ==",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should compare empty variable correctly with ==",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should compare numeric value correctly with ==",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when variable does not equal value with !=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false when variable equals value with !=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should compare empty variable correctly with !=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should compare non-empty to empty with !=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should compare numeric value correctly with !=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when variable is greater than value with >",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false when variable is not greater than value with >",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false when variable equals value with >",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false for non-numeric values with >",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when variable is greater than value with >=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when variable equals value with >=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false when variable is less than value with >=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when variable is less than value with <",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false when variable is not less than value with <",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false when variable equals value with <",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false for non-numeric values with <",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when variable is less than value with <=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when variable equals value with <=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false when variable is greater than value with <=",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle negative numbers with > operator",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle negative numbers with < operator",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle decimal numbers with >= operator",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle decimal numbers with <= operator",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should use || with global variable",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should use ?? with global variable",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should use ||= with global variable",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should use ??= with global variable",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should use == with global variable",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should support nested macro in || fallback value",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should support nested macro in ?? fallback value",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle whitespace with || operator",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle whitespace with ?? operator",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should NOT evaluate ?? fallback when variable exists",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate ?? fallback when variable does not exist",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should NOT evaluate || fallback when variable is truthy",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate || fallback when variable is falsy",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should NOT evaluate ??= value when variable exists",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate ??= value when variable does not exist",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should NOT evaluate ||= value when variable is truthy",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate ||= value when variable is falsy",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should always evaluate = value expression",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should always evaluate += value expression",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should always evaluate == value expression",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should only evaluate value expression once when needed",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle = operator with empty value",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle += operator with empty value",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle -= operator with empty value (non-numeric)",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle || operator with empty fallback",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle ?? operator with empty fallback",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle == operator with empty comparison value",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle == operator comparing non-empty to empty",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return raw with trailing content after ++ operator",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return empty with trailing content after -- operator",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return raw with trailing content after -- operator separated by spaces",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate truthy local variable in if condition",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate falsy local variable in if condition",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate truthy global variable in if condition",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate inverted variable condition",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate inverted global variable condition",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should evaluate inverted condition with whitespace after !",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should treat non-existent variable as falsy in if condition",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle else branch with variable shorthand",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle variable with hyphen in if condition",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should work with variable set before if check",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should treat zero as falsy in if condition",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should treat non-zero number as truthy in if condition",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should NOT execute setvar in false branch",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should execute setvar in true branch",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should only execute setvar in chosen else branch",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should only execute setvar in chosen then branch",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should execute multiple setvars only in chosen branch",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle nested if with delayed resolution",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should work with variable shorthand condition and delayed resolution",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should handle inline if inside scoped if with else",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should correctly find outer else with multiple inline ifs",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when local variable exists",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false when local variable does not exist",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when local variable exists but is empty",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return true when global variable exists",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should return false when global variable does not exist",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should delete local variable",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should delete global variable",
+      "why": "input 不是单引号字面量"
+    },
+    {
+      "name": "should use hasvar in if condition",
+      "why": "input 不是单引号字面量"
+    }
+  ]
+}

@@ -11,6 +11,7 @@
 #include "CompletionPresetService.h"
 #include "GlobalConstants.h"
 #include "PromptBuilder.h"
+#include "SettingsService.h"
 #include "WorldInfoEntryEntity.h"
 #include "WorldInfoMatcher.h"
 #include "WorldInfoService.h"
@@ -72,6 +73,11 @@ QList<ChatMessage> buildChatPromptContext(
     const QList<PromptEntity> allPrompts =
             CompletionPresetService::instance().getPromptsByPresetId(preset.id);
 
+    // {{setvar}} 这类宏的变量是"每个聊天一份"，装配前要把作用域告诉 PromptBuilder
+    PromptBuilder::instance().setVariableSession(sessionId);
+
     return PromptBuilder::instance().buildChatMessages(
-            character, validHistory, userInput, preset, wir, allPrompts, personaDesc, generationType);
+            character, validHistory, userInput, preset, wir, allPrompts, personaDesc, generationType,
+            // {{user}} / 示例区的 name 从设置里取；PromptBuilder 本身不碰单例，方便单测
+            SettingsService::instance().getString(GlobalConstants::USER_NAME));
 }

@@ -40,7 +40,9 @@ public:
             ChatMessage c;
             c.role = m.role;
             c.appendText(m.content);
+            // 只有带 name 的消息（示例区）才把说话人发出去，历史消息保持不带 name（ST 默认行为）
             c.senderName = m.name;
+            c.includeName = !m.name.isEmpty();
             chat.append(c);
         }
         return chat;

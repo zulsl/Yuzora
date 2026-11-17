@@ -21,6 +21,7 @@ public:
         ModelError,             //AI模型错误
         PermissionError,        //权限错误
         OperationError,         //操作错误
+        PromptBuilderError,     //提示词构建错误
         UnknownError            //未知错误
     };
 

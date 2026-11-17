@@ -1,4 +1,4 @@
-﻿find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Sql Test)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Sql Test)
 
 qt_add_executable(YuzoraTests
     WorldInfoEntryListModelTest.cpp
@@ -383,6 +383,8 @@ qt_add_executable(YuzoraPromptBuilderTests
     PromptBuilderTest.cpp
     ../src/model/service/prompt/PromptBuilder.cpp
     ../src/model/service/prompt/PromptBuilder.h
+    ../src/model/service/prompt/MacroEngine.cpp
+    ../src/model/service/prompt/MacroEngine.h
     ../src/model/service/prompt/ChatCompletion.h
     ../src/model/service/prompt/ChatMessageGroup.h
     ../src/model/network/ChatMessage.cpp
@@ -393,6 +395,8 @@ qt_add_executable(YuzoraPromptBuilderTests
     ../src/model/entity/CompletionPresetEntity.h
     ../src/model/entity/WorldInfoEntryEntity.h
     ../src/model/entity/PromptEntity.h
+    ../src/base/AppException.cpp
+    ../src/base/AppException.h
     ../src/base/GlobalConstants.cpp
     ../src/base/GlobalConstants.h
 )
@@ -444,6 +448,29 @@ set_tests_properties(YuzoraWorldInfoMatcherTests PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
 )
 
+# 宏引擎：语料取自 SillyTavern 自己的 e2e 用例（tests/frontend/MacroEngine.e2e.js）
+qt_add_executable(YuzoraMacroEngineTests
+    MacroEngineTest.cpp
+    ../src/model/service/prompt/MacroEngine.cpp
+    ../src/model/service/prompt/MacroEngine.h
+)
+
+target_include_directories(YuzoraMacroEngineTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/prompt
+)
+
+target_compile_definitions(YuzoraMacroEngineTests PRIVATE
+    TEST_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/fixtures"
+)
+
+target_link_libraries(YuzoraMacroEngineTests PRIVATE Qt6::Core Qt6::Test)
+set_target_properties(YuzoraMacroEngineTests PROPERTIES WIN32_EXECUTABLE FALSE)
+
+add_test(NAME YuzoraMacroEngineTests COMMAND YuzoraMacroEngineTests)
+set_tests_properties(YuzoraMacroEngineTests PROPERTIES
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+)
+
 qt_add_executable(YuzoraPresetPromptListModelTests
     PresetPromptListModelTest.cpp
     ../src/model/list/preset/PresetPromptListModel.cpp
@@ -468,3 +495,12 @@ add_test(NAME YuzoraPresetPromptListModelTests COMMAND YuzoraPresetPromptListMod
 set_tests_properties(YuzoraPresetPromptListModelTests PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
 )
+
+# 对账工具自身的回归（不依赖用户数据）：
+#   prompt_diff.py --selftest 覆盖 identical/content/role/only-ours/only-st/换行 等分类。
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME PromptDiffToolSelftest
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/../tools/prompt_diff.py --selftest)
+endif()

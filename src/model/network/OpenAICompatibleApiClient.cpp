@@ -7,6 +7,7 @@
 #include <QUrl>
 #include <QUrlQuery>
 #include <QThread>
+#include <limits>
 
 OpenAICompatibleApiClient::OpenAICompatibleApiClient(QObject *parent)
 {
@@ -62,7 +63,15 @@ QJsonObject OpenAICompatibleApiClient::buildRequestBody(const QList<ChatMessage>
     // body["response_format"] = m_preset.response_format;
     // body["stop"] = m_preset.stop;
     body["temperature"] = m_preset.temperature;
-    body["top_p"] = m_preset.topP;
+
+    // top_p 的合法区间是 (0, 1.0]。预设里的 0 表示"不启用 top_p"，
+    // 直接发 0 会被服务端判成参数非法（DeepSeek 实测：
+    //   HTTP 400 "Invalid top_p value, the valid range of top_p is (0, 1.0]"）。
+    // ST 对 DeepSeek 就是这么处理的（openai.js:3015-3018）：
+    //   generate_data.top_p = generate_data.top_p || Number.EPSILON;
+    double topP = m_preset.topP;
+    if (topP <= 0.0) topP = std::numeric_limits<double>::epsilon();
+    body["top_p"] = topP;
 
 
     // 消息数组转换

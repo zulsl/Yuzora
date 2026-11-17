@@ -47,7 +47,10 @@ struct ToolCall {
 struct ChatMessage
 {
     GlobalConstants::MessageType role = GlobalConstants::User;  //发送者角色
-    QString senderName;                 // 发送者名称（工具调用/角色名）(无用,保留字段)
+    QString senderName;                 // 发送者名称（示例对话靠它区分说话人）
+    bool includeName = false;//是否把 senderName 作为 name 字段发给接口。
+    // ST 默认（names_behavior = DEFAULT）只有示例消息带 name，聊天历史不带；
+    // 打开会改变请求体，业务侧默认不开。
 
     QList<ContentPart> parts;           // 统一承载文本和图片
 

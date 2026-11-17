@@ -36,6 +36,11 @@ QJsonObject ChatMessage::toJson() const {
         obj["content"] = arr;
     }
 
+    // 说话人名字：ST 默认只有示例消息带 name（getChat() 里 message.name 有值才发）。
+    if (includeName && !senderName.isEmpty()) {
+        obj["name"] = senderName;
+    }
+
     if (!toolCalls.isEmpty()) {
         QJsonArray calls;
         for (const auto &call : toolCalls)

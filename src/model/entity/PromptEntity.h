@@ -17,7 +17,7 @@ public:
     QString presetId;             //所属预设id
     QString name;                 // 显示名称
     bool isActive = true;         //是否激活
-    GlobalConstants::MessageType role = GlobalConstants::MessageType::System;   // 0 system / 1 user / 2 assistant
+    GlobalConstants::MessageType role = GlobalConstants::System;   // 0 system / 1 user / 2 assistant
     QString content;              // 原始内容（含变量占位符）
     bool system_prompt = false;   // 是否为系统内置提示词(不可删除)
     bool marker = false;          // 是否为标记（如 charDescription, worldInfoBefore）

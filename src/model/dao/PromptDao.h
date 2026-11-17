@@ -12,6 +12,8 @@ public:
 
     QList<PromptEntity> selectPromptsByPresetId(const QString& presetId);
     bool createPrompts(const QList<PromptEntity>& prompts);
+    // 删除某个预设下的全部提示词（重新导入同名预设时整体替换用）
+    bool removeByPresetId(const QString& presetId);
 
 protected:
     // ========== 实现基类纯虚方法 ==========

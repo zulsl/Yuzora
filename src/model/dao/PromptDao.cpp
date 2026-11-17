@@ -72,6 +72,22 @@ bool PromptDao::createPrompts(const QList<PromptEntity> & prompts)
     return true;
 }
 
+bool PromptDao::removeByPresetId(const QString &presetId)
+{
+    QSqlDatabase db = connection();
+    QSqlQuery query(db);
+
+    const QString sql = QString("DELETE FROM %1 WHERE preset_id = ?").arg(tableName());
+    query.prepare(sql);
+    query.addBindValue(presetId);
+
+    if (!query.exec()) {
+        DatabaseError("removeByPresetId", query.lastError(), sql, query);
+        return false;
+    }
+    return true;
+}
+
 QString PromptDao::tableName() const
 {
     return "completion_presets_prompts";

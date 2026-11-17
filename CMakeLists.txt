@@ -94,6 +94,7 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/list/ChatSessionListModel.h src/model/list/ChatSessionListModel.cpp
         src/model/entity/ApiConfigEntity.h src/model/entity/CharacterEntity.h src/model/entity/ChatMessageEntity.h src/model/entity/ChatSessionEntity.h src/model/entity/CompletionPresetEntity.h src/model/entity/PromptEntity.h src/model/entity/SettingsEntity.h src/model/entity/VectorMemoryEntity.h src/model/entity/WorldInfoBookEntity.h src/model/entity/WorldInfoEntryEntity.h
         src/model/service/prompt/PromptBuilder.cpp src/model/service/prompt/PromptBuilder.h
+        src/model/service/prompt/MacroEngine.cpp src/model/service/prompt/MacroEngine.h
         src/model/list/preset/PresetPromptListModel.cpp src/model/list/preset/PresetPromptListModel.h
         src/model/list/preset/PresetListModel.cpp src/model/list/preset/PresetListModel.h
         src/model/dao/PromptDao.h src/model/dao/PromptDao.cpp

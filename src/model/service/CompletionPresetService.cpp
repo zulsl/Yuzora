@@ -5,6 +5,7 @@
 #include "ConnectionProviderRegistry.h"
 #include "IConnectionProvider.h"
 
+#include <QDateTime>
 #include <QSet>
 #include <QSqlDatabase>
 
@@ -111,7 +112,7 @@ void CompletionPresetService::CreateDefaultPromptEntries(const QString& presetId
     worldInfoAfter.id=Utils::generateUuid();
     worldInfoAfter.identifier = "worldInfoAfter";
     worldInfoAfter.presetId=presetId;
-    worldInfoAfter.name = "World Info (after)";
+    worldInfoAfter.name = "世界书之后";
     worldInfoAfter.system_prompt = true;
     worldInfoAfter.marker = true;
 
@@ -119,7 +120,7 @@ void CompletionPresetService::CreateDefaultPromptEntries(const QString& presetId
     personaDescription.id=Utils::generateUuid();
     personaDescription.identifier = "personaDescription";
     personaDescription.presetId=presetId;
-    personaDescription.name = "persona Description(人物描述)";
+    personaDescription.name = "(用户描述)";
     personaDescription.system_prompt = true;
     personaDescription.marker = true;
 
@@ -127,15 +128,15 @@ void CompletionPresetService::CreateDefaultPromptEntries(const QString& presetId
     charDescription.id=Utils::generateUuid();
     charDescription.identifier = "charDescription";
     charDescription.presetId=presetId;
-    charDescription.name = "char Description(角色描述)";
+    charDescription.name = "(角色描述)";
     charDescription.system_prompt = true;
     charDescription.marker = true;
 
     PromptEntity charPersonality;
     charPersonality.id=Utils::generateUuid();
-    charPersonality.identifier = "charDescription";
+    charPersonality.identifier = "charPersonality";
     charPersonality.presetId=presetId;
-    charPersonality.name = "char Description(角色性格)";
+    charPersonality.name = "(角色性格)";
     charPersonality.system_prompt = true;
     charPersonality.marker = true;
 
@@ -143,7 +144,7 @@ void CompletionPresetService::CreateDefaultPromptEntries(const QString& presetId
     scenario.id=Utils::generateUuid();
     scenario.identifier = "scenario";
     scenario.presetId=presetId;
-    scenario.name = "Character Scenario";
+    scenario.name = "(角色场景)";
     scenario.system_prompt = true;
     scenario.marker = true;
 
@@ -152,7 +153,7 @@ void CompletionPresetService::CreateDefaultPromptEntries(const QString& presetId
     enhanceDefinitions.identifier = "enhanceDefinitions";
     enhanceDefinitions.content = "If you have more knowledge of {{char}}, add to the character's lore and personality to enhance them but keep the Character Sheet's definitions absolute.";
     enhanceDefinitions.presetId=presetId;
-    enhanceDefinitions.name = "enhance Definitions(增强定义)";
+    enhanceDefinitions.name = "(增强定义)";
     enhanceDefinitions.system_prompt = true;
     enhanceDefinitions.marker = false;
     enhanceDefinitions.isActive = false;
@@ -161,15 +162,15 @@ void CompletionPresetService::CreateDefaultPromptEntries(const QString& presetId
     nsfw.id=Utils::generateUuid();
     nsfw.identifier = "nsfw";
     nsfw.presetId=presetId;
-    nsfw.name = "Auxiliary Prompt(辅助提示)";
+    nsfw.name = "(辅助提示)";
     nsfw.system_prompt = true;
     nsfw.marker = false;
 
     PromptEntity worldInfoBefore;
     worldInfoBefore.id=Utils::generateUuid();
-    worldInfoBefore.identifier = "worldInfoAfter";
+    worldInfoBefore.identifier = "worldInfoBefore";
     worldInfoBefore.presetId=presetId;
-    worldInfoBefore.name = "World Info (before)";
+    worldInfoBefore.name = "世界书之前";
     worldInfoBefore.system_prompt = true;
     worldInfoBefore.marker = true;
 
@@ -177,7 +178,7 @@ void CompletionPresetService::CreateDefaultPromptEntries(const QString& presetId
     dialogueExamples.id=Utils::generateUuid();
     dialogueExamples.identifier = "dialogueExamples";
     dialogueExamples.presetId=presetId;
-    dialogueExamples.name = "Chat Examples";
+    dialogueExamples.name = "对话示例";
     dialogueExamples.system_prompt = true;
     dialogueExamples.marker = true;
 
@@ -185,7 +186,7 @@ void CompletionPresetService::CreateDefaultPromptEntries(const QString& presetId
     chatHistory.id=Utils::generateUuid();
     chatHistory.identifier = "chatHistory";
     chatHistory.presetId=presetId;
-    chatHistory.name = "Chat History";
+    chatHistory.name = "聊天历史";
     chatHistory.system_prompt = true;
     chatHistory.marker = true;
 
@@ -212,8 +213,8 @@ void CompletionPresetService::CreateDefaultPromptEntries(const QString& presetId
 
 
     //顺序条目
-    promptOrderList<<"main"<<"worldInfoAfter"<<"personaDescription"<<"charDescription"
-        <<"charPersonality"<<"scenario"<<"enhanceDefinitions"<<"nsfw"<<"worldInfoBefore"
+    promptOrderList<<"main"<<"worldInfoBefore"<<"personaDescription"<<"charDescription"
+        <<"charPersonality"<<"scenario"<<"enhanceDefinitions"<<"nsfw"<<"worldInfoAfter"
         <<"dialogueExamples"<<"chatHistory"<<"jailbreak";
 
 }
@@ -566,16 +567,22 @@ CompletionPresetEntity CompletionPresetService::parsePresetDataToEntity(const QJ
     preset.topA = stJson.value("top_a").toDouble();
     preset.minP = stJson.value("min_p").toDouble();
 
-    //实用提示词
-    preset.impersonationPrompt = stJson.value("impersonation_prompt").toString();
-    preset.wiFormat = stJson.value("wi_format").toString();
-    preset.scenarioFormat = stJson.value("scenario_format").toString();
-    preset.personalityFormat = stJson.value("personality_format").toString();
-    preset.groupNudgePrompt = stJson.value("group_nudge_prompt").toString();
-    preset.newChatPrompt = stJson.value("new_chat_prompt").toString();
-    preset.newGroupChatPrompt = stJson.value("new_group_chat_prompt").toString();
-    preset.newExampleChatPrompt = stJson.value("new_example_chat_prompt").toString();
-    preset.continueNudgePrompt = stJson.value("continue_nudge_prompt").toString();
+    //实用提示词：字段存在才覆盖；**显式空串是有效值**（"不要 New Chat 标记"），
+    // 缺失时才保留实体默认（= ST 的 default_*，openai.js:107-114,428）。
+    const auto assignString = [&stJson](const char* key, QString& field) {
+        const QLatin1String name(key);
+        if (stJson.contains(name))
+            field = stJson.value(name).toString();
+    };
+    assignString("impersonation_prompt", preset.impersonationPrompt);
+    assignString("wi_format", preset.wiFormat);
+    assignString("scenario_format", preset.scenarioFormat);
+    assignString("personality_format", preset.personalityFormat);
+    assignString("group_nudge_prompt", preset.groupNudgePrompt);
+    assignString("new_chat_prompt", preset.newChatPrompt);
+    assignString("new_group_chat_prompt", preset.newGroupChatPrompt);
+    assignString("new_example_chat_prompt", preset.newExampleChatPrompt);
+    assignString("continue_nudge_prompt", preset.continueNudgePrompt);
 
     QHash<QString, bool> id_isActive;
 
@@ -683,11 +690,58 @@ int CompletionPresetService::importFromSillyTavern(const QString& filePath,const
         return 0;
     }
 
+    return importFromSillyTavernJson(doc.object(), fileName);
+}
+
+int CompletionPresetService::importFromSillyTavernJson(const QJsonObject& stJson,
+                                                      const QString& fileName)
+{
+    if (stJson.isEmpty()) {
+        emit operationError("文件读取失败或格式无效");
+        return 0;
+    }
+
     //读取并解析json
     QList<PromptEntity> promptList;
-    CompletionPresetEntity entity=parsePresetDataToEntity(doc.object(),fileName,promptList);
-    createPreset(entity);
-    createPrompts(promptList);
+    CompletionPresetEntity entity = parsePresetDataToEntity(stJson, fileName, promptList);
+
+    // 同名预设覆盖更新：ST 那边的预设是会变的（用户会开关提示词、改正文）。
+    // 如果导入时总是新建一份，库里就会留着一份旧数据——实例：狐神抚的
+    // 3a59f94a(19907 字) 在 ST 里已禁用，库里还是启用，请求体里白白多一整块。
+    CompletionPresetEntity existing;
+    for (const CompletionPresetEntity& preset : m_completionPresetDao->selectAll()) {
+        if (preset.name == fileName) {
+            existing = preset;
+            break;
+        }
+    }
+
+    if (!existing.id.isEmpty()) {
+        entity.id = existing.id;
+        entity.isActive = existing.isActive;      // 别把当前激活的预设弄丢
+        entity.createdAt = existing.createdAt;
+        entity.updatedAt = QDateTime::currentDateTime();
+
+        if (!updatePreset(entity)) return 0;
+        if (!m_promptDao->removeByPresetId(entity.id)) {
+            emit operationError("旧提示词清理失败");
+            return 0;
+        }
+        for (PromptEntity& prompt : promptList) prompt.presetId = entity.id;
+        if (!createPrompts(promptList)) {
+            emit operationError("提示词写入失败");
+            return 0;
+        }
+        Utils::writeLog("INFO", "CompletionPresetService", "覆盖更新预设: " + fileName);
+        return 1;
+    }
+
+    const QString newId = createPreset(entity);
+    if (newId.isEmpty()) return 0;          // createPreset 已经 emit 过 operationError
+    if (!createPrompts(promptList)) {
+        emit operationError("提示词写入失败");
+        return 0;
+    }
 
     return 1;
 }

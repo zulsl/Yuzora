@@ -14,10 +14,13 @@
 
 #include "DeviceHelper.h"
 #include "ExceptionHandler.h"
+#include "ScopeTimer.h"
 
 // ---------- 字符串与提示词模板处理 ----------
 QString Utils::replacePromptVariables(const QString& templateStr, const QVariantMap& vars)
 {
+    ScopeTimer t("宏替换:");
+
     // result 保存最终输出副本
     QString result = templateStr;
 

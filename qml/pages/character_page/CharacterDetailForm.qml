@@ -266,7 +266,7 @@ Item {
                     { field: "personality", label: "性格特征", maxLines: 4 },
                     { field: "scenario", label: "对话场景设定", maxLines: 4 },
                     { field: "exampleDialogue", label: "示例对话", maxLines: 6 },
-                    { field: "systemPrompt", label: "角色专属系统提示词", maxLines: 4 }
+                    { field: "systemPrompt", label: "角色专属系统提示词(该提示词会覆盖预设的主提示词,谨慎输入)", maxLines: 4 }
                 ]
 
                 LongTextField {
