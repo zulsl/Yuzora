@@ -19,8 +19,7 @@ QML_ELEMENT
 // ======================================
     // 应用基础信息
     //Q_GLOBAL_STATIC替换const QString APP_NAME = "Yuzora";更好的全局静态变量
-    const QString APP_NAME = "Yuzora";
-    const QVersionNumber APP_VERSION = QVersionNumber(2, 0, 0);
+    const QString APP_NAME = "Yuzora";  //内部文件统一名称,文件路径依赖该名称,不可更改
 
     //数据库常量
     const QString DB_FILE_NAME = "Yuzora_data.db";

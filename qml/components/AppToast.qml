@@ -10,7 +10,8 @@ Popup {
 
     property string message: ""
     property bool isError: false
-    readonly property int autoHideMs: 3000
+    // 错误信息通常要读两遍，给的时间比普通提示长；点一下也能直接关掉
+    readonly property int autoHideMs: isError ? 8000 : 3000
 
     function showToast(msg, error) {
         if (msg === undefined || msg === null || msg === "") return
@@ -52,6 +53,11 @@ Popup {
         bottomPadding: Theme.spaceSm
         leftPadding: Theme.spaceLg
         rightPadding: Theme.spaceLg
+
+        // 点一下立即关掉：错误提示不该挡住操作
+        TapHandler {
+            onTapped: root.close()
+        }
     }
 
     enter: Transition {

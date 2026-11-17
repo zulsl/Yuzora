@@ -8,6 +8,8 @@
 #include "GlobalConstants.h"
 
 #include <QDir>
+#include <QClipboard>
+#include <QGuiApplication>
 
 ChatViewModel::ChatViewModel(QObject* parent)
     : QObject(parent)
@@ -85,6 +87,8 @@ ChatViewModel::ChatViewModel(QObject* parent)
             this, &ChatViewModel::onGenerationFinished);
     connect(m_chatService, &ChatService::generationFailed,
             this, &ChatViewModel::onGenerationFailed);
+    connect(m_chatService, &ChatService::generationErrorDetail,
+            this, &ChatViewModel::onGenerationErrorDetail);
     connect(m_chatService, &ChatService::generationCanceled,
             this, &ChatViewModel::onGenerationCanceled);
 
@@ -144,6 +148,16 @@ bool ChatViewModel::sendWithEnter() const
 ChatMessageListModel* ChatViewModel::messageModel() const
 {
     return m_messageModel;
+}
+
+QString ChatViewModel::lastGenerationError() const
+{
+    return m_lastGenerationError;
+}
+
+QString ChatViewModel::lastGenerationErrorDetail() const
+{
+    return m_lastGenerationErrorDetail;
 }
 
 // ======================================
@@ -264,7 +278,7 @@ void ChatViewModel::onSessionSwitched(const QString& characterId, const QString&
     // 重置消息列表与分页
     m_messageModel->clear();
     loadInitialMessages();
-
+    clearGenerationError();
 }
 
 void ChatViewModel::onMessageAppended(const ChatMessageEntity& message)
@@ -291,6 +305,7 @@ void ChatViewModel::onMessageDeleted(const QString& messageId)
 void ChatViewModel::onGenerationStarted(const QString& messageId)
 {
     Q_UNUSED(messageId)
+    clearGenerationError();
     m_isGenerating = true;
     emit isGeneratingChanged();
 }
@@ -326,9 +341,52 @@ void ChatViewModel::onGenerationFailed(const QString& messageId, int errorCode, 
     Q_UNUSED(errorCode)
     m_isGenerating = false;
     emit isGeneratingChanged();
+
+    // 细节信号先于本槽到达（ChatService 保证顺序），这里只需把结论存下来
+    m_lastGenerationError = errorMsg;
+    emit lastGenerationErrorChanged();
+
     emit generationError(errorMsg);
     m_messageModel->updateMessageStatus(messageId,
         static_cast<int>(GlobalConstants::MessageGenerationStatus::Failed));
+}
+
+void ChatViewModel::onGenerationErrorDetail(const QString& detail)
+{
+    m_lastGenerationErrorDetail = detail;
+    emit lastGenerationErrorDetailChanged();
+}
+
+void ChatViewModel::clearGenerationError()
+{
+    if (!m_lastGenerationError.isEmpty()) {
+        m_lastGenerationError.clear();
+        emit lastGenerationErrorChanged();
+    }
+    if (!m_lastGenerationErrorDetail.isEmpty()) {
+        m_lastGenerationErrorDetail.clear();
+        emit lastGenerationErrorDetailChanged();
+    }
+}
+
+void ChatViewModel::dismissGenerationError()
+{
+    clearGenerationError();
+}
+
+void ChatViewModel::copyGenerationError()
+{
+    QString text = m_lastGenerationError;
+    if (!m_lastGenerationErrorDetail.isEmpty()) {
+        if (!text.isEmpty())
+            text += QStringLiteral("\n\n");
+        text += m_lastGenerationErrorDetail;
+    }
+    if (text.isEmpty())
+        return;
+
+    QGuiApplication::clipboard()->setText(text);
+    emit operationTip(QStringLiteral("错误详情已复制"));
 }
 
 void ChatViewModel::onGenerationCanceled(const QString& messageId)

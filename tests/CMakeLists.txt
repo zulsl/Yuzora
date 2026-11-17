@@ -349,6 +349,8 @@ qt_add_executable(YuzoraApiConfigViewModelTests
     ../src/model/dao/ConnectionProviderRegistry.h
     ../src/model/network/BaseApiClient.cpp
     ../src/model/network/BaseApiClient.h
+    ../src/model/network/NetworkError.cpp
+    ../src/model/network/NetworkError.h
     ../src/model/network/ChatMessage.cpp
     ../src/model/network/ChatMessage.h
     ../src/model/entity/ApiConfigEntity.h
@@ -468,6 +470,25 @@ set_target_properties(YuzoraMacroEngineTests PROPERTIES WIN32_EXECUTABLE FALSE)
 
 add_test(NAME YuzoraMacroEngineTests COMMAND YuzoraMacroEngineTests)
 set_tests_properties(YuzoraMacroEngineTests PROPERTIES
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+)
+
+# 网络错误分类：纯函数，不依赖真实网络
+qt_add_executable(YuzoraNetworkErrorTests
+    NetworkErrorTest.cpp
+    ../src/model/network/NetworkError.cpp
+    ../src/model/network/NetworkError.h
+)
+
+target_include_directories(YuzoraNetworkErrorTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/network
+)
+
+target_link_libraries(YuzoraNetworkErrorTests PRIVATE Qt6::Core Qt6::Network Qt6::Test)
+set_target_properties(YuzoraNetworkErrorTests PROPERTIES WIN32_EXECUTABLE FALSE)
+
+add_test(NAME YuzoraNetworkErrorTests COMMAND YuzoraNetworkErrorTests)
+set_tests_properties(YuzoraNetworkErrorTests PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
 )
 

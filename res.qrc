@@ -20,6 +20,17 @@
         <file>res/history.svg</file>
         <file>res/message-circle-plus.svg</file>
         <file>res/app/app_logo.png</file>
+        <file>res/app/yuzora-16.png</file>
+        <file>res/app/yuzora-20.png</file>
+        <file>res/app/yuzora-24.png</file>
+        <file>res/app/yuzora-32.png</file>
+        <file>res/app/yuzora-40.png</file>
+        <file>res/app/yuzora-48.png</file>
+        <file>res/app/yuzora-64.png</file>
+        <file>res/app/yuzora-96.png</file>
+        <file>res/app/yuzora-128.png</file>
+        <file>res/app/yuzora-256.png</file>
+        <file>res/app/yuzora-512.png</file>
         <file>res/main_page/adjustments-horizontal.svg</file>
         <file>res/main_page/book.svg</file>
         <file>res/main_page/book-2.svg</file>

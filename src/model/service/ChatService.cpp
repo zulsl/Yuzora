@@ -33,6 +33,9 @@ ChatService::ChatService(const ChatServiceDependencies& deps, QObject* parent)
                 this, &ChatService::onCompletionFinished);
         connect(m_completion, &ChatCompletionRunner::failed,
                 this, &ChatService::onCompletionFailed);
+        // 细节先于 failed 到达，先存起来，等 onCompletionFailed 一起交给 ViewModel
+        connect(m_completion, &ChatCompletionRunner::failedDetail,
+                this, [this](const QString& detail) { m_lastErrorDetail = detail; });
     }
 
     // 开场白状态透传给 QML（三个属性 + 一个 NOTIFY 信号对外保持不变）
@@ -347,6 +350,7 @@ bool ChatService::startGeneration(const QString& userInput, const QString& gener
 
     m_generatingMessageId = assistantMsgId;
     m_fullResponse.clear();
+    m_lastErrorDetail.clear();
     m_isGenerating = true;
     emit generationStarted(assistantMsgId);
 
@@ -356,6 +360,7 @@ bool ChatService::startGeneration(const QString& userInput, const QString& gener
 
 void ChatService::failGeneration(const QString& assistantMsgId, const QString& error)
 {
+    m_lastErrorDetail.clear();
     if (assistantMsgId.isEmpty()) {
         emit operationError(error);
         return;
@@ -501,6 +506,7 @@ void ChatService::cancelGeneration()
 
     if (m_completion) m_completion->cancel();
     m_isGenerating = false;
+    m_lastErrorDetail.clear();
 
     // 标记消息为已取消
     m_messageDao->updateStatus(m_generatingMessageId,
@@ -582,6 +588,13 @@ void ChatService::onCompletionFailed(const QString& error)
 
     emit messageStatusChanged(m_generatingMessageId,
         static_cast<int>(GlobalConstants::MessageGenerationStatus::Failed));
+
+    // 细节先发：ViewModel 收到 generationFailed 时已经能拿到技术细节
+    const QString detail = m_lastErrorDetail;
+    m_lastErrorDetail.clear();
+    if (!detail.isEmpty())
+        emit generationErrorDetail(detail);
+
     emit generationFailed(m_generatingMessageId,
         static_cast<int>(AppException::ErrorCode::NetworkError), error);
 

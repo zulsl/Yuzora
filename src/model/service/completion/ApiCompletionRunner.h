@@ -21,7 +21,7 @@ private:
     void releaseClient();
     void onChunk(const QString& chunk);
     void onFinished(const QString& fullText);
-    void onFailed(const QString& error);
+    void onFailed(const QString& error, const QString& detail);
 
     BaseApiClient* m_client = nullptr;
 };

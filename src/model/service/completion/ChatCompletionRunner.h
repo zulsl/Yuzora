@@ -31,6 +31,9 @@ signals:
     void chunkReceived(const QString& chunk);  // 流式增量
     void finished(const QString& fullText);    // 完成（流式/非流式都会给完整文本）
     void failed(const QString& error);         // 失败（含"未配置 API"这类前置错误）
+    // 失败的技术细节（分类/地址/状态码/原始错误）。先于 failed 发出，可能为空。
+    // 单独一个信号是为了不改变 failed 的既有签名（ChatService、测试里的假实现都依赖它）。
+    void failedDetail(const QString& detail);
 };
 
 #endif // CHATCOMPLETIONRUNNER_H

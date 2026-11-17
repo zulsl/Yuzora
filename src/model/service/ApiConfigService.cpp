@@ -3,6 +3,7 @@
 #include "BaseApiClient.h"
 #include "GlobalConstants.h"
 #include "ModelFactory.h"
+#include "Utils.h"
 #include <QUuid>
 #include <QDateTime>
 
@@ -162,8 +163,12 @@ void ApiConfigService::fetchModelList(const QString &configId)
             });
 
     connect(tempClient, &BaseApiClient::requestFailed,
-            this, [this, configId, tempClient](const QString& error) {
-                emit operationError(error);
+            this, [this, configId, tempClient](const QString& message, const QString& detail) {
+                if (!detail.isEmpty()) {
+                    Utils::writeLog("ERROR", "ApiConfigService",
+                                    QStringLiteral("获取模型列表失败：\n%1").arg(detail));
+                }
+                emit operationError(message);
                 tempClient->deleteLater();
                 emit fetchModelListEnd(configId);
             });

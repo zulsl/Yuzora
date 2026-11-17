@@ -37,7 +37,8 @@ Item {
         target: ChatViewModel
         function onOperationError(message) { Ui.toast(message, true) }
         function onOperationTip(message) { Ui.toast(message, false) }
-        function onGenerationError(message) { Ui.toast(message, true) }
+        // 生成失败不再走 toast：ChatPage 里有常驻错误卡片（结论/建议/详情/复制），
+        // 弹 toast 会重复，而且 3 秒根本读不完。
     }
 
     Connections {

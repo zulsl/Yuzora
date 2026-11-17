@@ -49,7 +49,8 @@ signals:
 //==========公有信号==========
     void streamChunkReceived(const QString& chunk);// 流式模式下，每收到一个数据块信号
     void completionFinished(const QString& fullText);// 非流式模式下，收到完整响应信号
-    void requestFailed(const QString& error);// 请求错误信号
+    // message：给用户看的结论 + 建议；detail：分类、地址、状态码、原始错误、响应片段
+    void requestFailed(const QString& message, const QString& detail);// 请求错误信号
     void cancelled();// 请求被用户取消
     void tokenUsageUpdated(int promptTokens, int completionTokens,int totalTokens);//令牌使用情况已更新(未完成)
     void modelListFetched(const QStringList& modelNames);//拉取模型列表槽,返回模型名列表
@@ -83,7 +84,6 @@ private slots:
 
 private:
     void processSseBuffer();//处理sse
-    void handleError(QNetworkReply::NetworkError error);//处理错误()
 
 
     QNetworkAccessManager* m_networkManager = nullptr;  //网络管理器

@@ -109,6 +109,8 @@ signals:
     void generationChunk(const QString& messageId, const QString& chunk);//收到流块
     void generationFinished(const QString& messageId, const QString& fullText);//生成完成
     void generationFailed(const QString& messageId, int errorCode, const QString& errorMsg);//生成失败
+    // 失败的技术细节（分类/地址/HTTP 状态/原始错误），先于 generationFailed 发出
+    void generationErrorDetail(const QString& detail);
     void generationCanceled(const QString& messageId);
 
     void operationTip(const QString& tipMsg);//提示信息
@@ -154,6 +156,7 @@ private:
     // 运行时状态（唯一可信源）
     QString m_generatingMessageId;//回复消息id
     QString m_fullResponse;//完整回复内容()
+    QString m_lastErrorDetail;//最近一次失败的技术细节（failedDetail 先到，generationFailed 时消费）
     bool m_isGenerating = false;//正在生成
 };
 

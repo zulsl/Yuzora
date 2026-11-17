@@ -6,7 +6,9 @@
 #include <QNetworkReply>
 #include <QJsonDocument>
 #include <QThread>
+#include <QUrl>
 
+#include "NetworkError.h"
 #include "Utils.h"
 
 BaseApiClient::BaseApiClient(QObject* parent)
@@ -100,17 +102,40 @@ void BaseApiClient::fetchModelList()
         if (m_currentReply->error() == QNetworkReply::NoError)
         {
             //读取并保存模型列表
-            QStringList modelNames = parseModelList(m_currentReply->readAll());
-            qDebug()<<"模型获取成功:"<<modelNames;
-            emit modelListFetched(modelNames);
+            const QByteArray body = m_currentReply->readAll();
+            const QStringList modelNames = parseModelList(body);
+
+            if (modelNames.isEmpty()) {
+                // 200 但没有模型：可能是服务端回了 error（有的网关这么干），
+                // 也可能这个接口根本不支持 /models——两种都别报"获取成功"。
+                const QString endpoint = m_currentReply->url().toString(QUrl::RemoveQuery);
+                NetworkError::Info info =
+                    NetworkError::classify(0, 200, QString(), body, endpoint);
+                if (info.providerMessage.isEmpty()) {
+                    info = NetworkError::emptyResponse(
+                        endpoint,
+                        QStringLiteral("接口没有返回任何模型"),
+                        QStringLiteral("确认 baseDomain 以 /v1 结尾，并且该服务支持 GET /models；"
+                                       "有些服务不提供模型列表，需要手动填写模型名。"));
+                }
+                Utils::writeLog("ERROR", "BaseApiClient",
+                                QStringLiteral("模型列表为空：\n%1\n响应体：%2")
+                                    .arg(info.detail(), QString::fromUtf8(body.left(2000))));
+                emit requestFailed(info.userMessage(), info.detail());
+            } else {
+                qDebug() << "模型获取成功:" << modelNames;
+                emit modelListFetched(modelNames);
+            }
         }
         else
         {
-            QNetworkReply::NetworkError err = m_currentReply->error();
-            QString errMsg = m_currentReply->errorString();
-            qDebug()<<err;
-            qDebug()<<errMsg;
-            emit requestFailed(QString(errMsg));
+            const QByteArray errorBody = m_currentReply->readAll();
+            const NetworkError::Info info =
+                NetworkError::fromReply(m_currentReply, errorBody);
+            Utils::writeLog("ERROR", "BaseApiClient",
+                            QStringLiteral("拉取模型列表失败：\n%1\n响应体：%2")
+                                .arg(info.detail(), QString::fromUtf8(errorBody.left(2000))));
+            emit requestFailed(info.userMessage(), info.detail());
         }
         m_currentReply->deleteLater();
         m_currentReply = nullptr;
@@ -259,44 +284,18 @@ void BaseApiClient::onFinished()
     //请求错误
     if (err != QNetworkReply::NoError) {
         // 错误响应体可能已经被 onReadyRead 读进 m_streamBuffer 了，
-        // 此时 reply->readAll() 是空的——两个都要看，否则永远显示"（响应体为空）"。
+        // 此时 reply->readAll() 是空的——两个都要看。
         QByteArray errorBody = m_streamBuffer;
         errorBody += reply->readAll();
         m_streamBuffer.clear();
-        QString errorMsg = reply->errorString();
 
-        // HTTP/2 没有 reason phrase，Qt 的 errorString 会变成
-        // "server replied: \"\""，看不出到底是 400 还是 401。把状态码和
-        // 响应体里的 error.message 都补进去。
-        const QVariant statusVar = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
-        const int status = statusVar.isValid() ? statusVar.toInt() : 0;
-
-        if (!errorBody.isEmpty()) {
-            QJsonDocument doc = QJsonDocument::fromJson(errorBody);
-            if (doc.isObject()) {
-                QJsonObject obj = doc.object();
-                if (obj.contains("error")) {
-                    QJsonObject errObj = obj.value("error").toObject();
-                    const QString message = errObj.value("message").toString();
-                    if (!message.isEmpty()) errorMsg = message;
-                }
-            }
-        }
-
-        if (status > 0) {
-            errorMsg = QStringLiteral("HTTP %1：%2").arg(status).arg(errorMsg);
-        }
-        if (errorBody.isEmpty()) {
-            errorMsg += QStringLiteral("（响应体为空）");
-        } else {
-            Utils::writeLog("ERROR", "BaseApiClient",
-                            QStringLiteral("请求失败 status=%1 body=%2")
-                                .arg(status)
-                                .arg(QString::fromUtf8(errorBody.left(2000))));
-        }
-
-        qWarning().noquote() << "请求失败:" << errorMsg;
-        emit requestFailed(errorMsg);
+        // 统一翻译成「结论 + 建议 + 技术细节」；原始 body 只进日志，不进界面
+        const NetworkError::Info info = NetworkError::fromReply(reply, errorBody);
+        Utils::writeLog("ERROR", "BaseApiClient",
+                        QStringLiteral("请求失败：\n%1\n响应体：%2")
+                            .arg(info.detail(), QString::fromUtf8(errorBody.left(2000))));
+        qWarning().noquote() << "请求失败:" << info.userMessage();
+        emit requestFailed(info.userMessage(), info.detail());
         return;
     }
 
@@ -312,26 +311,40 @@ void BaseApiClient::onFinished()
         QByteArray rawData = m_streamBuffer;
         m_streamBuffer.clear();
 
+        const QString endpoint = reply->url().toString(QUrl::RemoveQuery);
+        const QVariant statusVar = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute);
+        const int status = statusVar.isValid() ? statusVar.toInt() : 0;
+
         QJsonParseError parseErr;
         QJsonDocument doc = QJsonDocument::fromJson(rawData, &parseErr);
         if (parseErr.error != QJsonParseError::NoError) {
-            // cancelAllRequests();
-            emit requestFailed(QStringLiteral("响应解析失败：%1").arg(parseErr.errorString()));
+            const NetworkError::Info info =
+                NetworkError::parseFailure(parseErr.errorString(), rawData, endpoint, status);
+            Utils::writeLog("ERROR", "BaseApiClient",
+                            QStringLiteral("响应解析失败：\n%1").arg(info.detail()));
+            emit requestFailed(info.userMessage(), info.detail());
             return;
         }
         if (!doc.isObject()) {
-            // cancelAllRequests();
-            emit requestFailed(QStringLiteral("响应格式错误，非JSON对象"));
+            const NetworkError::Info info = NetworkError::parseFailure(
+                QStringLiteral("响应是合法 JSON，但不是对象"), rawData, endpoint, status);
+            emit requestFailed(info.userMessage(), info.detail());
             return;
         }
 
         QJsonObject root = doc.object();
-        // 检查业务错误
+        // 检查业务错误（有些服务 HTTP 200 也返回 error）
         if (root.contains("error")) {
-            QJsonObject errObj = root.value("error").toObject();
-            QString msg = errObj.value("message").toString(QStringLiteral("未知接口错误"));
-            // cancelAllRequests();
-            emit requestFailed(msg);
+            NetworkError::Info info = NetworkError::classify(0, status, QString(), rawData, endpoint);
+            if (info.providerMessage.isEmpty()) {
+                info.kind = NetworkError::Kind::BadRequest;
+                info.summary = QStringLiteral("服务返回错误");
+                info.hint = QStringLiteral("服务端给了 error 字段但没给说明，"
+                                           "查看详情里的响应片段。");
+            }
+            Utils::writeLog("ERROR", "BaseApiClient",
+                            QStringLiteral("业务错误：\n%1").arg(info.detail()));
+            emit requestFailed(info.userMessage(), info.detail());
             return;
         }
 
@@ -397,31 +410,5 @@ void BaseApiClient::processSseBuffer()
             emit streamChunkReceived(chunk);
         }
     }
-}
-
-void BaseApiClient::handleError(QNetworkReply::NetworkError error)
-{
-    Q_UNUSED(error);
-    if (!m_currentReply) return;
-
-    QString errorString = m_currentReply->errorString();
-
-    // 尝试解析响应体中的业务错误信息（如 OpenAI 的 error.message）
-    QByteArray errorBody = m_currentReply->readAll();
-    if (!errorBody.isEmpty()) {
-        QJsonDocument doc = QJsonDocument::fromJson(errorBody);
-        if (doc.isObject()) {
-            QJsonObject root = doc.object();
-            if (root.contains("error")) {
-                QJsonObject errorObj = root.value("error").toObject();
-                QString msg = errorObj.value("message").toString();
-                if (!msg.isEmpty()) {
-                    errorString = msg;
-                }
-            }
-        }
-    }
-
-    emit requestFailed(errorString);
 }
 

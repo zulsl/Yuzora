@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(Yuzora VERSION 2.0.0 LANGUAGES CXX)
+project(Yuzora VERSION 1.0.0 LANGUAGES CXX)
+
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -14,6 +15,18 @@ qt_standard_project_setup(REQUIRES 6.8)
 qt_add_executable(${PROJECT_NAME}
     main.cpp
 )
+
+# 宏定义,版本号唯一权威来源
+add_definitions(-DAPP_VERSION="${PROJECT_VERSION}")
+
+# Windows：把 .ico 编进 exe（资源管理器/任务栏固定项显示的图标）。
+# Qt 的 setWindowIcon 只改运行时的窗口图标，不改 exe 文件本身的图标。
+# OBJECT_DEPENDS 让 .ico 变化时 rc 会重编——否则 CMake 只盯着 app.rc，换了图标 exe 还是旧的。
+if(WIN32)
+    target_sources(${PROJECT_NAME} PRIVATE app.rc)
+    set_source_files_properties(app.rc PROPERTIES
+        OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/res/app/yuzora.ico")
+endif()
 
 if(ANDROID)
     # 安卓openssl需自己导入
@@ -61,7 +74,7 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/ApplicationBootstrap.cpp src/model/ApplicationBootstrap.h
         src/viewmodel/ApiConfigViewModel.h src/viewmodel/CharacterViewModel.h src/viewmodel/CharacterDraft.h src/viewmodel/ChatViewModel.h src/viewmodel/CompletionPresetViewModel.h src/viewmodel/CompletionPresetDraft.h src/viewmodel/SettingsViewModel.h src/viewmodel/WorldInfoViewModel.h src/viewmodel/WorldInfoEntryViewModel.h
         src/model/dao/CharacterDao.h src/model/dao/ChatMessageDao.h src/model/dao/ChatSessionDao.h src/model/dao/CompletionPresetDao.h src/model/dao/SettingsDao.h src/model/dao/VectorMemoryDao.h src/model/dao/WorldInfoBookDao.h
-        src/model/network/BaseApiClient.cpp src/model/network/BaseApiClient.h src/model/network/ClaudeApiClient.cpp src/model/network/ClaudeApiClient.h src/model/network/DeepSeekApiClient.cpp src/model/network/DeepSeekApiClient.h src/model/network/DoubaoApiClient.cpp src/model/network/DoubaoApiClient.h src/model/network/GeminiApiClient.cpp src/model/network/GeminiApiClient.h src/model/network/ModelFactory.cpp src/model/network/ModelFactory.h
+        src/model/network/BaseApiClient.cpp src/model/network/BaseApiClient.h src/model/network/NetworkError.cpp src/model/network/NetworkError.h src/model/network/ClaudeApiClient.cpp src/model/network/ClaudeApiClient.h src/model/network/DeepSeekApiClient.cpp src/model/network/DeepSeekApiClient.h src/model/network/DoubaoApiClient.cpp src/model/network/DoubaoApiClient.h src/model/network/GeminiApiClient.cpp src/model/network/GeminiApiClient.h src/model/network/ModelFactory.cpp src/model/network/ModelFactory.h
         src/model/service/CharacterCardParser.h src/model/service/ChatService.h src/model/service/MemoryService.h src/model/service/WorldInfoMatcher.h
         src/model/list/CharacterListModel.h src/model/list/ChatMessageListModel.h
         src/model/dao/CharacterDao.cpp src/model/dao/ChatMessageDao.cpp src/model/dao/ChatSessionDao.cpp src/model/dao/CompletionPresetDao.cpp src/model/dao/SettingsDao.cpp src/model/dao/VectorMemoryDao.cpp src/model/dao/WorldInfoBookDao.cpp

@@ -59,6 +59,10 @@ public:
     Q_PROPERTY(int greetingCount READ greetingCount NOTIFY greetingStateChanged FINAL)
     //当前会话已经加载的消息条数（开场白切换只在"只剩开场白一条"时开放）
     Q_PROPERTY(int messageCount READ messageCount NOTIFY messageCountChanged FINAL)
+    //最近一次生成失败的结论 + 建议（空 = 没有错误）
+    Q_PROPERTY(QString lastGenerationError READ lastGenerationError NOTIFY lastGenerationErrorChanged FINAL)
+    //最近一次生成失败的技术细节（分类/地址/HTTP 状态/原始错误）
+    Q_PROPERTY(QString lastGenerationErrorDetail READ lastGenerationErrorDetail NOTIFY lastGenerationErrorDetailChanged FINAL)
 
 
 public:
@@ -79,6 +83,8 @@ public:
     int greetingIndex() const;
     int greetingCount() const;
     int messageCount() const;
+    QString lastGenerationError() const;
+    QString lastGenerationErrorDetail() const;
 
 
 
@@ -96,6 +102,8 @@ public:
     Q_INVOKABLE void renameSession(const QString& sessionId, const QString& title);//重命名会话
     Q_INVOKABLE void loadMoreHistory();//加载更多历史记录
     Q_INVOKABLE void switchGreeting(int delta);//切换开场白（+1 下一条 / -1 上一条，循环）
+    Q_INVOKABLE void dismissGenerationError();//关闭错误提示
+    Q_INVOKABLE void copyGenerationError();//复制错误详情到剪贴板
 
 
 
@@ -107,6 +115,8 @@ signals:
     void hasMoreHistoryChanged();
     void sendWithEnterChanged();
     void generationError(const QString& errorMsg);
+    void lastGenerationErrorChanged();
+    void lastGenerationErrorDetailChanged();
 
     void operationError(const QString& errorMsg);//错误信息
     void operationTip(const QString& tipMsg);//提示信息
@@ -126,10 +136,12 @@ private slots:
     void onGenerationChunk(const QString& messageId, const QString& chunk);//收到流块
     void onGenerationFinished(const QString& messageId, const QString& fullText);
     void onGenerationFailed(const QString& messageId, int errorCode, const QString& errorMsg);
+    void onGenerationErrorDetail(const QString& detail);
     void onGenerationCanceled(const QString& messageId);
 
 private:
     void loadInitialMessages();//加载初始消息
+    void clearGenerationError();//清空错误提示（内部用，统一发通知）
     void refreshSessionList();//刷新会话列表
     ChatMessageItemModel* createItemFromEntity(const ChatMessageEntity& entity);//从实体创建项
 
@@ -142,6 +154,8 @@ private:
     QDateTime m_oldestMessageTime;
     QString m_oldestMessageId;
     bool m_hasMoreHistory = false;
+    QString m_lastGenerationError;//给用户看的结论+建议
+    QString m_lastGenerationErrorDetail;//技术细节
 
     // 列表模型
     ChatMessageListModel* m_messageModel = nullptr;

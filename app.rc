@@ -1,0 +1,3 @@
+// Windows 可执行文件图标（资源管理器 / 开始菜单 / 任务栏固定项都读这里）。
+// Qt 的 setWindowIcon 只影响运行中的窗口，管不到 exe 文件本身，所以必须由 .rc 嵌入。
+IDI_ICON1 ICON "res/app/yuzora.ico"

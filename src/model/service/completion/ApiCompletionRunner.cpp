@@ -70,9 +70,12 @@ void ApiCompletionRunner::onFinished(const QString& fullText)
     emit finished(text);
 }
 
-void ApiCompletionRunner::onFailed(const QString& error)
+void ApiCompletionRunner::onFailed(const QString& error, const QString& detail)
 {
     releaseClient();
+    // 先发细节再发失败：ChatService 在 failed 里就要把两条信息一起交给 UI
+    if (!detail.isEmpty())
+        emit failedDetail(detail);
     emit failed(error);
 }
 

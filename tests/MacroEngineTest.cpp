@@ -9,7 +9,7 @@
 
 // 语料来自 SillyTavern 1.19.0 自己的 e2e 用例：
 //   tests/frontend/MacroEngine.e2e.js
-// 抽取脚本见 tools/st_macro_corpus/extract.mjs。
+// 已一次性抽取并固化在 tests/fixtures/st_macro_corpus.json（148 条），不再依赖本机 ST 安装。
 // 这里拿它做差分测试：同一个输入，我们的引擎必须和 ST 输出一致。
 
 namespace {

@@ -73,8 +73,11 @@ qrc_*.cpp
 Thumbs.db
 
 *.res
+*.aps
 
 *.rc
+# app.rc 是手写的 Windows 图标资源，不是生成物，必须进仓库
+!/app.rc
 
 /.qmake.cache
 

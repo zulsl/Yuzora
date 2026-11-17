@@ -32,9 +32,17 @@ int main(int argc, char *argv[])
     QQuickStyle::setStyle(QStringLiteral("Material"));
 
 //设置应用基本信息
-    app.setWindowIcon(QIcon(":/icons/res/app/favicon-48x48.png"));
-    app.setApplicationName(GlobalConstants::APP_NAME);
-    app.setApplicationVersion(GlobalConstants::APP_VERSION.toString());
+    // 窗口图标按尺寸各注册一张：任务栏 32px、Alt+Tab 48px、高 DPI 用 64/128，
+    // 比只给一张 256px 让 Qt 现场缩小要清晰。exe 文件图标由 app.rc 单独嵌入。
+    QIcon appIcon;
+    for (const int size : {16, 20, 24, 32, 40, 48, 64, 96, 128, 256}) {
+        appIcon.addFile(QStringLiteral(":/icons/res/app/yuzora-%1.png").arg(size),
+                        QSize(size, size));
+    }
+    app.setWindowIcon(appIcon);//窗口图标
+    app.setApplicationName(GlobalConstants::APP_NAME);//内部文件统一名称,不可更改
+    app.setApplicationDisplayName("语昼");//显示名称
+    app.setApplicationVersion(APP_VERSION);
     app.setOrganizationDomain("com.qtyuzora");
 
 //全局异常处理器和跨端适配层初始化

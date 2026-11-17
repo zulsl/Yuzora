@@ -134,6 +134,13 @@ public:
         running = false;
         emit failed(error);
     }
+    void failWithDetail(const QString& detail, const QString& error)
+    {
+        // 顺序与 ApiCompletionRunner 一致：先细节，后失败
+        running = false;
+        emit failedDetail(detail);
+        emit failed(error);
+    }
 
     QList<QList<ChatMessage>> requests;
     bool running = false;
@@ -295,6 +302,7 @@ private slots:
     void promptBuildFailureMarksMessageFailed();
     void finishingGenerationWritesContentAndAutoTitles();
     void failingGenerationMarksMessageFailed();
+void failureDetailArrivesBeforeFailure();
     void sessionSwitchPersistsLastActiveCharacterAndSession();
     void autoTitleSkipsRenamedSession();
 };
@@ -550,6 +558,31 @@ void ChatServiceTest::failingGenerationMarksMessageFailed()
     QCOMPARE(static_cast<int>(messages.last().status),
              static_cast<int>(GlobalConstants::MessageGenerationStatus::Failed));
     QCOMPARE(f.chatService.currentSession().title, QStringLiteral("新对话"));
+    QVERIFY(!f.chatService.isGenerating());
+}
+
+// 失败：细节信号必须先于 generationFailed 到达，ViewModel 才能一次性把两条信息交给界面
+void ChatServiceTest::failureDetailArrivesBeforeFailure()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QString(), {});
+    QVERIFY(f.characterDao.insert(character));
+    const QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    QStringList order;
+    QString receivedDetail;
+    QObject::connect(&f.chatService, &ChatService::generationErrorDetail,
+                     [&](const QString& detail) { order << QStringLiteral("detail"); receivedDetail = detail; });
+    QObject::connect(&f.chatService, &ChatService::generationFailed,
+                     [&](const QString&, int, const QString&) { order << QStringLiteral("failed"); });
+
+    f.chatService.sendMessage(QStringLiteral("你好"));
+    const QString detail = QStringLiteral("分类：域名解析失败\n请求：https://api.example.com/v1/chat/completions");
+    f.completion.failWithDetail(detail, QStringLiteral("无法解析服务器地址\n建议：检查 API 域名"));
+
+    QCOMPARE(order, QStringList({QStringLiteral("detail"), QStringLiteral("failed")}));
+    QCOMPARE(receivedDetail, detail);
     QVERIFY(!f.chatService.isGenerating());
 }
 

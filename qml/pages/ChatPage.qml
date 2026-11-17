@@ -14,6 +14,8 @@ PageScaffold {
     property string renameSessionId: ""
     property string deleteSessionId: ""
     property string deleteSessionTitle: ""
+    // 错误卡片里的"技术细节"是否展开
+    property bool errorDetailExpanded: false
 
     title: ChatViewModel.currentCharName.length > 0 ? ChatViewModel.currentCharName : "未选择角色"
     subtitle: {// 次级标题
@@ -39,6 +41,14 @@ PageScaffold {
             else
                 messageListView.positionViewAtEnd()
         })
+    }
+
+    // 收到新的错误时收起细节，避免看到上一次的展开状态
+    Connections {
+        target: ChatViewModel
+        function onLastGenerationErrorChanged() {
+            root.errorDetailExpanded = false
+        }
     }
 
     // PageHost 生命周期：切走时关闭抽屉，切回时按上面规则定位。
@@ -172,6 +182,124 @@ PageScaffold {
                 detail: ChatViewModel.currentCharName.length > 0
                         ? "和 " + ChatViewModel.currentCharName + " 打个招呼吧"
                         : "先在「角色管理」里选择一个角色"
+            }
+        }
+
+        // ========== 请求失败提示 ==========
+        // 以前网络错误只弹 3 秒 toast：长一点的错误看不完、错过就没了，
+        // 也分不清是网络、Key 还是模型名的问题。这里把「结论 + 建议」留在界面上，
+        // 技术细节按需展开、可复制。新的请求开始或切换会话时自动清空。
+        Rectangle {
+            id: errorCard
+            Layout.fillWidth: true
+            implicitHeight: errorContent.implicitHeight + Theme.spaceSm * 2
+            Layout.preferredHeight: visible ? implicitHeight : 0
+            visible: ChatViewModel.lastGenerationError.length > 0
+            color: Theme.dangerSubtle
+
+            ColumnLayout {
+                id: errorContent
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Theme.spaceSm
+                spacing: Theme.spaceXs
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spaceSm
+
+                    Label {
+                        text: "请求失败"
+                        font.pixelSize: Theme.fontBodySm
+                        font.bold: true
+                        font.family: Theme.fontFamily
+                        color: Theme.danger
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Label {
+                        visible: ChatViewModel.lastGenerationErrorDetail.length > 0
+                        text: root.errorDetailExpanded ? "收起详情" : "查看详情"
+                        font.pixelSize: Theme.fontCaption
+                        font.family: Theme.fontFamily
+                        color: Theme.textSecondary
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.errorDetailExpanded = !root.errorDetailExpanded
+                        }
+                    }
+
+                    Label {
+                        text: "复制"
+                        font.pixelSize: Theme.fontCaption
+                        font.family: Theme.fontFamily
+                        color: Theme.textSecondary
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: ChatViewModel.copyGenerationError()
+                        }
+                    }
+
+                    Label {
+                        text: "关闭"
+                        font.pixelSize: Theme.fontCaption
+                        font.family: Theme.fontFamily
+                        color: Theme.textSecondary
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: ChatViewModel.dismissGenerationError()
+                        }
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: ChatViewModel.lastGenerationError
+                    wrapMode: Text.WordWrap
+                    font.pixelSize: Theme.fontBodySm
+                    font.family: Theme.fontFamily
+                    color: Theme.textPrimary
+                }
+
+                ScrollView {
+                    id: errorDetailScroll
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 120
+                    visible: root.errorDetailExpanded
+                             && ChatViewModel.lastGenerationErrorDetail.length > 0
+                    contentWidth: availableWidth
+                    clip: true
+                    ScrollBar.vertical.policy: ScrollBar.AsNeeded
+
+                    TextArea {
+                        id: errorDetailArea
+                        // 与 LongTextField 相同的写法：显式宽度才能正确换行
+                        width: Math.max(0, errorDetailScroll.availableWidth - Theme.spaceMd)
+                        text: ChatViewModel.lastGenerationErrorDetail
+                        readOnly: true
+                        selectByMouse: true
+                        wrapMode: TextArea.WrapAtWordBoundaryOrAnywhere
+                        textFormat: TextArea.PlainText
+                        font.pixelSize: Theme.fontCaption
+                        font.family: Theme.fontFamily
+                        color: Theme.textSecondary
+                        topPadding: Theme.spaceXs
+                        bottomPadding: Theme.spaceXs
+                        leftPadding: Theme.spaceSm
+                        rightPadding: Theme.spaceSm
+                        background: Rectangle {
+                            radius: Theme.radiusSm
+                            color: Theme.bgSurface
+                            border.width: 1
+                            border.color: Theme.borderDefault
+                        }
+                    }
+                }
             }
         }
 
