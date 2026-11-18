@@ -105,6 +105,10 @@ public:
     Q_INVOKABLE void switchGreeting(int delta);//切换开场白（+1 下一条 / -1 上一条，循环）
     Q_INVOKABLE void dismissGenerationError();//关闭错误提示
     Q_INVOKABLE void copyGenerationError();//复制错误详情到剪贴板
+    // 消息显示文本：只在展示时替换身份宏，数据库里仍存原始文本
+    Q_INVOKABLE QString renderMessageText(const QString& raw,
+                                          const QString& userName,
+                                          const QString& charName) const;
 
 
 

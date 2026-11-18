@@ -4,6 +4,7 @@
 #include "CharacterService.h"
 #include "CompletionPresetService.h"
 #include "SettingsService.h"
+#include "MessageTextRenderer.h"
 #include "Utils.h"
 #include "GlobalConstants.h"
 
@@ -452,6 +453,13 @@ ChatMessageItemModel* ChatViewModel::createItemFromEntity(const ChatMessageEntit
 QString ChatViewModel::currentCharAvatarPath()
 {
     return Utils::avatarPathToUrl(m_currentCharAvatarPath);
+}
+
+QString ChatViewModel::renderMessageText(const QString& raw,
+                                         const QString& userName,
+                                         const QString& charName) const
+{
+    return MessageTextRenderer::render(raw, userName, charName);
 }
 
 ChatSessionListModel* ChatViewModel::sessionModel() const

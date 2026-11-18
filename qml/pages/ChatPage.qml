@@ -175,11 +175,15 @@ PageScaffold {
 
                 delegate: MessageBubble {
                     width: ListView.view.width
+                    // 数据库里存的是原始文本（{{user}} / {{char}} 等宏），
+                    // 只在显示时投影成当前用户名/角色名；编辑仍应拿 model.content。
+                    readonly property string displayContent: ChatViewModel.renderMessageText(
+                        model.content, SettingsViewModel.userName, ChatViewModel.currentCharName)
                     // 修正：原实现用 messageType === 0 判断"是我"，而 0 其实是 System，
                     // 导致用户消息与 AI 消息的气泡样式整体对调。
                     isUser: model.messageType === GlobalConstants.User
                     senderName: model.senderName
-                    content: model.content
+                    content: displayContent
                     status: model.status
                     isLastMessage: index === messageListView.count - 1
                     isGreeting: model.id === ChatViewModel.greetingMessageId
@@ -193,8 +197,8 @@ PageScaffold {
                     onDeleteRequested: {
                         root.pendingDeleteMessageId = model.id
                         root.pendingDeleteIsGreeting = (model.id === ChatViewModel.greetingMessageId)
-                        root.pendingDeleteIsEmpty = (model.content.trim().length === 0)
-                        root.pendingDeleteExcerpt = root.messageExcerpt(model.content)
+                        root.pendingDeleteIsEmpty = (displayContent.trim().length === 0)
+                        root.pendingDeleteExcerpt = root.messageExcerpt(displayContent)
                         deleteMessageDialog.open()
                     }
                     onRegenerateRequested: ChatViewModel.regenerateMessage(model.id)

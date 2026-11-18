@@ -689,6 +689,8 @@ bool ChatService::insertUserMessage(const QString& content, QString& outMessageI
     msg.sessionId = m_sessions->currentSessionId();
     msg.type = GlobalConstants::MessageType::User;
     msg.status = GlobalConstants::MessageGenerationStatus::Normal;
+    // 落库保留原始文本：{{user}} / {{char}} 只在显示层和提示词装配时替换。
+    // 如果在这里替换，改名后旧消息不会更新，编辑时也会丢掉原始宏。
     msg.content = content;
     msg.senderName = QStringLiteral("User");
     msg.timestamp = QDateTime::currentDateTime();

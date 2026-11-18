@@ -69,6 +69,7 @@ qt_add_qml_module(${PROJECT_NAME}
         src/base/GlobalConstants.cpp
         src/base/GlobalConstants.h src/base/Utils.cpp
         src/base/Utils.h        src/crossplatform/DeviceHelper.cpp
+        src/base/MessageTextRenderer.cpp src/base/MessageTextRenderer.h
         src/crossplatform/DeviceHelper.h
         src/model/DatabaseManager.cpp src/model/DatabaseManager.h
         src/model/ApplicationBootstrap.cpp src/model/ApplicationBootstrap.h

@@ -450,6 +450,25 @@ set_tests_properties(YuzoraWorldInfoMatcherTests PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
 )
 
+# 聊天消息显示投影：身份宏只改显示，不改原始记录
+qt_add_executable(YuzoraMessageTextRendererTests
+    MessageTextRendererTest.cpp
+    ../src/base/MessageTextRenderer.cpp
+    ../src/base/MessageTextRenderer.h
+)
+
+target_include_directories(YuzoraMessageTextRendererTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/base
+)
+
+target_link_libraries(YuzoraMessageTextRendererTests PRIVATE Qt6::Core Qt6::Test)
+set_target_properties(YuzoraMessageTextRendererTests PROPERTIES WIN32_EXECUTABLE FALSE)
+
+add_test(NAME YuzoraMessageTextRendererTests COMMAND YuzoraMessageTextRendererTests)
+set_tests_properties(YuzoraMessageTextRendererTests PROPERTIES
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+)
+
 # 宏引擎：语料取自 SillyTavern 自己的 e2e 用例（tests/frontend/MacroEngine.e2e.js）
 qt_add_executable(YuzoraMacroEngineTests
     MacroEngineTest.cpp
