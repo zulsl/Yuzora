@@ -281,38 +281,38 @@ void ApiConfigService::initBuiltinConfigs()
     Qwen.updatedAt = QDateTime::currentDateTime();
     m_dao->insert(Qwen);
 
-    //Gimini
-    ApiConfigEntity Gimini;
-    Gimini.id = Utils::generateUuid();
-    Gimini.name = QStringLiteral("Gimini");
-    Gimini.modelType = GlobalConstants::ModelType::OpenAI;
-    Gimini.isBuiltin = true;
-    Gimini.isOpenAICompatible = true;
-    Gimini.baseDomain = QStringLiteral(
+    //Gemini
+    ApiConfigEntity Gemini;
+    Gemini.id = Utils::generateUuid();
+    Gemini.name = QStringLiteral("Gemini");
+    Gemini.modelType = GlobalConstants::ModelType::OpenAI;
+    Gemini.isBuiltin = true;
+    Gemini.isOpenAICompatible = true;
+    Gemini.baseDomain = QStringLiteral(
                 "https://generativelanguage.googleapis.com/v1beta/openai");
-    Gimini.apiPath = QStringLiteral("/chat/completions");
-    Gimini.availableModels = {
+    Gemini.apiPath = QStringLiteral("/chat/completions");
+    Gemini.availableModels = {
         "gemini-3.5-flash-lite","gemini-4-hydrogen","gemini-4-argon","gemini-4-carbon"};
-    Gimini.isActive = false;
-    Gimini.createdAt = QDateTime::currentDateTime();
-    Gimini.updatedAt = QDateTime::currentDateTime();
-    m_dao->insert(Gimini);
+    Gemini.isActive = false;
+    Gemini.createdAt = QDateTime::currentDateTime();
+    Gemini.updatedAt = QDateTime::currentDateTime();
+    m_dao->insert(Gemini);
 
-    //Cluade
-    ApiConfigEntity Cluade;
-    Cluade.id = Utils::generateUuid();
-    Cluade.name = QStringLiteral("Cluade");
-    Cluade.modelType = GlobalConstants::ModelType::OpenAI;
-    Cluade.isBuiltin = true;
-    Cluade.isOpenAICompatible = true;
-    Cluade.baseDomain = QStringLiteral("https://api.anthropic.com/v1");
-    Cluade.apiPath = QStringLiteral("/chat/completions");
-    Cluade.availableModels = {
+    //Claude
+    ApiConfigEntity Claude;
+    Claude.id = Utils::generateUuid();
+    Claude.name = QStringLiteral("Claude");
+    Claude.modelType = GlobalConstants::ModelType::OpenAI;
+    Claude.isBuiltin = true;
+    Claude.isOpenAICompatible = true;
+    Claude.baseDomain = QStringLiteral("https://api.anthropic.com/v1");
+    Claude.apiPath = QStringLiteral("/chat/completions");
+    Claude.availableModels = {
         "claude-opus-5-5","claude-fable-5-2","claude-sonnet-5-5"};
-    Cluade.isActive = false;
-    Cluade.createdAt = QDateTime::currentDateTime();
-    Cluade.updatedAt = QDateTime::currentDateTime();
-    m_dao->insert(Cluade);
+    Claude.isActive = false;
+    Claude.createdAt = QDateTime::currentDateTime();
+    Claude.updatedAt = QDateTime::currentDateTime();
+    m_dao->insert(Claude);
 
     //Ollama 本地
     // ApiConfigEntity ollama;

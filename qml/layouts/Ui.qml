@@ -13,9 +13,20 @@ QtObject {
 
     signal drawerRequested()
     signal toastRequested(string message, bool isError)
+    // 推入式页面（目前是“关于”）的进入/返回意图
+    signal aboutRequested()
+    signal backRequested()
 
     function requestDrawer() {
         drawerRequested()
+    }
+
+    function requestAbout() {
+        aboutRequested()
+    }
+
+    function requestBack() {
+        backRequested()
     }
 
     function toast(message, isError) {

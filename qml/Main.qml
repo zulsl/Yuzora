@@ -56,6 +56,9 @@ ApplicationWindow {
 
     // 当前页索引（导航高亮用）
     property int currentPage: 0
+    // “关于”是推入式页面，不占侧栏导航项；记住推入前的页面用于返回。
+    property int previousPage: 0
+    readonly property int aboutPageIndex: 6
 
     // ========== 窗口根 Item ==========
     // ApplicationWindow 不是 Item：Keys 只能挂在 Item 上，
@@ -104,7 +107,8 @@ ApplicationWindow {
     }
 
     property var pageComponents: [
-        chatPage, apiConfigPage, presetPage, characterPage, worldInfoPage, settingsPage
+        chatPage, apiConfigPage, presetPage, characterPage, worldInfoPage, settingsPage,
+        aboutPage
     ]
 
     function switchPage(index) {
@@ -112,10 +116,26 @@ ApplicationWindow {
         mainWindow.currentPage = index
     }
 
+    function pushAbout() {
+        if (currentPage === aboutPageIndex) return
+        previousPage = currentPage
+        currentPage = aboutPageIndex
+    }
+
+    function popAbout() {
+        if (currentPage !== aboutPageIndex) return
+        currentPage = (previousPage >= 0 && previousPage < aboutPageIndex)
+                      ? previousPage : 5
+    }
+
     // ========== 系统返回（Android 返回键 / 手势）==========
     function handleBack() {
         if (navHost.drawerOpened) {
             navHost.closeDrawer()
+            return
+        }
+        if (mainWindow.currentPage === mainWindow.aboutPageIndex) {
+            mainWindow.popAbout()
             return
         }
         mainWindow.close()
@@ -135,6 +155,14 @@ ApplicationWindow {
 
         function onToastRequested(message, isError) {
             globalToast.showToast(message, isError)
+        }
+
+        function onAboutRequested() {
+            mainWindow.pushAbout()
+        }
+
+        function onBackRequested() {
+            mainWindow.popAbout()
         }
     }
 
@@ -190,5 +218,11 @@ ApplicationWindow {
     Component {
         id: settingsPage
         SettingsPage {}
+    }
+
+    // 推入式页面：不在 NavigationHost.items 里，由 Ui.requestAbout() 切进来。
+    Component {
+        id: aboutPage
+        AboutPage {}
     }
 }

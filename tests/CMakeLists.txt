@@ -517,6 +517,27 @@ set_tests_properties(YuzoraPresetPromptListModelTests PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
 )
 
+# 关于页的版本比较：纯函数，不发起真实网络请求
+qt_add_executable(YuzoraAboutViewModelTests
+    AboutViewModelTest.cpp
+    ../src/viewmodel/AboutViewModel.cpp
+    ../src/viewmodel/AboutViewModel.h
+)
+
+target_include_directories(YuzoraAboutViewModelTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/viewmodel
+)
+
+target_link_libraries(YuzoraAboutViewModelTests PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Network Qt6::Test)
+set_target_properties(YuzoraAboutViewModelTests PROPERTIES WIN32_EXECUTABLE FALSE)
+
+add_test(NAME YuzoraAboutViewModelTests COMMAND YuzoraAboutViewModelTests)
+set_tests_properties(YuzoraAboutViewModelTests PROPERTIES
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+)
+
 # 对账工具自身的回归（不依赖用户数据）：
 #   prompt_diff.py --selftest 覆盖 identical/content/role/only-ours/only-st/换行 等分类。
 find_package(Python3 COMPONENTS Interpreter QUIET)

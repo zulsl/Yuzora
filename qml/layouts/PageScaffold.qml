@@ -21,6 +21,8 @@ Item {
     property string subtitle: ""
     property string leftIconSource: "qrc:/icons/res/menu.svg"
     property bool showLeftButton: true
+    // 宽窗口默认隐藏左上角按钮（侧栏常驻）；推入式页面需要用它返回，强制显示。
+    property bool forceLeftButton: false
     property bool showToolBar: true
     property int contentPadding: Theme.pagePadding
     // 是否由页面骨架统一吸收软键盘高度（整块内容上抬）。
@@ -54,8 +56,10 @@ Item {
             title: root.title
             subtitle: root.subtitle
             leftIconSource: root.leftIconSource
-            // 宽窗口下左侧菜单常驻，不再需要汉堡按钮；窄窗口才显示
-            showLeftButton: root.showLeftButton && !Theme.isExpanded
+            // 宽窗口下左侧菜单常驻，不再需要汉堡按钮；窄窗口才显示。
+            // 推入式页面（关于）用 forceLeftButton 保留返回箭头。
+            showLeftButton: root.showLeftButton
+                             && (root.forceLeftButton || !Theme.isExpanded)
             onLeftClicked: root.leftClicked()
         }
 

@@ -107,6 +107,34 @@ PageScaffold {
                 }
             }
 
+            // ========== 关于 ==========
+            SectionCard {
+                title: "关于"
+                Layout.fillWidth: true
+
+                LabeledField {
+                    label: "关于语昼"
+
+                    RowLayout {
+                        Layout.fillWidth: true
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: "版本 " + AboutViewModel.currentVersion
+                            font.pixelSize: Theme.fontBodySm
+                            font.family: Theme.fontFamily
+                            color: Theme.textSecondary
+                        }
+
+                        AppButton {
+                            text: "查看"
+                            variant: "secondary"
+                            onClicked: Ui.requestAbout()
+                        }
+                    }
+                }
+            }
+
             AppButton {
                 Layout.fillWidth: true
                 text: "恢复默认设置"

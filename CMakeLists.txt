@@ -73,6 +73,7 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/DatabaseManager.cpp src/model/DatabaseManager.h
         src/model/ApplicationBootstrap.cpp src/model/ApplicationBootstrap.h
         src/viewmodel/ApiConfigViewModel.h src/viewmodel/CharacterViewModel.h src/viewmodel/CharacterDraft.h src/viewmodel/ChatViewModel.h src/viewmodel/CompletionPresetViewModel.h src/viewmodel/CompletionPresetDraft.h src/viewmodel/SettingsViewModel.h src/viewmodel/WorldInfoViewModel.h src/viewmodel/WorldInfoEntryViewModel.h
+        src/viewmodel/AboutViewModel.h
         src/model/dao/CharacterDao.h src/model/dao/ChatMessageDao.h src/model/dao/ChatSessionDao.h src/model/dao/CompletionPresetDao.h src/model/dao/SettingsDao.h src/model/dao/VectorMemoryDao.h src/model/dao/WorldInfoBookDao.h
         src/model/network/BaseApiClient.cpp src/model/network/BaseApiClient.h src/model/network/NetworkError.cpp src/model/network/NetworkError.h src/model/network/ClaudeApiClient.cpp src/model/network/ClaudeApiClient.h src/model/network/DeepSeekApiClient.cpp src/model/network/DeepSeekApiClient.h src/model/network/DoubaoApiClient.cpp src/model/network/DoubaoApiClient.h src/model/network/GeminiApiClient.cpp src/model/network/GeminiApiClient.h src/model/network/ModelFactory.cpp src/model/network/ModelFactory.h
         src/model/service/CharacterCardParser.h src/model/service/ChatService.h src/model/service/MemoryService.h src/model/service/WorldInfoMatcher.h
@@ -84,6 +85,7 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/service/completion/ChatCompletionRunner.h src/model/service/completion/ApiCompletionRunner.cpp src/model/service/completion/ApiCompletionRunner.h
         src/model/service/greeting/GreetingService.cpp src/model/service/greeting/GreetingService.h
         src/viewmodel/ApiConfigViewModel.cpp src/viewmodel/ApiConfigDraft.cpp src/viewmodel/ApiConfigDraft.h src/viewmodel/CharacterViewModel.cpp src/viewmodel/CharacterDraft.cpp src/viewmodel/ChatViewModel.cpp src/viewmodel/CompletionPresetViewModel.cpp src/viewmodel/CompletionPresetDraft.cpp src/viewmodel/SettingsViewModel.cpp src/viewmodel/WorldInfoViewModel.cpp src/viewmodel/WorldInfoEntryViewModel.cpp
+        src/viewmodel/AboutViewModel.cpp
         src/model/list/CharacterListModel.cpp src/model/list/ChatMessageListModel.cpp
         src/model/list/ChatMessageItemModel.cpp src/model/list/ChatMessageItemModel.h
         src/model/dao/ApiConfigDao.h src/model/dao/ApiConfigDao.cpp
@@ -142,12 +144,15 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/components/TypingDots.qml
         qml/components/ExpandableRow.qml
         qml/components/CameraMask.qml
+        qml/components/AboutGroup.qml
+        qml/components/AboutRow.qml
         qml/pages/character_page/CharacterDetailForm.qml
         qml/pages/character_page/CharacterBookDialog.qml
         qml/pages/character_page/AlternateGreetingsList.qml
         qml/pages/character_page/CharacterListPanel.qml
         qml/pages/character_page/CharacterPage.qml
         qml/pages/SettingsPage.qml
+        qml/pages/AboutPage.qml
         qml/pages/WorldInfoPage.qml
         qml/components/SliderFloatInput.qml
         qml/pages/completion_preset_page/PromptsListView.qml
@@ -175,6 +180,8 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/pages/worldInfo_page/EntryNumberField.qml
         qml/pages/worldInfo_page/EntryKeywordList.qml
         qml/pages/worldInfo_page/EntrySelectiveLogicComboBox.qml
+        qml/pages/about_page/DonationDialog.qml
+        qml/pages/about_page/PrivacyDialog.qml
 
 )
 
@@ -202,6 +209,9 @@ install(TARGETS Yuzora
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+# GPL 分发要求随二进制附上许可证；关于页只链接，不把全文塞进 QML。
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE"
+        DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 include(CTest)
 if(BUILD_TESTING)

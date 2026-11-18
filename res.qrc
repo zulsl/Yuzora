@@ -43,6 +43,7 @@
         <file>res/main_page/users.svg</file>
         <file>res/main_page/world-cog.svg</file>
         <file>res/app/favicon-48x48.png</file>
+        <file>res/donation/alipay.jpg</file>
         <file>res/file-export.svg</file>
         <file>res/file-import.svg</file>
         <file>res/file-report.svg</file>
@@ -53,10 +54,15 @@
         <file>res/circle-chevron-down.svg</file>
         <file>res/switch-3.svg</file>
         <file>res/camera.svg</file>
+        <file>res/github.svg</file>
         <file>res/icons8-Blue.png</file>
         <file>res/icons8-Green.png</file>
         <file>res/icons8-vector.png</file>
         <file>res/icons8-vector-light.png</file>
+        <file>res/spy.svg</file>
+        <file>res/brand-tabler.svg</file>
+        <file>res/tip-jar.svg</file>
+        <file>res/brand-bilibili.svg</file>
     </qresource>
     <qresource prefix="/default">
         <file>res/default/user.png</file>
