@@ -67,131 +67,291 @@ qt_add_qml_module(${PROJECT_NAME}
     URI ${PROJECT_NAME}
     VERSION 1.0
     RESOURCES res.qrc
+
     SOURCES
-        src/base/AppException.cpp src/base/AppException.h
+        # src/base
+        src/base/AppException.cpp
+        src/base/AppException.h
         src/base/ExceptionHandler.cpp
         src/base/ExceptionHandler.h
         src/base/GlobalConstants.cpp
-        src/base/GlobalConstants.h src/base/Utils.cpp
-        src/base/Utils.h        src/crossplatform/DeviceHelper.cpp
-        src/base/MessageTextRenderer.cpp src/base/MessageTextRenderer.h
+        src/base/GlobalConstants.h
+        src/base/MessageTextRenderer.cpp
+        src/base/MessageTextRenderer.h
+        src/base/ScopeTimer.cpp
+        src/base/ScopeTimer.h
+        src/base/Utils.cpp
+        src/base/Utils.h
+
+        # src/crossplatform
+        src/crossplatform/DeviceHelper.cpp
         src/crossplatform/DeviceHelper.h
-        src/model/DatabaseManager.cpp src/model/DatabaseManager.h
-        src/model/migration/SchemaMigration.h
-        src/model/migration/SchemaMigrations.cpp src/model/migration/SchemaMigrations.h
-        src/model/migration/MigrationRunner.cpp src/model/migration/MigrationRunner.h
-        src/model/ApplicationBootstrap.cpp src/model/ApplicationBootstrap.h
-        src/viewmodel/ApiConfigViewModel.h src/viewmodel/CharacterViewModel.h src/viewmodel/CharacterDraft.h src/viewmodel/ChatViewModel.h src/viewmodel/CompletionPresetViewModel.h src/viewmodel/CompletionPresetDraft.h src/viewmodel/SettingsViewModel.h src/viewmodel/WorldInfoViewModel.h src/viewmodel/WorldInfoEntryViewModel.h
-        src/viewmodel/AboutViewModel.h
-        src/model/dao/CharacterDao.h src/model/dao/ChatMessageDao.h src/model/dao/ChatSessionDao.h src/model/dao/CompletionPresetDao.h src/model/dao/SettingsDao.h src/model/dao/VectorMemoryDao.h src/model/dao/WorldInfoBookDao.h
-        src/model/network/BaseApiClient.cpp src/model/network/BaseApiClient.h src/model/network/NetworkError.cpp src/model/network/NetworkError.h src/model/network/ClaudeApiClient.cpp src/model/network/ClaudeApiClient.h src/model/network/DeepSeekApiClient.cpp src/model/network/DeepSeekApiClient.h src/model/network/DoubaoApiClient.cpp src/model/network/DoubaoApiClient.h src/model/network/GeminiApiClient.cpp src/model/network/GeminiApiClient.h src/model/network/ModelFactory.cpp src/model/network/ModelFactory.h
-        src/model/service/character/CharacterCardParser.h src/model/service/chat/ChatService.h src/model/service/chat/MemoryService.h src/model/service/worldinfo/WorldInfoMatcher.h
-        src/model/list/CharacterListModel.h src/model/list/ChatMessageListModel.h
-        src/model/dao/CharacterDao.cpp src/model/dao/ChatMessageDao.cpp src/model/dao/ChatSessionDao.cpp src/model/dao/CompletionPresetDao.cpp src/model/dao/SettingsDao.cpp src/model/dao/VectorMemoryDao.cpp src/model/dao/WorldInfoBookDao.cpp
-        src/model/service/character/CharacterCardParser.cpp src/model/service/chat/ChatService.cpp src/model/service/chat/MemoryService.cpp src/model/service/worldinfo/WorldInfoMatcher.cpp
-        src/model/service/chat/ChatServiceAssembly.cpp src/model/dao/TransactionScope.h
-        src/model/service/chat/SessionService.cpp src/model/service/chat/SessionService.h
-        src/model/service/chat/completion/ChatCompletionRunner.h src/model/service/chat/completion/ApiCompletionRunner.cpp src/model/service/chat/completion/ApiCompletionRunner.h
-        src/model/service/character/GreetingService.cpp src/model/service/character/GreetingService.h
-        src/viewmodel/ApiConfigViewModel.cpp src/viewmodel/ApiConfigDraft.cpp src/viewmodel/ApiConfigDraft.h src/viewmodel/CharacterViewModel.cpp src/viewmodel/CharacterDraft.cpp src/viewmodel/ChatViewModel.cpp src/viewmodel/CompletionPresetViewModel.cpp src/viewmodel/CompletionPresetDraft.cpp src/viewmodel/SettingsViewModel.cpp src/viewmodel/WorldInfoViewModel.cpp src/viewmodel/WorldInfoEntryViewModel.cpp
-        src/viewmodel/AboutViewModel.cpp
-        src/model/list/CharacterListModel.cpp src/model/list/ChatMessageListModel.cpp
-        src/model/list/ChatMessageItemModel.cpp src/model/list/ChatMessageItemModel.h
-        src/model/dao/ApiConfigDao.h src/model/dao/ApiConfigDao.cpp
-        src/model/service/app/ApiConfigService.h src/model/service/app/ApiConfigService.cpp
-        src/model/list/ApiConfigListModel.h src/model/list/ApiConfigListModel.cpp
-        src/model/network/OpenAICompatibleApiClient.h src/model/network/OpenAICompatibleApiClient.cpp
-        src/model/dao/AbstractDao.h src/model/dao/AbstractDao.cpp
-        src/model/dao/IConnectionProvider.h
-        src/model/dao/ConnectionProviderRegistry.cpp src/model/dao/ConnectionProviderRegistry.h
+
+        # src/model
+        src/model/ApplicationBootstrap.cpp
+        src/model/ApplicationBootstrap.h
+        src/model/DatabaseManager.cpp
+        src/model/DatabaseManager.h
+
+        # src/model/dao
+        src/model/dao/AbstractDao.cpp
+        src/model/dao/AbstractDao.h
+        src/model/dao/ApiConfigDao.cpp
+        src/model/dao/ApiConfigDao.h
         src/model/dao/BaseDao.h
-        src/model/service/character/CharacterService.h src/model/service/character/CharacterService.cpp
-        src/model/list/CharacterItemViewModel.cpp src/model/list/CharacterItemViewModel.h
-        src/model/service/preset/CompletionPresetService.h src/model/service/preset/CompletionPresetService.cpp
-        src/model/network/ChatMessage.h src/model/network/ChatMessage.cpp
-        src/model/service/app/SettingsService.h src/model/service/app/SettingsService.cpp
-        src/model/service/app/StorageService.h src/model/service/app/StorageService.cpp
-        src/model/service/worldinfo/WorldInfoService.h src/model/service/worldinfo/WorldInfoService.cpp
-        src/model/list/WorldInfoBookListModel.h src/model/list/WorldInfoBookListModel.cpp
-        src/model/list/WorldInfoEntryListModel.h src/model/list/WorldInfoEntryListModel.cpp
-        src/model/list/WorldInfoBookItemModel.h src/model/list/WorldInfoBookItemModel.cpp
-        src/model/list/ChatSessionListModel.h src/model/list/ChatSessionListModel.cpp
-        src/model/entity/ApiConfigEntity.h src/model/entity/CharacterEntity.h src/model/entity/ChatMessageEntity.h src/model/entity/ChatSessionEntity.h src/model/entity/CompletionPresetEntity.h src/model/entity/PromptEntity.h src/model/entity/SettingsEntity.h src/model/entity/VectorMemoryEntity.h src/model/entity/WorldInfoBookEntity.h src/model/entity/WorldInfoEntryEntity.h
-        src/model/service/prompt/PromptBuilder.cpp src/model/service/prompt/PromptBuilder.h
-        src/model/service/prompt/MacroEngine.cpp src/model/service/prompt/MacroEngine.h
-        src/model/list/preset/PresetPromptListModel.cpp src/model/list/preset/PresetPromptListModel.h
-        src/model/list/preset/PresetListModel.cpp src/model/list/preset/PresetListModel.h
-        src/model/dao/PromptDao.h src/model/dao/PromptDao.cpp
-        src/base/ScopeTimer.h src/base/ScopeTimer.cpp
-        src/model/dao/WorldInfoEntryDao.h src/model/dao/WorldInfoEntryDao.cpp
-        src/model/service/prompt/ChatCompletion.cpp src/model/service/prompt/ChatCompletion.h
-        src/model/service/prompt/ChatPromptContext.cpp src/model/service/prompt/ChatPromptContext.h
+        src/model/dao/CharacterDao.cpp
+        src/model/dao/CharacterDao.h
+        src/model/dao/ChatMessageDao.cpp
+        src/model/dao/ChatMessageDao.h
+        src/model/dao/ChatSessionDao.cpp
+        src/model/dao/ChatSessionDao.h
+        src/model/dao/CompletionPresetDao.cpp
+        src/model/dao/CompletionPresetDao.h
+        src/model/dao/ConnectionProviderRegistry.cpp
+        src/model/dao/ConnectionProviderRegistry.h
+        src/model/dao/IConnectionProvider.h
+        src/model/dao/PromptDao.cpp
+        src/model/dao/PromptDao.h
+        src/model/dao/SettingsDao.cpp
+        src/model/dao/SettingsDao.h
+        src/model/dao/TransactionScope.h
+        src/model/dao/VectorMemoryDao.cpp
+        src/model/dao/VectorMemoryDao.h
+        src/model/dao/WorldInfoBookDao.cpp
+        src/model/dao/WorldInfoBookDao.h
+        src/model/dao/WorldInfoEntryDao.cpp
+        src/model/dao/WorldInfoEntryDao.h
+
+        # src/model/entity
+        src/model/entity/ApiConfigEntity.h
+        src/model/entity/CharacterEntity.h
+        src/model/entity/ChatMessageEntity.h
+        src/model/entity/ChatSessionEntity.h
+        src/model/entity/CompletionPresetEntity.h
+        src/model/entity/PromptEntity.h
+        src/model/entity/SettingsEntity.h
+        src/model/entity/VectorMemoryEntity.h
+        src/model/entity/WorldInfoBookEntity.h
+        src/model/entity/WorldInfoEntryEntity.h
+
+        # src/model/list
+        src/model/list/ApiConfigListModel.cpp
+        src/model/list/ApiConfigListModel.h
+        src/model/list/CharacterItemViewModel.cpp
+        src/model/list/CharacterItemViewModel.h
+        src/model/list/CharacterListModel.cpp
+        src/model/list/CharacterListModel.h
+        src/model/list/ChatMessageItemModel.cpp
+        src/model/list/ChatMessageItemModel.h
+        src/model/list/ChatMessageListModel.cpp
+        src/model/list/ChatMessageListModel.h
+        src/model/list/ChatSessionListModel.cpp
+        src/model/list/ChatSessionListModel.h
+        src/model/list/WorldInfoBookItemModel.cpp
+        src/model/list/WorldInfoBookItemModel.h
+        src/model/list/WorldInfoBookListModel.cpp
+        src/model/list/WorldInfoBookListModel.h
+        src/model/list/WorldInfoEntryListModel.cpp
+        src/model/list/WorldInfoEntryListModel.h
+
+        # src/model/list/preset
+        src/model/list/preset/PresetListModel.cpp
+        src/model/list/preset/PresetListModel.h
+        src/model/list/preset/PresetPromptListModel.cpp
+        src/model/list/preset/PresetPromptListModel.h
+
+        # src/model/migration
+        src/model/migration/MigrationRunner.cpp
+        src/model/migration/MigrationRunner.h
+        src/model/migration/SchemaMigration.h
+        src/model/migration/SchemaMigrations.cpp
+        src/model/migration/SchemaMigrations.h
+
+        # src/model/network
+        src/model/network/BaseApiClient.cpp
+        src/model/network/BaseApiClient.h
+        src/model/network/ChatMessage.cpp
+        src/model/network/ChatMessage.h
+        src/model/network/ClaudeApiClient.cpp
+        src/model/network/ClaudeApiClient.h
+        src/model/network/DeepSeekApiClient.cpp
+        src/model/network/DeepSeekApiClient.h
+        src/model/network/DoubaoApiClient.cpp
+        src/model/network/DoubaoApiClient.h
+        src/model/network/GeminiApiClient.cpp
+        src/model/network/GeminiApiClient.h
+        src/model/network/ModelFactory.cpp
+        src/model/network/ModelFactory.h
+        src/model/network/NetworkError.cpp
+        src/model/network/NetworkError.h
+        src/model/network/OpenAICompatibleApiClient.cpp
+        src/model/network/OpenAICompatibleApiClient.h
+
+        # src/model/service/app
+        src/model/service/app/ApiConfigService.cpp
+        src/model/service/app/ApiConfigService.h
+        src/model/service/app/SettingsService.cpp
+        src/model/service/app/SettingsService.h
+        src/model/service/app/StorageService.cpp
+        src/model/service/app/StorageService.h
+
+        # src/model/service/character
+        src/model/service/character/CharacterCardParser.cpp
+        src/model/service/character/CharacterCardParser.h
+        src/model/service/character/CharacterService.cpp
+        src/model/service/character/CharacterService.h
+        src/model/service/character/GreetingService.cpp
+        src/model/service/character/GreetingService.h
+
+        # src/model/service/chat
+        src/model/service/chat/ChatService.cpp
+        src/model/service/chat/ChatService.h
+        src/model/service/chat/ChatServiceAssembly.cpp
+        src/model/service/chat/MemoryService.cpp
+        src/model/service/chat/MemoryService.h
+        src/model/service/chat/SessionService.cpp
+        src/model/service/chat/SessionService.h
+
+        # src/model/service/chat/completion
+        src/model/service/chat/completion/ApiCompletionRunner.cpp
+        src/model/service/chat/completion/ApiCompletionRunner.h
+        src/model/service/chat/completion/ChatCompletionRunner.h
+
+        # src/model/service/preset
+        src/model/service/preset/CompletionPresetService.cpp
+        src/model/service/preset/CompletionPresetService.h
+
+        # src/model/service/prompt
+        src/model/service/prompt/ChatCompletion.cpp
+        src/model/service/prompt/ChatCompletion.h
         src/model/service/prompt/ChatMessageGroup.h
+        src/model/service/prompt/ChatPromptContext.cpp
+        src/model/service/prompt/ChatPromptContext.h
+        src/model/service/prompt/MacroEngine.cpp
+        src/model/service/prompt/MacroEngine.h
+        src/model/service/prompt/PromptBuilder.cpp
+        src/model/service/prompt/PromptBuilder.h
+
+        # src/model/service/worldinfo
+        src/model/service/worldinfo/WorldInfoMatcher.cpp
+        src/model/service/worldinfo/WorldInfoMatcher.h
+        src/model/service/worldinfo/WorldInfoService.cpp
+        src/model/service/worldinfo/WorldInfoService.h
+
+        # src/viewmodel
+        src/viewmodel/AboutViewModel.cpp
+        src/viewmodel/AboutViewModel.h
+        src/viewmodel/ApiConfigDraft.cpp
+        src/viewmodel/ApiConfigDraft.h
+        src/viewmodel/ApiConfigViewModel.cpp
+        src/viewmodel/ApiConfigViewModel.h
+        src/viewmodel/CharacterDraft.cpp
+        src/viewmodel/CharacterDraft.h
+        src/viewmodel/CharacterViewModel.cpp
+        src/viewmodel/CharacterViewModel.h
+        src/viewmodel/ChatViewModel.cpp
+        src/viewmodel/ChatViewModel.h
+        src/viewmodel/CompletionPresetDraft.cpp
+        src/viewmodel/CompletionPresetDraft.h
+        src/viewmodel/CompletionPresetViewModel.cpp
+        src/viewmodel/CompletionPresetViewModel.h
+        src/viewmodel/SettingsViewModel.cpp
+        src/viewmodel/SettingsViewModel.h
+        src/viewmodel/WorldInfoEntryViewModel.cpp
+        src/viewmodel/WorldInfoEntryViewModel.h
+        src/viewmodel/WorldInfoViewModel.cpp
+        src/viewmodel/WorldInfoViewModel.h
 
     QML_FILES
-        qml/Main.qml
-        qml/pages/ApiConfigPage.qml
-        qml/pages/ChatPage.qml
-        qml/pages/CompletionPresetPage.qml
-        qml/components/IconButton.qml
-        qml/components/AppCheckBox.qml
-        qml/components/TextContextMenu.qml
-        qml/components/AppButton.qml
-        qml/components/AppToolBar.qml
-        qml/components/AppToast.qml
-        qml/components/CircleAvatar.qml
-        qml/components/TagChip.qml
-        qml/components/EmptyState.qml
-        qml/components/ConfirmDialog.qml
-        qml/components/TextInputDialog.qml
-        qml/components/SectionCard.qml
-        qml/components/LabeledField.qml
-        qml/components/LongTextField.qml
-        qml/components/ChatScrollBar.qml
-        qml/components/MessageBubble.qml
-        qml/components/MessageContextMenu.qml
-        qml/components/TypingDots.qml
-        qml/components/ExpandableRow.qml
-        qml/components/CameraMask.qml
-        qml/components/AboutGroup.qml
-        qml/components/AboutRow.qml
-        qml/pages/character_page/CharacterDetailForm.qml
-        qml/pages/character_page/CharacterBookDialog.qml
-        qml/pages/character_page/AlternateGreetingsList.qml
-        qml/pages/character_page/CharacterListPanel.qml
-        qml/pages/character_page/CharacterPage.qml
-        qml/pages/SettingsPage.qml
-        qml/pages/AboutPage.qml
-        qml/pages/WorldInfoPage.qml
-        qml/components/SliderFloatInput.qml
-        qml/pages/completion_preset_page/PromptsListView.qml
-        qml/pages/completion_preset_page/PresetListPanel.qml
-        qml/pages/completion_preset_page/PresetEditForm.qml
-        qml/pages/worldInfo_page/BookListPanel.qml
-        qml/pages/worldInfo_page/EntryListPanel.qml
-        qml/theme/Theme.qml
-        qml/theme/PaletteLight.qml
-        qml/theme/PaletteDark.qml
-        qml/theme/Metrics.qml
-        qml/theme/Motion.qml
-        qml/layouts/Ui.qml
-        qml/layouts/PageScaffold.qml
+        # qml/components/chat
+        qml/components/chat/MessageBubble.qml
+        qml/components/chat/TypingDots.qml
+
+        # qml/components/controls
+        qml/components/controls/AppButton.qml
+        qml/components/controls/AppCheckBox.qml
+        qml/components/controls/ChatScrollBar.qml
+        qml/components/controls/CircleAvatar.qml
+        qml/components/controls/EmptyState.qml
+        qml/components/controls/ExpandableRow.qml
+        qml/components/controls/IconButton.qml
+        qml/components/controls/LabeledField.qml
+        qml/components/controls/LongTextField.qml
+        qml/components/controls/SectionCard.qml
+        qml/components/controls/SliderFloatInput.qml
+        qml/components/controls/TagChip.qml
+
+        # qml/components/dialogs
+        qml/components/dialogs/ConfirmDialog.qml
+        qml/components/dialogs/TextInputDialog.qml
+
+        # qml/components/overlay
+        qml/components/overlay/AppToast.qml
+        qml/components/overlay/CameraMask.qml
+        qml/components/overlay/MessageContextMenu.qml
+        qml/components/overlay/TextContextMenu.qml
+
+        # qml/layouts
         qml/layouts/AdaptiveSplit.qml
-        qml/layouts/MasterDetailStack.qml
-        qml/layouts/NotificationBridge.qml
-        qml/layouts/PageHost.qml
+        qml/layouts/AppToolBar.qml
         qml/layouts/MasterDetailPage.qml
+        qml/layouts/MasterDetailStack.qml
         qml/layouts/NavigationHost.qml
         qml/layouts/NavigationPanel.qml
-        qml/pages/worldInfo_page/BookEntryListView.qml
-        qml/pages/worldInfo_page/TriggerStrategyComboBox.qml
-        qml/pages/worldInfo_page/InsertPositionComboBox.qml
-        qml/pages/worldInfo_page/EntryNumberField.qml
-        qml/pages/worldInfo_page/EntryKeywordList.qml
-        qml/pages/worldInfo_page/EntrySelectiveLogicComboBox.qml
-        qml/pages/about_page/DonationDialog.qml
-        qml/pages/about_page/PrivacyDialog.qml
+        qml/layouts/NotificationBridge.qml
+        qml/layouts/PageHost.qml
+        qml/layouts/PageScaffold.qml
+        qml/layouts/Ui.qml
 
+        # qml
+        qml/Main.qml
+
+        # qml/pages/about
+        qml/pages/about/AboutGroup.qml
+        qml/pages/about/AboutPage.qml
+        qml/pages/about/AboutRow.qml
+        qml/pages/about/DonationDialog.qml
+        qml/pages/about/PrivacyDialog.qml
+
+        # qml/pages/api_config
+        qml/pages/api_config/ApiConfigPage.qml
+
+        # qml/pages/character
+        qml/pages/character/AlternateGreetingsList.qml
+        qml/pages/character/CharacterBookDialog.qml
+        qml/pages/character/CharacterDetailForm.qml
+        qml/pages/character/CharacterListPanel.qml
+        qml/pages/character/CharacterPage.qml
+
+        # qml/pages/chat
+        qml/pages/chat/ChatPage.qml
+
+        # qml/pages/completion_preset
+        qml/pages/completion_preset/CompletionPresetPage.qml
+        qml/pages/completion_preset/PresetEditForm.qml
+        qml/pages/completion_preset/PresetListPanel.qml
+        qml/pages/completion_preset/PromptsListView.qml
+
+        # qml/pages/settings
+        qml/pages/settings/SettingsPage.qml
+
+        # qml/pages/world_info
+        qml/pages/world_info/BookEntryListView.qml
+        qml/pages/world_info/BookListPanel.qml
+        qml/pages/world_info/EntryKeywordList.qml
+        qml/pages/world_info/EntryListPanel.qml
+        qml/pages/world_info/EntryNumberField.qml
+        qml/pages/world_info/EntrySelectiveLogicComboBox.qml
+        qml/pages/world_info/InsertPositionComboBox.qml
+        qml/pages/world_info/TriggerStrategyComboBox.qml
+        qml/pages/world_info/WorldInfoPage.qml
+
+        # qml/theme
+        qml/theme/Metrics.qml
+        qml/theme/Motion.qml
+        qml/theme/PaletteDark.qml
+        qml/theme/PaletteLight.qml
+        qml/theme/Theme.qml
 )
 
 
