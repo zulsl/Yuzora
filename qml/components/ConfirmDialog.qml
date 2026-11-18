@@ -33,6 +33,7 @@ Dialog {
 
     header: Label {
         text: root.title
+        textFormat: Text.PlainText
         visible: root.title.length > 0
         font.pixelSize: Theme.fontTitle
         font.bold: true
@@ -48,6 +49,7 @@ Dialog {
         Label {
             width: parent.width
             text: root.text
+            textFormat: Text.PlainText
             wrapMode: Text.WordWrap
             font.pixelSize: Theme.fontBody
             font.family: Theme.fontFamily
@@ -57,6 +59,7 @@ Dialog {
             width: parent.width
             visible: root.detail.length > 0
             text: root.detail
+            textFormat: Text.PlainText
             wrapMode: Text.WordWrap
             font.pixelSize: Theme.fontBodySm
             font.family: Theme.fontFamily

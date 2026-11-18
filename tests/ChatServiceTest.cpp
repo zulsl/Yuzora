@@ -301,8 +301,17 @@ private slots:
     void sendMessageAppendsUserBeforeAssistantAndStartsGeneration();
     void promptBuildFailureMarksMessageFailed();
     void finishingGenerationWritesContentAndAutoTitles();
+    void autoTitleUsesUserMessageNotReply();
+    void autoTitleTruncatesLongUserMessage();
+    void repairsLegacyBrokenSessionTitle();
     void failingGenerationMarksMessageFailed();
-void failureDetailArrivesBeforeFailure();
+    void failureDetailArrivesBeforeFailure();
+    void deleteMessageRemovesOnlyThatRow();
+    void deleteMessageRejectsGeneratingMessage();
+    void regenerateRejectsNonLastMessage();
+    void regenerateRejectsUserMessage();
+    void regenerateRejectsGreeting();
+    void regenerateFailedPlaceholderKeepsEarlierReply();
     void sessionSwitchPersistsLastActiveCharacterAndSession();
     void autoTitleSkipsRenamedSession();
 };
@@ -515,10 +524,11 @@ void ChatServiceTest::promptBuildFailureMarksMessageFailed()
              static_cast<int>(GlobalConstants::MessageGenerationStatus::Failed));
     QCOMPARE(f.completion.starts, 0);
     QVERIFY(!f.chatService.isGenerating());
-    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("新对话"));
+    // 标题只取决于用户消息，和生成是否成功无关
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("你好"));
 }
 
-// 完成：内容落库、状态转 Normal、会话标题按前 10 个字符自动生成
+// 完成：内容落库、状态转 Normal；标题在发送时由用户消息生成，回复不再覆盖
 void ChatServiceTest::finishingGenerationWritesContentAndAutoTitles()
 {
     Fixture f;
@@ -529,6 +539,8 @@ void ChatServiceTest::finishingGenerationWritesContentAndAutoTitles()
     QCOMPARE(f.chatService.currentSession().title, QStringLiteral("新对话"));
 
     f.chatService.sendMessage(QStringLiteral("你好"));
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("你好"));
+
     f.completion.completeWith(QStringLiteral("这是AI的回复内容"));
 
     const QList<ChatMessageEntity> messages = f.chatService.loadLatestMessages(sessionId, 10);
@@ -537,11 +549,80 @@ void ChatServiceTest::finishingGenerationWritesContentAndAutoTitles()
     QCOMPARE(static_cast<int>(messages.last().status),
              static_cast<int>(GlobalConstants::MessageGenerationStatus::Normal));
 
-    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("这是AI的回复内容..."));
+    // 长回复、带包装标签的回复都不能再改标题
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("你好"));
     QVERIFY(!f.chatService.isGenerating());
 }
 
-// 失败：状态转 Failed，标题保持默认，生成中标志复位
+// 模型回复可能以 <content> 之类的包装标签开头；标题只取用户消息，
+// 否则截前几个字符会得到标签/空白，QML 把 <content> 当富文本标签后只剩 "..."
+void ChatServiceTest::autoTitleUsesUserMessageNotReply()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QString(), {});
+    QVERIFY(f.characterDao.insert(character));
+    const QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    QSignalSpy listSpy(&f.chatService, &ChatService::sessionListChanged);
+    f.chatService.sendMessage(QStringLiteral("写一段雨夜场景"));
+    // 标题在发送时就落库并刷新列表/副标题，不能等回复完成
+    QCOMPARE(listSpy.count(), 1);
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("写一段雨夜场景"));
+
+    f.completion.completeWith(QStringLiteral("<content>\n\n这是一段很长的雨夜场景回复。</content>"));
+
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("写一段雨夜场景"));
+}
+
+// 首条用户消息折叠成单行；只有超长才加省略号
+void ChatServiceTest::autoTitleTruncatesLongUserMessage()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QString(), {});
+    QVERIFY(f.characterDao.insert(character));
+    QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    f.chatService.sendMessage(QStringLiteral("  第一行\n\n第二行  "));
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("第一行 第二行"));
+    f.completion.completeWith(QStringLiteral("回复"));
+
+    // 第二条消息不能覆盖首条消息生成的标题
+    f.chatService.sendMessage(QStringLiteral("第二问"));
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("第一行 第二行"));
+    f.completion.completeWith(QStringLiteral("回复"));
+
+    // 新会话用长消息：截到 24 个字符，并带一个省略号
+    sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+    f.chatService.sendMessage(QStringLiteral("长").repeated(40));
+    QCOMPARE(f.chatService.currentSession().title,
+             QStringLiteral("长").repeated(24) + QStringLiteral("…"));
+}
+
+// 旧版已经落库的 "<content>\n..." 标题：进入角色时按首条用户消息修一次
+void ChatServiceTest::repairsLegacyBrokenSessionTitle()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QString(), {});
+    QVERIFY(f.characterDao.insert(character));
+    const QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    f.chatService.sendMessage(QStringLiteral("真正的标题"));
+    f.completion.completeWith(QStringLiteral("回复"));
+
+    // 模拟旧版本写坏的标题（用户在界面看到的是 "..."）
+    QVERIFY(f.chatService.renameSession(sessionId, QStringLiteral("<content>\n...")));
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("<content>\n..."));
+
+    f.chatService.openCharacterSession(character.id);
+
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("真正的标题"));
+}
+
+// 失败：状态转 Failed，标题仍由用户消息决定，生成中标志复位
 void ChatServiceTest::failingGenerationMarksMessageFailed()
 {
     Fixture f;
@@ -557,7 +638,7 @@ void ChatServiceTest::failingGenerationMarksMessageFailed()
     QCOMPARE(messages.size(), 2);
     QCOMPARE(static_cast<int>(messages.last().status),
              static_cast<int>(GlobalConstants::MessageGenerationStatus::Failed));
-    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("新对话"));
+    QCOMPARE(f.chatService.currentSession().title, QStringLiteral("你好"));
     QVERIFY(!f.chatService.isGenerating());
 }
 
@@ -584,6 +665,164 @@ void ChatServiceTest::failureDetailArrivesBeforeFailure()
     QCOMPARE(order, QStringList({QStringLiteral("detail"), QStringLiteral("failed")}));
     QCOMPARE(receivedDetail, detail);
     QVERIFY(!f.chatService.isGenerating());
+}
+
+// 删除：只删这一条，不级联；删掉后其它消息和开场白都还在
+void ChatServiceTest::deleteMessageRemovesOnlyThatRow()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QStringLiteral("开场白"), {});
+    QVERIFY(f.characterDao.insert(character));
+    const QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    f.chatService.sendMessage(QStringLiteral("你好"));
+    f.completion.completeWith(QStringLiteral("回复"));
+
+    QList<ChatMessageEntity> messages = f.chatService.loadLatestMessages(sessionId, 10);
+    QCOMPARE(messages.size(), 3); // 开场白 + 用户 + 助手
+    const QString greetingId = f.chatService.greetingMessageId();
+    const QString assistantId = messages.last().id;
+
+    QSignalSpy deletedSpy(&f.chatService, &ChatService::messageDeleted);
+    f.chatService.deleteMessage(assistantId);
+
+    messages = f.chatService.loadLatestMessages(sessionId, 10);
+    QCOMPARE(messages.size(), 2);
+    QCOMPARE(deletedSpy.count(), 1);
+    QVERIFY(f.messageDao.selectById(assistantId).id.isEmpty());
+    QVERIFY(!f.messageDao.selectById(greetingId).id.isEmpty());
+    QCOMPARE(f.chatService.greetingMessageId(), greetingId);
+}
+
+// 生成中的那条不能删：服务层兜底，避免 UI 判断失误后把正在写的消息删掉
+void ChatServiceTest::deleteMessageRejectsGeneratingMessage()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QString(), {});
+    QVERIFY(f.characterDao.insert(character));
+    const QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    f.chatService.sendMessage(QStringLiteral("你好"));
+    const ChatMessageEntity placeholder = f.chatService.loadLatestMessages(sessionId, 10).last();
+
+    QSignalSpy errorSpy(&f.chatService, &ChatService::operationError);
+    f.chatService.deleteMessage(placeholder.id);
+
+    QCOMPARE(errorSpy.count(), 1);
+    QVERIFY(!f.messageDao.selectById(placeholder.id).id.isEmpty());
+}
+
+// 只能重新生成会话最后一条：对更早的助手回复要拒绝，不能把后面的对话截断
+void ChatServiceTest::regenerateRejectsNonLastMessage()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QString(), {});
+    QVERIFY(f.characterDao.insert(character));
+    const QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    f.chatService.sendMessage(QStringLiteral("第一问"));
+    f.completion.completeWith(QStringLiteral("第一答"));
+    f.chatService.sendMessage(QStringLiteral("第二问"));
+    f.completion.completeWith(QStringLiteral("第二答"));
+
+    const QList<ChatMessageEntity> messages = f.chatService.loadLatestMessages(sessionId, 10);
+    QCOMPARE(messages.size(), 4);
+    const QString firstAssistantId = messages.at(1).id;
+
+    QSignalSpy errorSpy(&f.chatService, &ChatService::operationError);
+    f.chatService.regenerateMessage(firstAssistantId);
+
+    QCOMPARE(errorSpy.count(), 1);
+    QVERIFY(errorSpy.takeFirst().at(0).toString().contains(QStringLiteral("最后一条")));
+    QVERIFY(!f.messageDao.selectById(firstAssistantId).id.isEmpty());
+    QCOMPARE(f.completion.starts, 2);
+}
+
+// 用户消息不能重新生成
+void ChatServiceTest::regenerateRejectsUserMessage()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QString(), {});
+    QVERIFY(f.characterDao.insert(character));
+    const QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    f.chatService.sendMessage(QStringLiteral("你好"));
+    f.completion.completeWith(QStringLiteral("回复"));
+    const QList<ChatMessageEntity> messages = f.chatService.loadLatestMessages(sessionId, 10);
+    const QString userId = messages.first().id;
+
+    QSignalSpy errorSpy(&f.chatService, &ChatService::operationError);
+    f.chatService.regenerateMessage(userId);
+
+    QCOMPARE(errorSpy.count(), 1);
+    QVERIFY(errorSpy.takeFirst().at(0).toString().contains(QStringLiteral("助手回复")));
+    QCOMPARE(f.completion.starts, 1);
+}
+
+// 开场白是 Chat Message，但不是生成回复：不允许重新生成
+void ChatServiceTest::regenerateRejectsGreeting()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QStringLiteral("开场白"), {});
+    QVERIFY(f.characterDao.insert(character));
+    const QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    const QString greetingId = f.chatService.greetingMessageId();
+    QVERIFY(!greetingId.isEmpty());
+
+    QSignalSpy errorSpy(&f.chatService, &ChatService::operationError);
+    f.chatService.regenerateMessage(greetingId);
+
+    QCOMPARE(errorSpy.count(), 1);
+    QVERIFY(errorSpy.takeFirst().at(0).toString().contains(QStringLiteral("开场白")));
+    QVERIFY(!f.messageDao.selectById(greetingId).id.isEmpty());
+    QCOMPARE(f.completion.starts, 0);
+}
+
+// 回归：失败占位之后重新生成，必须替换失败占位，而不是把更早的正常回复删掉
+void ChatServiceTest::regenerateFailedPlaceholderKeepsEarlierReply()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QString(), {});
+    QVERIFY(f.characterDao.insert(character));
+    const QString sessionId = f.chatService.createSession(character.id);
+    f.chatService.switchSession(sessionId);
+
+    f.chatService.sendMessage(QStringLiteral("第一问"));
+    f.completion.completeWith(QStringLiteral("第一答"));
+    f.chatService.sendMessage(QStringLiteral("第二问"));
+    f.completion.failWith(QStringLiteral("网络错误"));
+
+    QList<ChatMessageEntity> messages = f.chatService.loadLatestMessages(sessionId, 10);
+    QCOMPARE(messages.size(), 4);
+    const QString earlierAssistantId = messages.at(1).id;
+    const QString failedPlaceholderId = messages.at(3).id;
+    QCOMPARE(static_cast<int>(messages.at(3).status),
+             static_cast<int>(GlobalConstants::MessageGenerationStatus::Failed));
+    const int startsBefore = f.completion.starts;
+
+    f.chatService.regenerateMessage(failedPlaceholderId);
+
+    // 更早的正常回复必须原样保留
+    const ChatMessageEntity earlier = f.messageDao.selectById(earlierAssistantId);
+    QVERIFY(!earlier.id.isEmpty());
+    QCOMPARE(earlier.content, QStringLiteral("第一答"));
+
+    // 失败占位被替换成新的 Generating 占位，请求重新发出
+    messages = f.chatService.loadLatestMessages(sessionId, 10);
+    QCOMPARE(messages.size(), 4);
+    QVERIFY(f.messageDao.selectById(failedPlaceholderId).id.isEmpty());
+    QCOMPARE(static_cast<int>(messages.last().type),
+             static_cast<int>(GlobalConstants::MessageType::Assistant));
+    QCOMPARE(static_cast<int>(messages.last().status),
+             static_cast<int>(GlobalConstants::MessageGenerationStatus::Generating));
+    QCOMPARE(f.completion.starts, startsBefore + 1);
+    QVERIFY(f.chatService.isGenerating());
 }
 
 // 切换会话要写回两处：角色卡的 last_session_id + 设置里的最后角色

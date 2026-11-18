@@ -16,6 +16,18 @@ PageScaffold {
     property string deleteSessionTitle: ""
     // 错误卡片里的"技术细节"是否展开
     property bool errorDetailExpanded: false
+    // 消息删除确认：先记住目标与摘要，再弹窗
+    property string pendingDeleteMessageId: ""
+    property string pendingDeleteExcerpt: ""
+    property bool pendingDeleteIsGreeting: false
+    property bool pendingDeleteIsEmpty: false
+
+    function messageExcerpt(text) {
+        const flat = String(text).replace(/\s+/g, " ").trim()
+        if (flat.length === 0)
+            return ""
+        return flat.length > 60 ? flat.substring(0, 60) + "…" : flat
+    }
 
     title: ChatViewModel.currentCharName.length > 0 ? ChatViewModel.currentCharName : "未选择角色"
     subtitle: {// 次级标题
@@ -141,7 +153,9 @@ PageScaffold {
                 spacing: Theme.spaceSm
                 reuseItems: true
                 model: ChatViewModel.messageModel
-                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+                // 滚动条用下面的 ChatScrollBar 自绘：ListView 对不等高 delegate 的
+                // contentHeight 是估算值，长气泡进出时会让原生 ScrollBar 的长度来回跳。
 
                 // 消息数变化时跟随：只有开场白一条就停在顶部，否则沿用"在底部才跟随"
                 onCountChanged: {
@@ -166,12 +180,36 @@ PageScaffold {
                     isUser: model.messageType === GlobalConstants.User
                     senderName: model.senderName
                     content: model.content
+                    status: model.status
+                    isLastMessage: index === messageListView.count - 1
+                    isGreeting: model.id === ChatViewModel.greetingMessageId
+                    generationActive: ChatViewModel.isGenerating
                     timeText: SettingsViewModel.showTimeStamp ? model.timeText : ""
                     isEdited: model.isEdited
                     avatarSource: model.messageType === GlobalConstants.User
                                   ? SettingsViewModel.userAvatar
                                   : ChatViewModel.currentCharAvatarPath
+
+                    onDeleteRequested: {
+                        root.pendingDeleteMessageId = model.id
+                        root.pendingDeleteIsGreeting = (model.id === ChatViewModel.greetingMessageId)
+                        root.pendingDeleteIsEmpty = (model.content.trim().length === 0)
+                        root.pendingDeleteExcerpt = root.messageExcerpt(model.content)
+                        deleteMessageDialog.open()
+                    }
+                    onRegenerateRequested: ChatViewModel.regenerateMessage(model.id)
                 }
+            }
+
+            ChatScrollBar {
+                id: chatScrollBar
+                flickable: messageListView
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.topMargin: Theme.spaceSm
+                anchors.bottomMargin: Theme.spaceSm
+                anchors.rightMargin: 2
             }
 
             EmptyState {
@@ -428,6 +466,7 @@ PageScaffold {
                         Label {
                             Layout.fillWidth: true
                             text: model.title
+                            textFormat: Text.PlainText
                             elide: Text.ElideRight
                             font.pixelSize: Theme.fontBody
                             font.family: Theme.fontFamily
@@ -494,5 +533,24 @@ PageScaffold {
         acceptText: "删除"
         danger: true
         onConfirmed: ChatViewModel.deleteSession(root.deleteSessionId)
+    }
+
+    // 删除单条消息：开场白、空回复用不同文案，避免让人以为会改角色卡
+    ConfirmDialog {
+        id: deleteMessageDialog
+        title: root.pendingDeleteIsGreeting ? "删除开场白" : "删除消息"
+        text: root.pendingDeleteIsGreeting
+              ? "删除后这条开场白会从当前会话移除，开场白切换条也会消失；角色卡里的开场白内容不会被修改。"
+              : root.pendingDeleteIsEmpty
+                ? "这条回复没有内容，删除后不会再出现在会话里。"
+                : "确定删除这条消息吗？此操作不可撤销。"
+        detail: root.pendingDeleteExcerpt
+        acceptText: "删除"
+        danger: true
+        onConfirmed: {
+            ChatViewModel.deleteMessage(root.pendingDeleteMessageId)
+            root.pendingDeleteMessageId = ""
+        }
+        onDeclined: root.pendingDeleteMessageId = ""
     }
 }

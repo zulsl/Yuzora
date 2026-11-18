@@ -91,6 +91,7 @@ public:
     // UI操作接口（全部转发至ChatService）
     Q_INVOKABLE void sendMessage(const QString& content);//发送消息
     Q_INVOKABLE void regenerateLastMessage();//重新生成最后消息
+    Q_INVOKABLE void regenerateMessage(const QString& messageId);//重新生成指定回复（最后一条助手消息）
     Q_INVOKABLE void continueGeneration();//继续生成
     Q_INVOKABLE void cancelGeneration();//取消生成
     Q_INVOKABLE void editMessage(const QString& messageId, const QString& newContent);//编辑消息

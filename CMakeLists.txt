@@ -136,7 +136,10 @@ qt_add_qml_module(${PROJECT_NAME}
         qml/components/SectionCard.qml
         qml/components/LabeledField.qml
         qml/components/LongTextField.qml
+        qml/components/ChatScrollBar.qml
         qml/components/MessageBubble.qml
+        qml/components/MessageContextMenu.qml
+        qml/components/TypingDots.qml
         qml/components/ExpandableRow.qml
         qml/components/CameraMask.qml
         qml/pages/character_page/CharacterDetailForm.qml

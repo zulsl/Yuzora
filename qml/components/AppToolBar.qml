@@ -80,6 +80,7 @@ ToolBar {
             Label {// 标题
                 width: parent.width
                 text: root.title
+                textFormat: Text.PlainText
                 font.pixelSize: Theme.fontTitle
                 font.bold: true
                 font.family: Theme.fontFamily
@@ -92,6 +93,7 @@ ToolBar {
                 width: parent.width
                 visible: root.subtitle.length > 0
                 text: root.subtitle
+                textFormat: Text.PlainText
                 font.pixelSize: Theme.fontCaption
                 font.family: Theme.fontFamily
                 color: Theme.textSecondary

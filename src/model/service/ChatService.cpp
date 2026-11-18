@@ -14,6 +14,21 @@
 #include "greeting/GreetingService.h"
 
 
+namespace {
+// 旧版自动标题 = 回复前 10 字符 + "..."。回复以 <content> 开头时，
+// 落库的是 "<content>\n..."，界面把它当富文本后就只剩 "..."。
+// 只认这几个明确特征，避免把用户手写的 "<3" 之类标题也改掉。
+bool isLegacyAutoTitleArtifact(const QString& title)
+{
+    const QString trimmed = title.trimmed();
+    // 旧格式一定以 "..." 结尾；再看是否只剩省略号或带 <content 包装
+    return trimmed.endsWith(QStringLiteral("..."))
+        && (trimmed == QStringLiteral("...")
+            || trimmed.startsWith(QStringLiteral("<content")));
+}
+}
+
+
 ChatService::ChatService(const ChatServiceDependencies& deps, QObject* parent)
     : QObject(parent)
     , m_characterDao(deps.characterDao)
@@ -91,6 +106,9 @@ QString ChatService::openCharacterSession(const QString &charId)
         return newSid;
     }
 
+    // 进入角色时顺手修掉旧版留下的 "<content>\n..." 标题
+    repairLegacySessionTitles(charId);
+
     // 有会话：优先上次打开的，失效了就取最新创建的那条
     const QString lastSid = m_sessions->lastSessionIdForCharacter(charId);
     const QString targetSessionId = (!lastSid.isEmpty() && m_sessions->exists(lastSid))
@@ -115,6 +133,26 @@ QString ChatService::createSession(const QString& characterId)
 
     emit sessionListChanged(characterId);
     return sessionId;
+}
+
+void ChatService::repairLegacySessionTitles(const QString& characterId)
+{
+    if (characterId.isEmpty()) return;
+
+    bool changed = false;
+    const QList<ChatSessionEntity> sessions = m_sessions->listForCharacter(characterId);
+    for (const ChatSessionEntity& session : sessions) {
+        if (!isLegacyAutoTitleArtifact(session.title)) continue;
+
+        const ChatMessageEntity firstUser = m_messageDao->selectFirstUserBySessionId(session.id);
+        if (firstUser.id.isEmpty()) continue;
+
+        if (m_sessions->autoTitleFromUserMessage(session.id, firstUser.content, true))
+            changed = true;
+    }
+
+    if (changed)
+        emit sessionListChanged(characterId);
 }
 
 void ChatService::switchSession(const QString& sessionId)
@@ -274,11 +312,18 @@ void ChatService::deleteMessage(const QString& messageId)
 {
     if (messageId.isEmpty()) return;
 
+    // 生成中不允许删除任何消息：UI 会置灰，这里兜底，避免删掉正在被引用的历史
+    if (m_isGenerating) {
+        emit operationError(QStringLiteral("正在生成回复，请先停止再删除"));
+        return;
+    }
+
     ChatMessageEntity msg = m_messageDao->selectById(messageId);
     if (msg.id.isEmpty()) return;
 
     if (!m_messageDao->remove(messageId)) {
-        Utils::writeLog("ERROR", "ChatService", "删除邮件失败: " + messageId);
+        Utils::writeLog("ERROR", "ChatService", "删除消息失败: " + messageId);
+        emit operationError(QStringLiteral("删除消息失败，请查看日志"));
         return;
     }
 
@@ -289,6 +334,7 @@ void ChatService::deleteMessage(const QString& messageId)
 
     m_sessions->touch(msg.sessionId);
     emit messageDeleted(messageId);
+    emit operationTip(QStringLiteral("已删除消息"));
 }
 
 // ======================================
@@ -414,6 +460,11 @@ void ChatService::sendMessage(const QString& userInput)
         // 事务成功后再通知UI更新，保证数据库与UI一致()
         emit messageAppended(m_messageDao->selectById(userMsgId));
         emit messageAppended(m_messageDao->selectById(assistantMsgId));
+
+        // 标题只用用户自己说的话：模型回复可能以 <content> 等包装标签开头，
+        // 截前几个字符会把标签/空白带进标题（界面上就只剩"..."）。
+        if (m_sessions->autoTitleFromUserMessage(m_sessions->currentSessionId(), userInput))
+            emit sessionListChanged(m_sessions->currentCharacterId());
     }
     catch (const QString& err) {
         if (transactionOk) {
@@ -429,21 +480,49 @@ void ChatService::sendMessage(const QString& userInput)
 
 void ChatService::regenerateLastMessage()
 {
-    if (m_isGenerating || m_sessions->currentSessionId().isEmpty()) return;
+    if (m_isGenerating) return;
 
-    // 定位最后一条助理消息
-    ChatMessageEntity lastAssistantMsg;
-    QList<ChatMessageEntity> allMsgs = m_messageDao->selectLatestBySessionId(m_sessions->currentSessionId(), 1000);
-    for (auto it = allMsgs.rbegin(); it != allMsgs.rend(); ++it) {
-        if (it->type == GlobalConstants::MessageType::Assistant
-            && it->status == GlobalConstants::MessageGenerationStatus::Normal) {
-            lastAssistantMsg = *it;
-            break;
-        }
+    const QString sessionId = m_sessions->currentSessionId();
+    if (sessionId.isEmpty()) return;
+
+    const ChatMessageEntity last = m_messageDao->selectLastBySessionId(sessionId);
+    if (last.id.isEmpty() || last.type != GlobalConstants::MessageType::Assistant) {
+        emit operationError(QStringLiteral("最后一条消息不是助手回复"));
+        return;
     }
 
-    if (lastAssistantMsg.id.isEmpty()) {
-        Utils::writeLog("WARN", "ChatService", "没有要重新生成的消息");
+    regenerateMessage(last.id);
+}
+
+// 重新生成一条助手回复：只允许会话最后一条、非开场白。
+// 失败/取消的占位也是助手消息，所以"失败后重试"和"换一条回复"走同一条路；
+// 以前按"最后一条 Normal 助手消息"找，会把更早的正常回复误删，这里用会话最后一条兜住。
+void ChatService::regenerateMessage(const QString& messageId)
+{
+    if (m_isGenerating) {
+        emit operationError(QStringLiteral("正在生成回复，请先停止再重新生成"));
+        return;
+    }
+
+    const QString sessionId = m_sessions->currentSessionId();
+    if (sessionId.isEmpty() || messageId.isEmpty())
+        return;
+
+    const ChatMessageEntity message = m_messageDao->selectById(messageId);
+    if (message.id.isEmpty() || message.sessionId != sessionId) {
+        emit operationError(QStringLiteral("找不到要重新生成的消息"));
+        return;
+    }
+    if (message.type != GlobalConstants::MessageType::Assistant) {
+        emit operationError(QStringLiteral("只能重新生成助手回复"));
+        return;
+    }
+    if (m_greeting && messageId == m_greeting->messageId()) {
+        emit operationError(QStringLiteral("开场白不能重新生成"));
+        return;
+    }
+    if (m_messageDao->selectLastBySessionId(sessionId).id != messageId) {
+        emit operationError(QStringLiteral("只能重新生成会话的最后一条回复"));
         return;
     }
 
@@ -451,17 +530,15 @@ void ChatService::regenerateLastMessage()
     QString newAssistantMsgId;
 
     try {
-        // 删除原助理消息
-        if (!m_messageDao->remove(lastAssistantMsg.id)) {
-            throw QStringLiteral("删除原消息失败");
+        // 删除旧回复（位置就是最后一条），再插新的生成中占位
+        if (!m_messageDao->remove(messageId)) {
+            throw QStringLiteral("删除原回复失败");
         }
-
-        // 插入新的生成中占位消息
         if (!insertPlaceholderAssistantMessage(newAssistantMsgId)) {
-            throw QStringLiteral("创建新消息失败");
+            throw QStringLiteral("创建新回复失败");
         }
 
-        m_sessions->touch(m_sessions->currentSessionId());
+        m_sessions->touch(sessionId);
 
         if (transactionOk) {
             if (!m_transaction->commit()) {
@@ -469,8 +546,8 @@ void ChatService::regenerateLastMessage()
             }
         }
 
-        // 事务成功后同步UI
-        emit messageDeleted(lastAssistantMsg.id);
+        // 事务成功后再同步 UI
+        emit messageDeleted(messageId);
         emit messageAppended(m_messageDao->selectById(newAssistantMsgId));
     }
     catch (const QString& err) {
@@ -478,10 +555,11 @@ void ChatService::regenerateLastMessage()
             m_transaction->rollback();
         }
         Utils::writeLog("ERROR", "ChatService", "重新生成失败: " + err);
+        emit operationError(QStringLiteral("重新生成失败：") + err);
         return;
     }
 
-    // 重新构建上下文（无新用户输入）
+    // 重新构建上下文（无新用户输入）；新占位是 Generating，不会进上下文
     startGeneration(QString(), QStringLiteral("regenerate"), newAssistantMsgId);
 }
 
@@ -565,8 +643,7 @@ void ChatService::onCompletionFinished(const QString& fullText)
 
     //更新时间戳
     m_sessions->touch(m_sessions->currentSessionId());
-    //更新标题
-    m_sessions->autoTitleFromReply(m_sessions->currentSessionId(), m_fullResponse);
+    // 标题在 sendMessage 时已按首条用户消息生成；不要用回复文本覆盖。
 
 
 //发送信号

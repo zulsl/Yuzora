@@ -82,7 +82,8 @@ public:
 
     // ========== AI生成核心 ==========
     void sendMessage(const QString& userInput);//发送消息
-    void regenerateLastMessage();//重新生成上一条消息
+    void regenerateLastMessage();//重新生成最后一条消息（保留给旧调用方）
+    void regenerateMessage(const QString& messageId);//重新生成指定消息（必须是会话最后一条助手回复）
     void continueGeneration();//继续生成
     void cancelGeneration();//取消生成
     bool isGenerating() const;
@@ -129,6 +130,10 @@ private:
     // 内部业务流程
     bool insertUserMessage(const QString& content, QString& outMessageId);//追加聊天记录
     bool insertPlaceholderAssistantMessage(QString& outMessageId);//追加助手占位符
+
+    // 旧版本按回复前 10 字符生成的标题可能留下 <content>\n... 这类残片；
+    // 打开角色时按首条用户消息修一次，只匹配明确的旧格式，不碰用户手写标题。
+    void repairLegacySessionTitles(const QString& characterId);
 
     // 构建提示词 → 启动补全。
     // 提示词构建失败（如固定提示词超出上下文预算，对应 ST 的 TokenBudgetExceededError）

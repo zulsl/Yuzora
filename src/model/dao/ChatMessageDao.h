@@ -36,6 +36,8 @@ public:
     ChatMessageEntity selectLastBySessionId(const QString& sessionId);
     // 获取会话第一条消息（识别开场白用）
     ChatMessageEntity selectFirstBySessionId(const QString& sessionId);
+    // 获取会话第一条用户消息（自动标题用；开场白不算）
+    ChatMessageEntity selectFirstUserBySessionId(const QString& sessionId);
 
     //按会话ID清除
     bool clearBySessionId(const QString& sessionId);

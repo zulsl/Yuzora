@@ -65,8 +65,24 @@ One continuous conversation between the user and a character; it owns its messag
 _Avoid_: 聊天记录, chat, thread
 
 **Session Title** (会话标题):
-The display name of a Chat Session, shown in the history list and the page subtitle. It starts as a placeholder, may be generated automatically from the first reply, and is not overwritten by that automatic naming once the user has set it.
+The display name of a Chat Session, shown in the history list and the page subtitle. It starts as a placeholder, is generated automatically from the first user message, and is not overwritten by that automatic naming once the user has set it.
 _Avoid_: 会话名, chat name
+
+**Chat Message** (聊天消息):
+One persisted message inside a Chat Session, written by the user or the character, carrying its own generation status. A greeting message is a Chat Message whose content comes from the Greeting Set, not a generated reply.
+_Avoid_: line, entry, bubble
+
+**Regeneration** (重新生成):
+Replacing the latest assistant reply in a Chat Session with a newly generated one. It is not offered for a greeting message and never rewrites earlier messages.
+_Avoid_: retry, swipe, regenerate all
+
+**Retry** (重试):
+Regeneration triggered when the latest assistant Chat Message is a Failed or Canceled placeholder with no usable reply. The user sees it as Regeneration; the distinction is internal.
+_Avoid_: resend, continue
+
+**Message Deletion** (删除消息):
+Permanently removing a single Chat Message from its Chat Session, without deleting neighbouring messages. It never changes the character's Greeting Set.
+_Avoid_: hide, clear, truncate
 
 ## World Info
 

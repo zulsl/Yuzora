@@ -177,6 +177,12 @@ void ChatViewModel::regenerateLastMessage()
     // m_chatService->regenerateLastMessage(m_currentCharId, m_currentSessionId);
 }
 
+void ChatViewModel::regenerateMessage(const QString& messageId)
+{
+    if (m_isGenerating) return;
+    m_chatService->regenerateMessage(messageId);
+}
+
 void ChatViewModel::continueGeneration()
 {
     if (m_isGenerating) return;

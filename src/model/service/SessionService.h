@@ -55,8 +55,11 @@ public:
 
     // 会话被改过（发消息、切开场白）后刷新 last_modified
     void touch(const QString& sessionId);
-    // 标题还是"新对话"时，用回复的前 10 个字符自动生成标题
-    void autoTitleFromReply(const QString& sessionId, const QString& replyText);
+    // 标题还是"新对话"时，用首条用户消息生成标题（单行、最多 24 字符）。
+    // 不用模型回复：回复可能以 <content> 之类的包装标签开头，截前几个字符会得到不可读的片段。
+    // overwriteExisting 只给旧数据修复用：仅当调用方已确认旧标题是自动生成的残片。
+    bool autoTitleFromUserMessage(const QString& sessionId, const QString& text,
+                                  bool overwriteExisting = false);
 
 private:
     ChatSessionDao* m_sessionDao = nullptr;

@@ -133,7 +133,7 @@ Item {
             Repeater {
                 model: [
                     { field: "description", label: "角色描述（系统提示词）", hint: "", maxLines: 8 },
-                    { field: "firstMessage", label: "初始开场白", hint: "", maxLines: 8 },
+                    { field: "firstMessage", label: "首选开场白", hint: "", maxLines: 8 },
                 ]
 
                 // 超过阈值的文本会退化为"只读预览 + 点开编辑"，

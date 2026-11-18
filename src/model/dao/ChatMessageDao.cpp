@@ -324,6 +324,35 @@ ChatMessageEntity ChatMessageDao::selectFirstBySessionId(const QString& sessionI
     return {};
 }
 
+ChatMessageEntity ChatMessageDao::selectFirstUserBySessionId(const QString& sessionId)
+{
+    if (sessionId.isEmpty()) return {};
+
+    QSqlDatabase db = connection();
+    QSqlQuery query(db);
+
+    QString sql = QString(
+                      "SELECT * FROM %1 "
+                      "WHERE session_id = ? AND message_type = ? "
+                      "ORDER BY timestamp ASC, rowid ASC "
+                      "LIMIT 1"
+                      ).arg(tableName());
+
+    query.prepare(sql);
+    query.addBindValue(sessionId);
+    query.addBindValue(static_cast<int>(GlobalConstants::MessageType::User));
+
+    if (!query.exec()) {
+        DatabaseError("selectFirstUserBySessionId", query.lastError());
+        return {};
+    }
+
+    if (query.next()) {
+        return parseFromQuery(query);
+    }
+    return {};
+}
+
 bool ChatMessageDao::clearBySessionId(const QString& sessionId)
 {
     QSqlDatabase db = connection();

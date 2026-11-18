@@ -1,6 +1,7 @@
 #include "SessionService.h"
 
 #include <QDateTime>
+#include <QRegularExpression>
 
 #include "CharacterDao.h"
 #include "CharacterEntity.h"
@@ -8,6 +9,24 @@
 #include "GlobalConstants.h"
 #include "SettingsService.h"
 #include "Utils.h"
+
+namespace {
+constexpr int kAutoTitleMaxLength = 24;
+
+// 标题只显示一行：折叠换行/连续空白，超长才加省略号。
+// 这里不解析 Markdown / HTML，标题按纯文本显示（QML 侧也统一 textFormat: PlainText）。
+QString makeSingleLineTitle(const QString& raw)
+{
+    static const QRegularExpression whitespace(QStringLiteral("\\s+"));
+    QString text = raw;
+    text.replace(whitespace, QStringLiteral(" "));
+    text = text.trimmed();
+
+    if (text.size() > kAutoTitleMaxLength)
+        text = text.left(kAutoTitleMaxLength).trimmed() + QStringLiteral("…");
+    return text;
+}
+}
 
 SessionService::SessionService(ChatSessionDao* sessionDao, CharacterDao* characterDao,
                                SettingsService* settingsService, QObject* parent)
@@ -191,18 +210,24 @@ void SessionService::touch(const QString& sessionId)
     m_sessionDao->updateLastModified(sessionId, QDateTime::currentDateTime());
 }
 
-void SessionService::autoTitleFromReply(const QString& sessionId, const QString& replyText)
+bool SessionService::autoTitleFromUserMessage(const QString& sessionId, const QString& text,
+                                               bool overwriteExisting)
 {
-    if (sessionId.isEmpty() || replyText.isEmpty()) return;
+    if (sessionId.isEmpty()) return false;
 
     ChatSessionEntity session = m_sessionDao->selectById(sessionId);
-    if (session.id.isEmpty()) return;
+    if (session.id.isEmpty()) return false;
 
     // 用户手动改过名就不覆盖（目前没有 title_is_manual 列，只能用默认标题判断）
-    if (session.title != QStringLiteral("新对话")) return;
+    if (!overwriteExisting && session.title != QStringLiteral("新对话")) return false;
 
-    session.title = replyText.left(10) + QStringLiteral("...");
+    const QString title = makeSingleLineTitle(text);
+    if (title.isEmpty()) return false;
+
+    session.title = title;
     if (!m_sessionDao->update(session)) {
         Utils::writeLog("ERROR", "SessionService", QStringLiteral("标题更新失败:%1").arg(sessionId));
+        return false;
     }
+    return true;
 }

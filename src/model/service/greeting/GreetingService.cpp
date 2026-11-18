@@ -48,7 +48,7 @@ bool GreetingService::insertGreetingMessage(const QString& sessionId, const QStr
     firstMsg.type = GlobalConstants::MessageType::Assistant;
     firstMsg.status = GlobalConstants::MessageGenerationStatus::Normal;
     firstMsg.content = texts.first();
-    firstMsg.senderName = QStringLiteral("第一条消息");
+    firstMsg.senderName = QStringLiteral("开场白");
     firstMsg.timestamp = QDateTime::currentDateTime();
     firstMsg.metadata.insert(QStringLiteral("greetingIndex"), 0);
 
