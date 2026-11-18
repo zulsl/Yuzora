@@ -142,7 +142,12 @@ void SettingsViewModel::customAppPath(const QUrl & fileUrl)
 
 void SettingsViewModel::clearAllData()
 {
-    StorageService::instance().clearAllData();
+    try {
+        StorageService::instance().clearAllData();
+    }
+    catch (const AppException& e) { m_exceptionHandler->handleException(e); }
+    catch (const std::exception& e) { m_exceptionHandler->handleException(e); }
+    catch (...) { m_exceptionHandler->handleException(); }
 }
 
 QString SettingsViewModel::getUserName() const

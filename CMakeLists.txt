@@ -50,6 +50,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/network
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service/prompt
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/migration
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/Repository
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/list
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/list/preset
@@ -72,6 +73,9 @@ qt_add_qml_module(${PROJECT_NAME}
         src/base/MessageTextRenderer.cpp src/base/MessageTextRenderer.h
         src/crossplatform/DeviceHelper.h
         src/model/DatabaseManager.cpp src/model/DatabaseManager.h
+        src/model/migration/SchemaMigration.h
+        src/model/migration/SchemaMigrations.cpp src/model/migration/SchemaMigrations.h
+        src/model/migration/MigrationRunner.cpp src/model/migration/MigrationRunner.h
         src/model/ApplicationBootstrap.cpp src/model/ApplicationBootstrap.h
         src/viewmodel/ApiConfigViewModel.h src/viewmodel/CharacterViewModel.h src/viewmodel/CharacterDraft.h src/viewmodel/ChatViewModel.h src/viewmodel/CompletionPresetViewModel.h src/viewmodel/CompletionPresetDraft.h src/viewmodel/SettingsViewModel.h src/viewmodel/WorldInfoViewModel.h src/viewmodel/WorldInfoEntryViewModel.h
         src/viewmodel/AboutViewModel.h

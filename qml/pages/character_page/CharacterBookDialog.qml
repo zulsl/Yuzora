@@ -93,63 +93,72 @@ Dialog {
             visible: !root.bound
             spacing: Theme.spaceXs
 
-            ListView {
-                id: bookList
+            Item {
+                id: bookArea
                 Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(contentHeight, root.maxListHeight)
-                clip: true
-                spacing: Theme.spaceXs
-                model: WorldInfoViewModel.bookModel
-                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                // 有文集时按列表内容撑开；没有文集时保留一块列表大小的空白，
+                // 让空态在列表区域正中显示，而不是按 0 宽布局项溢出到对话框左侧。
+                Layout.preferredHeight: bookList.count > 0
+                                       ? Math.min(bookList.contentHeight, root.maxListHeight)
+                                       : root.maxListHeight
 
-                delegate: ItemDelegate {
-                    id: bookDelegate
-                    required property int index
-                    required property var modelData
+                ListView {
+                    id: bookList
+                    anchors.fill: parent
+                    clip: true
+                    spacing: Theme.spaceXs
+                    model: WorldInfoViewModel.bookModel
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-                    width: ListView.view ? ListView.view.width : 0
-                    height: Theme.touchTarget
-                    // 停用的文集也能绑：启用是全局开关，绑定是另一个维度
-                    onClicked: {
-                        CharacterViewModel.bindCharacterBook(bookDelegate.modelData.id)
-                        root.close()
-                    }
+                    delegate: ItemDelegate {
+                        id: bookDelegate
+                        required property int index
+                        required property var modelData
 
-                    contentItem: RowLayout {
-                        spacing: Theme.spaceSm
-
-                        Label {
-                            Layout.fillWidth: true
-                            text: bookDelegate.modelData.name || ""
-                            font.pixelSize: Theme.fontBody
-                            font.family: Theme.fontFamily
-                            elide: Text.ElideRight
-                            color: bookDelegate.modelData.isEnabled ? Theme.textPrimary
-                                                                    : Theme.textDisabled
+                        width: ListView.view ? ListView.view.width : 0
+                        height: Theme.touchTarget
+                        // 停用的文集也能绑：启用是全局开关，绑定是另一个维度
+                        onClicked: {
+                            CharacterViewModel.bindCharacterBook(bookDelegate.modelData.id)
+                            root.close()
                         }
 
-                        Label {
-                            visible: !bookDelegate.modelData.isEnabled
-                            text: "未启用"
-                            font.pixelSize: Theme.fontCaption
-                            font.family: Theme.fontFamily
-                            color: Theme.textDisabled
-                        }
-                    }
+                        contentItem: RowLayout {
+                            spacing: Theme.spaceSm
 
-                    background: Rectangle {
-                        radius: Theme.radiusSm
-                        color: bookDelegate.hovered ? Theme.rowHover : "transparent"
+                            Label {
+                                Layout.fillWidth: true
+                                text: bookDelegate.modelData.name || ""
+                                font.pixelSize: Theme.fontBody
+                                font.family: Theme.fontFamily
+                                elide: Text.ElideRight
+                                color: bookDelegate.modelData.isEnabled ? Theme.textPrimary
+                                                                        : Theme.textDisabled
+                            }
+
+                            Label {
+                                visible: !bookDelegate.modelData.isEnabled
+                                text: "未启用"
+                                font.pixelSize: Theme.fontCaption
+                                font.family: Theme.fontFamily
+                                color: Theme.textDisabled
+                            }
+                        }
+
+                        background: Rectangle {
+                            radius: Theme.radiusSm
+                            color: bookDelegate.hovered ? Theme.rowHover : "transparent"
+                        }
                     }
                 }
-            }
 
-            EmptyState {
-                Layout.fillWidth: true
-                Layout.preferredHeight: Theme.controlLg * 2
-                visible: bookList.count === 0
-                text: "还没有世界书"
-                detail: "请先在世界书页创建或导入文集"
+                EmptyState {
+                    anchors.centerIn: parent
+                    width: parent.width
+                    visible: bookList.count === 0
+                    text: "还没有世界书"
+                    detail: "请先在世界书页创建或导入文集"
+                }
             }
         }
     }

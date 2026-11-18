@@ -80,70 +80,75 @@ Item {
             Item { Layout.fillWidth: true }
         }
 
-        ListView {
-            id: bookListView
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            clip: true
-            spacing: Theme.spaceXs
-            model: WorldInfoViewModel.bookModel
-            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-            delegate: ItemDelegate {
-                id: bookDelegate
-                required property int index
-                required property var modelData
+            ListView {
+                id: bookListView
+                anchors.fill: parent
+                clip: true
+                spacing: Theme.spaceXs
+                model: WorldInfoViewModel.bookModel
+                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-                width: ListView.view.width
-                height: Theme.touchTarget
-                highlighted: WorldInfoViewModel.currentBookId === bookDelegate.modelData.id
+                delegate: ItemDelegate {
+                    id: bookDelegate
+                    required property int index
+                    required property var modelData
 
-                // 上下内边距归零：ItemDelegate 默认上下各 8px，会把内容区压到 32px，
-                // 而 Material CheckBox 的 implicitHeight 是 48，塞不进去就整体向下溢出 8px，
-                // 表现就是文字和勾选框"偏下"。归零后内容区 = 行高 = 48，三者中心对齐。
-                topPadding: 0
-                bottomPadding: 0
+                    width: ListView.view.width
+                    height: Theme.touchTarget
+                    highlighted: WorldInfoViewModel.currentBookId === bookDelegate.modelData.id
 
-                onClicked: {
-                    bookListView.currentIndex = index
-                    WorldInfoViewModel.selectBook(bookDelegate.modelData.id)
-                    root.detailRequested()
-                }
+                    // 上下内边距归零：ItemDelegate 默认上下各 8px，会把内容区压到 32px，
+                    // 而 Material CheckBox 的 implicitHeight 是 48，塞不进去就整体向下溢出 8px，
+                    // 表现就是文字和勾选框"偏下"。归零后内容区 = 行高 = 48，三者中心对齐。
+                    topPadding: 0
+                    bottomPadding: 0
 
-                contentItem: RowLayout {
-                    spacing: Theme.spaceSm
-
-                    AppCheckBox {
-                        checked: bookDelegate.modelData.isEnabled
-                        onToggled: WorldInfoViewModel.toggleBookEnabled(bookDelegate.modelData.id)
+                    onClicked: {
+                        bookListView.currentIndex = index
+                        WorldInfoViewModel.selectBook(bookDelegate.modelData.id)
+                        root.detailRequested()
                     }
 
-                    Label {
-                        Layout.fillWidth: true
-                        text: bookDelegate.modelData.name || ""
-                        font.pixelSize: Theme.fontBody
-                        font.family: Theme.fontFamily
-                        font.weight: Font.Medium
-                        elide: Text.ElideRight
-                        color: bookDelegate.modelData.isEnabled ? Theme.textPrimary
-                                                                : Theme.textDisabled
-                    }
-                }
+                    contentItem: RowLayout {
+                        spacing: Theme.spaceSm
 
-                background: Rectangle {
-                    radius: Theme.radiusSm
-                    color: bookDelegate.highlighted ? Theme.rowSelected
-                         : bookDelegate.hovered ? Theme.rowHover
-                         : "transparent"
+                        AppCheckBox {
+                            checked: bookDelegate.modelData.isEnabled
+                            onToggled: WorldInfoViewModel.toggleBookEnabled(bookDelegate.modelData.id)
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: bookDelegate.modelData.name || ""
+                            font.pixelSize: Theme.fontBody
+                            font.family: Theme.fontFamily
+                            font.weight: Font.Medium
+                            elide: Text.ElideRight
+                            color: bookDelegate.modelData.isEnabled ? Theme.textPrimary
+                                                                    : Theme.textDisabled
+                        }
+                    }
+
+                    background: Rectangle {
+                        radius: Theme.radiusSm
+                        color: bookDelegate.highlighted ? Theme.rowSelected
+                             : bookDelegate.hovered ? Theme.rowHover
+                             : "transparent"
+                    }
                 }
             }
-        }
 
-        EmptyState {
-            Layout.fillWidth: true
-            Layout.preferredHeight: Theme.controlLg * 3
-            visible: bookListView.count === 0
-            text: "还没有世界书"
+            // 空态盖在列表区域正中，不再作为列表后面的独立布局项被挤到底部。
+            EmptyState {
+                anchors.centerIn: parent
+                width: parent.width
+                visible: bookListView.count === 0
+                text: "还没有世界书"
+            }
         }
     }
 }

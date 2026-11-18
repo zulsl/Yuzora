@@ -35,21 +35,12 @@ public:
 
 private:
     explicit DatabaseManager(QObject* parent = nullptr);
-    bool upgradeDatabase(QSqlDatabase& db, int oldVersion, int newVersion);//数据库更新版本预留
-
-    //创建数据表
-    bool createTables(QSqlDatabase& db);
     //返回当前线程的连接名称
     QString connectionNameForCurrentThread() const;
 
     bool m_isReady = false;//已就绪
-    const int DATABASE_VERSION = 2;
     QString m_dbFilePath;
     QMutex m_mutex;
-
-    bool hasColumn(QSqlDatabase& db, const QString& table, const QString& column);
-    bool ensureColumn(QSqlDatabase& db, const QString& table,
-                      const QString& column, const QString& definition);
 };
 
 #endif

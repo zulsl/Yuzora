@@ -172,6 +172,7 @@ PageScaffold {
                 AboutRow {
                     iconSource: "qrc:/icons/res/brand-bilibili.svg"
                     title: "哔哩哔哩"
+                    subtitle: "作者b站号"
                     showDivider: false
                     onClicked: Qt.openUrlExternally("https://space.bilibili.com/261474153")
                 }

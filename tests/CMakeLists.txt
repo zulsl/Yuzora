@@ -536,6 +536,28 @@ set_tests_properties(YuzoraPresetPromptListModelTests PROPERTIES
     ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
 )
 
+# 数据库迁移：新库、旧库引导、失败回滚、版本保护
+qt_add_executable(YuzoraMigrationTests
+    MigrationTest.cpp
+    ../src/model/migration/SchemaMigration.h
+    ../src/model/migration/SchemaMigrations.cpp
+    ../src/model/migration/SchemaMigrations.h
+    ../src/model/migration/MigrationRunner.cpp
+    ../src/model/migration/MigrationRunner.h
+)
+
+target_include_directories(YuzoraMigrationTests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/migration
+)
+
+target_link_libraries(YuzoraMigrationTests PRIVATE Qt6::Core Qt6::Sql Qt6::Test)
+set_target_properties(YuzoraMigrationTests PROPERTIES WIN32_EXECUTABLE FALSE)
+
+add_test(NAME YuzoraMigrationTests COMMAND YuzoraMigrationTests)
+set_tests_properties(YuzoraMigrationTests PROPERTIES
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+)
+
 # 关于页的版本比较：纯函数，不发起真实网络请求
 qt_add_executable(YuzoraAboutViewModelTests
     AboutViewModelTest.cpp
