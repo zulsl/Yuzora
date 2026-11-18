@@ -41,18 +41,23 @@ endif()
 
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/crossplatform
     ${CMAKE_CURRENT_SOURCE_DIR}/src/base
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/viewmodel
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/crossplatform
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/dao
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/entity
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/network
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service/prompt
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/migration
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/list
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/list/preset
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/migration
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/network
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service/app
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service/character
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service/chat
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service/chat/completion
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service/preset
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service/prompt
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service/worldinfo
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/viewmodel
 )
 
 set_source_files_properties(qml/theme/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -80,33 +85,33 @@ qt_add_qml_module(${PROJECT_NAME}
         src/viewmodel/AboutViewModel.h
         src/model/dao/CharacterDao.h src/model/dao/ChatMessageDao.h src/model/dao/ChatSessionDao.h src/model/dao/CompletionPresetDao.h src/model/dao/SettingsDao.h src/model/dao/VectorMemoryDao.h src/model/dao/WorldInfoBookDao.h
         src/model/network/BaseApiClient.cpp src/model/network/BaseApiClient.h src/model/network/NetworkError.cpp src/model/network/NetworkError.h src/model/network/ClaudeApiClient.cpp src/model/network/ClaudeApiClient.h src/model/network/DeepSeekApiClient.cpp src/model/network/DeepSeekApiClient.h src/model/network/DoubaoApiClient.cpp src/model/network/DoubaoApiClient.h src/model/network/GeminiApiClient.cpp src/model/network/GeminiApiClient.h src/model/network/ModelFactory.cpp src/model/network/ModelFactory.h
-        src/model/service/CharacterCardParser.h src/model/service/ChatService.h src/model/service/MemoryService.h src/model/service/WorldInfoMatcher.h
+        src/model/service/character/CharacterCardParser.h src/model/service/chat/ChatService.h src/model/service/chat/MemoryService.h src/model/service/worldinfo/WorldInfoMatcher.h
         src/model/list/CharacterListModel.h src/model/list/ChatMessageListModel.h
         src/model/dao/CharacterDao.cpp src/model/dao/ChatMessageDao.cpp src/model/dao/ChatSessionDao.cpp src/model/dao/CompletionPresetDao.cpp src/model/dao/SettingsDao.cpp src/model/dao/VectorMemoryDao.cpp src/model/dao/WorldInfoBookDao.cpp
-        src/model/service/CharacterCardParser.cpp src/model/service/ChatService.cpp src/model/service/MemoryService.cpp src/model/service/WorldInfoMatcher.cpp
-        src/model/service/ChatServiceAssembly.cpp src/model/service/TransactionScope.h
-        src/model/service/SessionService.cpp src/model/service/SessionService.h
-        src/model/service/completion/ChatCompletionRunner.h src/model/service/completion/ApiCompletionRunner.cpp src/model/service/completion/ApiCompletionRunner.h
-        src/model/service/greeting/GreetingService.cpp src/model/service/greeting/GreetingService.h
+        src/model/service/character/CharacterCardParser.cpp src/model/service/chat/ChatService.cpp src/model/service/chat/MemoryService.cpp src/model/service/worldinfo/WorldInfoMatcher.cpp
+        src/model/service/chat/ChatServiceAssembly.cpp src/model/dao/TransactionScope.h
+        src/model/service/chat/SessionService.cpp src/model/service/chat/SessionService.h
+        src/model/service/chat/completion/ChatCompletionRunner.h src/model/service/chat/completion/ApiCompletionRunner.cpp src/model/service/chat/completion/ApiCompletionRunner.h
+        src/model/service/character/GreetingService.cpp src/model/service/character/GreetingService.h
         src/viewmodel/ApiConfigViewModel.cpp src/viewmodel/ApiConfigDraft.cpp src/viewmodel/ApiConfigDraft.h src/viewmodel/CharacterViewModel.cpp src/viewmodel/CharacterDraft.cpp src/viewmodel/ChatViewModel.cpp src/viewmodel/CompletionPresetViewModel.cpp src/viewmodel/CompletionPresetDraft.cpp src/viewmodel/SettingsViewModel.cpp src/viewmodel/WorldInfoViewModel.cpp src/viewmodel/WorldInfoEntryViewModel.cpp
         src/viewmodel/AboutViewModel.cpp
         src/model/list/CharacterListModel.cpp src/model/list/ChatMessageListModel.cpp
         src/model/list/ChatMessageItemModel.cpp src/model/list/ChatMessageItemModel.h
         src/model/dao/ApiConfigDao.h src/model/dao/ApiConfigDao.cpp
-        src/model/service/ApiConfigService.h src/model/service/ApiConfigService.cpp
+        src/model/service/app/ApiConfigService.h src/model/service/app/ApiConfigService.cpp
         src/model/list/ApiConfigListModel.h src/model/list/ApiConfigListModel.cpp
         src/model/network/OpenAICompatibleApiClient.h src/model/network/OpenAICompatibleApiClient.cpp
         src/model/dao/AbstractDao.h src/model/dao/AbstractDao.cpp
         src/model/dao/IConnectionProvider.h
         src/model/dao/ConnectionProviderRegistry.cpp src/model/dao/ConnectionProviderRegistry.h
         src/model/dao/BaseDao.h
-        src/model/service/CharacterService.h src/model/service/CharacterService.cpp
+        src/model/service/character/CharacterService.h src/model/service/character/CharacterService.cpp
         src/model/list/CharacterItemViewModel.cpp src/model/list/CharacterItemViewModel.h
-        src/model/service/CompletionPresetService.h src/model/service/CompletionPresetService.cpp
+        src/model/service/preset/CompletionPresetService.h src/model/service/preset/CompletionPresetService.cpp
         src/model/network/ChatMessage.h src/model/network/ChatMessage.cpp
-        src/model/service/SettingsService.h src/model/service/SettingsService.cpp
-        src/model/service/StorageService.h src/model/service/StorageService.cpp
-        src/model/service/WorldInfoService.h src/model/service/WorldInfoService.cpp
+        src/model/service/app/SettingsService.h src/model/service/app/SettingsService.cpp
+        src/model/service/app/StorageService.h src/model/service/app/StorageService.cpp
+        src/model/service/worldinfo/WorldInfoService.h src/model/service/worldinfo/WorldInfoService.cpp
         src/model/list/WorldInfoBookListModel.h src/model/list/WorldInfoBookListModel.cpp
         src/model/list/WorldInfoEntryListModel.h src/model/list/WorldInfoEntryListModel.cpp
         src/model/list/WorldInfoBookItemModel.h src/model/list/WorldInfoBookItemModel.cpp

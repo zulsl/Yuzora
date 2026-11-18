@@ -7,11 +7,11 @@
 #include "CharacterService.h"
 #include "SettingsService.h"
 #include "ExceptionHandler.h"
-#include "prompt/ChatPromptContext.h"
+#include "ChatPromptContext.h"
 #include "AppException.h"
-#include "completion/ChatCompletionRunner.h"
+#include "ChatCompletionRunner.h"
 #include "SessionService.h"
-#include "greeting/GreetingService.h"
+#include "GreetingService.h"
 
 
 namespace {

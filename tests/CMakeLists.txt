@@ -1,5 +1,15 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Sql Test)
 
+# service 层按领域分子目录后，扁平 include 需要把每个子目录都加进搜索路径。
+set(SERVICE_INCLUDE_DIRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/app
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/character
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/chat
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/chat/completion
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/preset
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/worldinfo
+)
+
 qt_add_executable(YuzoraTests
     WorldInfoEntryListModelTest.cpp
     ../src/model/list/WorldInfoEntryListModel.cpp
@@ -51,8 +61,8 @@ set_tests_properties(YuzoraBaseDaoTests PROPERTIES
 
 qt_add_executable(YuzoraSettingsServiceTests
     SettingsServiceTest.cpp
-    ../src/model/service/SettingsService.cpp
-    ../src/model/service/SettingsService.h
+    ../src/model/service/app/SettingsService.cpp
+    ../src/model/service/app/SettingsService.h
     ../src/model/dao/SettingsDao.cpp
     ../src/model/dao/SettingsDao.h
     ../src/model/dao/BaseDao.h
@@ -72,7 +82,7 @@ target_include_directories(YuzoraSettingsServiceTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/dao
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${SERVICE_INCLUDE_DIRS}
 )
 
 target_link_libraries(YuzoraSettingsServiceTests PRIVATE
@@ -116,8 +126,8 @@ set_tests_properties(YuzoraCharacterDaoTests PROPERTIES
 
 qt_add_executable(YuzoraCharacterServiceTests
     CharacterServiceTest.cpp
-    ../src/model/service/CharacterService.cpp
-    ../src/model/service/CharacterService.h
+    ../src/model/service/character/CharacterService.cpp
+    ../src/model/service/character/CharacterService.h
     ../src/model/dao/CharacterDao.cpp
     ../src/model/dao/CharacterDao.h
     ../src/model/dao/BaseDao.h
@@ -136,7 +146,7 @@ target_include_directories(YuzoraCharacterServiceTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/dao
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${SERVICE_INCLUDE_DIRS}
 )
 
 target_link_libraries(YuzoraCharacterServiceTests PRIVATE
@@ -150,8 +160,8 @@ set_tests_properties(YuzoraCharacterServiceTests PROPERTIES
 
 qt_add_executable(YuzoraWorldInfoServiceTests
     WorldInfoServiceTest.cpp
-    ../src/model/service/WorldInfoService.cpp
-    ../src/model/service/WorldInfoService.h
+    ../src/model/service/worldinfo/WorldInfoService.cpp
+    ../src/model/service/worldinfo/WorldInfoService.h
     ../src/model/dao/WorldInfoBookDao.cpp
     ../src/model/dao/WorldInfoBookDao.h
     ../src/model/dao/WorldInfoEntryDao.cpp
@@ -174,7 +184,7 @@ target_include_directories(YuzoraWorldInfoServiceTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/dao
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${SERVICE_INCLUDE_DIRS}
 )
 
 target_link_libraries(YuzoraWorldInfoServiceTests PRIVATE
@@ -188,8 +198,8 @@ set_tests_properties(YuzoraWorldInfoServiceTests PROPERTIES
 
 qt_add_executable(YuzoraCompletionPresetServiceTests
     CompletionPresetServiceTest.cpp
-    ../src/model/service/CompletionPresetService.cpp
-    ../src/model/service/CompletionPresetService.h
+    ../src/model/service/preset/CompletionPresetService.cpp
+    ../src/model/service/preset/CompletionPresetService.h
     ../src/model/dao/CompletionPresetDao.cpp
     ../src/model/dao/CompletionPresetDao.h
     ../src/model/dao/PromptDao.cpp
@@ -212,7 +222,7 @@ target_include_directories(YuzoraCompletionPresetServiceTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/dao
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${SERVICE_INCLUDE_DIRS}
 )
 
 target_link_libraries(YuzoraCompletionPresetServiceTests PRIVATE
@@ -275,12 +285,12 @@ set_tests_properties(YuzoraCompletionPresetDraftTests PROPERTIES
 
 qt_add_executable(YuzoraChatServiceTests
     ChatServiceTest.cpp
-    ../src/model/service/ChatService.cpp
-    ../src/model/service/ChatService.h
-    ../src/model/service/CharacterService.cpp
-    ../src/model/service/CharacterService.h
-    ../src/model/service/SettingsService.cpp
-    ../src/model/service/SettingsService.h
+    ../src/model/service/chat/ChatService.cpp
+    ../src/model/service/chat/ChatService.h
+    ../src/model/service/character/CharacterService.cpp
+    ../src/model/service/character/CharacterService.h
+    ../src/model/service/app/SettingsService.cpp
+    ../src/model/service/app/SettingsService.h
     ../src/model/dao/ChatSessionDao.cpp
     ../src/model/dao/ChatSessionDao.h
     ../src/model/dao/ChatMessageDao.cpp
@@ -293,12 +303,12 @@ qt_add_executable(YuzoraChatServiceTests
     ../src/model/dao/IConnectionProvider.h
     ../src/model/dao/ConnectionProviderRegistry.cpp
     ../src/model/dao/ConnectionProviderRegistry.h
-    ../src/model/service/completion/ChatCompletionRunner.h
-    ../src/model/service/SessionService.cpp
-    ../src/model/service/SessionService.h
-    ../src/model/service/greeting/GreetingService.cpp
-    ../src/model/service/greeting/GreetingService.h
-    ../src/model/service/TransactionScope.h
+    ../src/model/service/chat/completion/ChatCompletionRunner.h
+    ../src/model/service/chat/SessionService.cpp
+    ../src/model/service/chat/SessionService.h
+    ../src/model/service/character/GreetingService.cpp
+    ../src/model/service/character/GreetingService.h
+    ../src/model/dao/TransactionScope.h
     ../src/model/entity/CharacterEntity.h
     ../src/model/entity/ChatMessageEntity.h
     ../src/model/entity/ChatSessionEntity.h
@@ -317,7 +327,7 @@ target_include_directories(YuzoraChatServiceTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/dao
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${SERVICE_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/prompt
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/network
 )
@@ -337,8 +347,8 @@ qt_add_executable(YuzoraApiConfigViewModelTests
     ../src/viewmodel/ApiConfigViewModel.h
     ../src/viewmodel/ApiConfigDraft.cpp
     ../src/viewmodel/ApiConfigDraft.h
-    ../src/model/service/ApiConfigService.cpp
-    ../src/model/service/ApiConfigService.h
+    ../src/model/service/app/ApiConfigService.cpp
+    ../src/model/service/app/ApiConfigService.h
     ../src/model/dao/ApiConfigDao.cpp
     ../src/model/dao/ApiConfigDao.h
     ../src/model/list/ApiConfigListModel.cpp
@@ -367,7 +377,7 @@ target_include_directories(YuzoraApiConfigViewModelTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/dao
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/list
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${SERVICE_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/network
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/viewmodel
 )
@@ -391,7 +401,7 @@ qt_add_executable(YuzoraPromptBuilderTests
     ../src/model/service/prompt/ChatMessageGroup.h
     ../src/model/network/ChatMessage.cpp
     ../src/model/network/ChatMessage.h
-    ../src/model/service/WorldInfoMatcher.h
+    ../src/model/service/worldinfo/WorldInfoMatcher.h
     ../src/model/entity/CharacterEntity.h
     ../src/model/entity/ChatMessageEntity.h
     ../src/model/entity/CompletionPresetEntity.h
@@ -408,7 +418,7 @@ target_include_directories(YuzoraPromptBuilderTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/base
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/network
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${SERVICE_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/prompt
 )
 
@@ -423,8 +433,8 @@ set_tests_properties(YuzoraPromptBuilderTests PROPERTIES
 
 qt_add_executable(YuzoraWorldInfoMatcherTests
     WorldInfoMatcherTest.cpp
-    ../src/model/service/WorldInfoMatcher.cpp
-    ../src/model/service/WorldInfoMatcher.h
+    ../src/model/service/worldinfo/WorldInfoMatcher.cpp
+    ../src/model/service/worldinfo/WorldInfoMatcher.h
     ../src/model/entity/WorldInfoEntryEntity.h
     ../src/model/entity/ChatMessageEntity.h
     ../src/model/entity/CharacterEntity.h
@@ -438,7 +448,7 @@ target_include_directories(YuzoraWorldInfoMatcherTests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/base
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/network
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/entity
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service
+    ${SERVICE_INCLUDE_DIRS}
 )
 
 target_link_libraries(YuzoraWorldInfoMatcherTests PRIVATE

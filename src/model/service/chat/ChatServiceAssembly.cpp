@@ -1,7 +1,7 @@
 #include "ChatService.h"
 
-#include "completion/ApiCompletionRunner.h"
-#include "greeting/GreetingService.h"
+#include "ApiCompletionRunner.h"
+#include "GreetingService.h"
 #include "SessionService.h"
 #include "CharacterDao.h"
 #include "CharacterService.h"

@@ -20,9 +20,9 @@
 #include "DatabaseManager.h"
 #include "WorldInfoService.h"
 #include "ChatMessage.h"
-#include "completion/ChatCompletionRunner.h"
-#include "greeting/GreetingService.h"
-#include "prompt/ChatPromptContext.h"
+#include "ChatCompletionRunner.h"
+#include "GreetingService.h"
+#include "ChatPromptContext.h"
 
 // ======================================
 // 链接桩
