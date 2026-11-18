@@ -51,7 +51,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/service/prompt
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/migration
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/model/Repository
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/list
     ${CMAKE_CURRENT_SOURCE_DIR}/src/model/list/preset
 )
