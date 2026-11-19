@@ -150,6 +150,9 @@ private:
     void refreshSessionList();//刷新会话列表
     ChatMessageItemModel* createItemFromEntity(const ChatMessageEntity& entity);//从实体创建项
 
+    // 当前会话/角色没了（会话被删、角色被删）：把页面上的角色名、标题、消息列表一起清空
+    void clearCurrentChatState();
+
     // 视图状态（仅用于UI展示，不做业务判断）
     bool m_isGenerating = false;//正在生成
     QString m_currentCharName;

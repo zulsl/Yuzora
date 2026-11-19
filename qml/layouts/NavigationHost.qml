@@ -36,9 +36,10 @@ Item {
     onWideChanged: if (wide) drawerOpen = false
 
     // ========== 快捷键 ==========
-    // Esc 关闭抽屉
+    // Esc 是桌面习惯；安卓返回键到 Qt 是 Qt.Key_Back（不是 Esc），两个都接，
+    // 否则手机上打开导航抽屉后按返回键只能看着它不动。
     Shortcut {
-        sequence: "Esc"
+        sequences: ["Esc", "Back"]
         enabled: root.drawerOpen
         onActivated: root.closeDrawer()
     }

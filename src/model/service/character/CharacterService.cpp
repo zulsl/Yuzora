@@ -52,7 +52,7 @@ void CharacterService::initBuiltinCharacters()
     if (!m_dao->selectAll().isEmpty()) return;
 
     CharacterEntity entity;
-    entity.name="ai助手";
+    entity.name="Ai助手";
     entity.description="You are a helpful assistant.";
     entity.createdAt=QDateTime::currentDateTime();
     entity.updatedAt=QDateTime::currentDateTime();
@@ -523,6 +523,7 @@ CharacterEntity CharacterService::parseCardDataToEntity(const QJsonObject& cardD
     entity.scenario = data.value("scenario").toString();
     entity.exampleDialogue = data.value("mes_example").toString();
     entity.systemPrompt = data.value("system_prompt").toString();
+    entity.postHistoryInstructions = data.value("post_history_instructions").toString();
     entity.characterVersion = data.value("character_version").toString("1.0.0");
 
     // 标签
@@ -531,7 +532,15 @@ CharacterEntity CharacterService::parseCardDataToEntity(const QJsonObject& cardD
         entity.tags.append(val.toString());
     }
 
-    entity.cardFormatVersion = cardData.value("spec").toString("v2").remove("v").toInt();
+    // spec 可能是 "chara_card_v2"（规范写法）、"v2"（早期本项目写法）或缺失（V1 卡）。
+    // 以前直接 remove("v").toInt()，"chara_card_v2" 会被算成 0。
+    const QString spec = cardData.value("spec").toString();
+    if (spec.contains("v3") || spec.contains("V3"))
+        entity.cardFormatVersion = 3;
+    else if (spec.contains("v2") || spec.contains("V2") || !spec.isEmpty())
+        entity.cardFormatVersion = 2;
+    else
+        entity.cardFormatVersion = 1;
 
     //是否收藏
     entity.isFavorite = false;
@@ -566,6 +575,7 @@ QJsonObject CharacterService::buildCardDataFromEntity(const CharacterEntity& ent
     data["first_mes"] = entity.firstMessage;
     data["mes_example"] = entity.exampleDialogue;
     data["system_prompt"] = entity.systemPrompt;
+    data["post_history_instructions"] = entity.postHistoryInstructions;
     data["creator_notes"] = entity.creatorNotes;
     data["creator"] = entity.creator;
     data["character_version"] = entity.characterVersion;
@@ -585,12 +595,35 @@ QJsonObject CharacterService::buildCardDataFromEntity(const CharacterEntity& ent
     data["tags"] = tags;
 
     // 扩展字段
-    if (!entity.extensions.isEmpty()) {
-        data["extensions"] = QJsonObject::fromVariantMap(entity.extensions);
+    data["extensions"] = QJsonObject::fromVariantMap(entity.extensions);
+
+    // 创建时间：V2 规范字段，换机器/重新导入也能保住"这张卡是什么时候做的"
+    data["create_date"] = entity.createdAt.isValid()
+        ? entity.createdAt.toUTC().toString(Qt::ISODate)
+        : QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+
+    // 角色绑定的世界书跟着卡走（ST 导出带书的角色卡时就是这么做的）。
+    // 一个角色只绑一本（与 ST 一致）；没有绑定就不写这个字段。
+    if (m_worldInfoService && !entity.worldBookIds.isEmpty()) {
+        const QJsonObject book =
+            m_worldInfoService->bookToCharacterBookJson(entity.worldBookIds.first());
+        if (!book.isEmpty())
+            data["character_book"] = book;
     }
 
     QJsonObject card;
-    card["spec"] = QString("v%1").arg(entity.cardFormatVersion);
+    card["spec"] = QStringLiteral("chara_card_v2");
+    card["spec_version"] = QStringLiteral("2.0");
     card["data"] = data;
+
+    // V1 兼容别名：只认顶层字段的老工具（以及 ST 的 V1 兜底分支）也能读到人设。
+    // 字段名沿用 V1 的叫法（creatorcomment 而不是 creator_notes）。
+    card["name"] = data.value("name");
+    card["description"] = data.value("description");
+    card["personality"] = data.value("personality");
+    card["scenario"] = data.value("scenario");
+    card["first_mes"] = data.value("first_mes");
+    card["mes_example"] = data.value("mes_example");
+    card["creatorcomment"] = data.value("creator_notes");
     return card;
 }

@@ -634,9 +634,21 @@ QJsonObject CompletionPresetService::toSillyTavernJson(const CompletionPresetEnt
 {
     QJsonObject obj;
     obj["name"] = preset.name;
-    obj["max_context_size"] = preset.maxContextToken;
-    obj["max_length"] = preset.maxResponseToken;
-    obj["stream"] = preset.streamEnabled;
+
+    // ST 的键名以它自己的 openai.js 为准（本文件的导入侧就是照那套读的）。
+    // 以前这里写的是 max_context_size / max_length / stream，ST 根本没有这三个键，
+    // 结果上下文长度和是否流式导出后就丢了。
+    obj["openai_max_context"] = preset.maxContextToken;
+    obj["openai_max_tokens"] = preset.maxResponseToken;
+    obj["stream_openai"] = preset.streamEnabled;
+
+    obj["max_context_unlocked"] = preset.maxContextUnlocked;
+    obj["names_behavior"] = preset.namesBehavior;
+    obj["continue_postfix"] = preset.continuePostfix;
+    obj["continue_prefill"] = preset.continuePrefill;
+    obj["squash_system_messages"] = preset.squashSystemMessages;
+    obj["function_calling"] = preset.functionCalling;
+    obj["show_thoughts"] = preset.showThoughts;
 
     obj["temperature"] = preset.temperature;
     obj["top_p"] = preset.topP;
@@ -647,37 +659,79 @@ QJsonObject CompletionPresetService::toSillyTavernJson(const CompletionPresetEnt
     obj["top_a"] = preset.topA;
     obj["min_p"] = preset.minP;
 
-    QJsonObject dynTemp;
-    dynTemp["enabled"] = preset.dynamicTempEnabled;
-    dynTemp["min"] = preset.dynamicTempMin;
-    dynTemp["max"] = preset.dynamicTempMax;
-    dynTemp["exponent"] = preset.dynamicTempExponent;
-    obj["dynamic_temperature"] = dynTemp;
+    // 实用提示词：显式空串是有效值（"不要 New Chat 标记"），必须原样写出，
+    // 不能因为空就跳过——跳过会变成"从没设置过"，导入侧会回退到默认值。
+    obj["impersonation_prompt"] = preset.impersonationPrompt;
+    obj["wi_format"] = preset.wiFormat;
+    obj["scenario_format"] = preset.scenarioFormat;
+    obj["personality_format"] = preset.personalityFormat;
+    obj["group_nudge_prompt"] = preset.groupNudgePrompt;
+    obj["new_chat_prompt"] = preset.newChatPrompt;
+    obj["new_group_chat_prompt"] = preset.newGroupChatPrompt;
+    obj["new_example_chat_prompt"] = preset.newExampleChatPrompt;
+    obj["continue_nudge_prompt"] = preset.continueNudgePrompt;
 
-    QString tmplName;
-    switch (preset.promptTemplate) {
-        case GlobalConstants::PromptTemplateType::Alpaca: tmplName = "Alpaca"; break;
-        case GlobalConstants::PromptTemplateType::ChatML: tmplName = "ChatML"; break;
-        case GlobalConstants::PromptTemplateType::Llama2: tmplName = "Llama2"; break;
-        case GlobalConstants::PromptTemplateType::Mistral: tmplName = "Mistral"; break;
-        case GlobalConstants::PromptTemplateType::GeminiPrompt: tmplName = "Gemini"; break;
-        default: tmplName = "Custom"; break;
+    // ========== 提示词本体 ==========
+    // 以前这里整个塌掉了：导出文件只有采样参数，一条提示词都没有，
+    // ST 打开就是个空预设。
+    const QList<PromptEntity> prompts = m_promptDao
+        ? m_promptDao->selectPromptsByPresetId(preset.id)
+        : QList<PromptEntity>();
+
+    QHash<QString, bool> enabledByIdentifier;
+    QHash<QString, bool> seen;
+    QJsonArray promptsArr;
+    for (const PromptEntity& prompt : prompts) {
+        if (prompt.identifier.isEmpty()) continue;
+        if (seen.contains(prompt.identifier)) continue;
+        seen.insert(prompt.identifier, true);
+        enabledByIdentifier.insert(prompt.identifier, prompt.isActive);
+
+        QJsonObject p;
+        p["identifier"] = prompt.identifier;
+        p["name"] = prompt.name;
+        p["system_prompt"] = prompt.system_prompt;
+        p["role"] = GlobalConstants::messageTypeToString(prompt.role);
+        p["content"] = prompt.content;
+        p["marker"] = prompt.marker;
+        p["injection_position"] = prompt.injection_position;
+        p["injection_depth"] = prompt.injection_depth;
+        p["injection_order"] = prompt.injection_order;
+        p["forbid_overrides"] = prompt.forbid_overrides;
+        // injection_trigger 没有落库，导出空数组（ST 的默认值也是空）
+        p["injection_trigger"] = QJsonArray();
+        promptsArr.append(p);
     }
-    obj["instruction_template"] = tmplName;
-    obj["system_prompt_prefix"] = preset.systemPromptPrefix;
-    obj["system_prompt_suffix"] = preset.systemPromptSuffix;
-    obj["input_prefix"] = preset.userMessagePrefix;
-    obj["input_suffix"] = preset.userMessageSuffix;
-    obj["output_prefix"] = preset.assistantMessagePrefix;
-    obj["output_suffix"] = preset.assistantMessageSuffix;
-    obj["separator"] = preset.conversationSeparator;
+    obj["prompts"] = promptsArr;
 
-    QJsonArray stopArr;
-    for (const auto& s : preset.stoppingStrings) stopArr.append(s);
-    obj["stopping_strings"] = stopArr;
+    // ========== 顺序 ==========
+    // 以预设的 promptOrder 为准，再补上"有实体但没登记进 order"的条目，
+    // 否则这些提示词在 ST 里会变成孤儿。
+    QStringList order = normalizePromptOrder(preset.promptOrder);
+    for (const PromptEntity& prompt : prompts) {
+        if (!prompt.identifier.isEmpty() && !order.contains(prompt.identifier))
+            order.append(prompt.identifier);
+    }
 
-    obj["auto_continue"] = preset.autoContinueEnabled;
-    obj["auto_continue_max"] = preset.autoContinueMax;
+    QJsonArray orderArr;
+    for (const QString& identifier : order) {
+        QJsonObject o;
+        o["identifier"] = identifier;
+        o["enabled"] = enabledByIdentifier.value(identifier, true);
+        orderArr.append(o);
+    }
+
+    // ST 的 prompt_order 是「按 character_id 分组」的数组：
+    // 100001 是它 chat completion 实际用的 dummyId（public/scripts/openai.js:696-698），
+    // 100000 是给普通角色用的默认组。两个都写，任何一路取到的都是完整顺序。
+    QJsonArray promptOrderArr;
+    for (const int characterId : {100000, 100001}) {
+        QJsonObject group;
+        group["character_id"] = characterId;
+        group["order"] = orderArr;
+        promptOrderArr.append(group);
+    }
+    obj["prompt_order"] = promptOrderArr;
 
     return obj;
 }

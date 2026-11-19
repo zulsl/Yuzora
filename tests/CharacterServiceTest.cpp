@@ -4,6 +4,8 @@
 #include <QJsonObject>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QTemporaryDir>
+#include <QFile>
 
 #include "CharacterDao.h"
 #include "CharacterService.h"
@@ -58,7 +60,12 @@ QString Utils::getAvatarDirPath() { return QStringLiteral("."); }
 QJsonObject Utils::extractPngMetadata(const QString&) { return {}; }
 bool Utils::injectPngMetadata(const QString&, const QJsonObject&) { return false; }
 QJsonDocument Utils::readJsonFile(const QString&) { return {}; }
-bool Utils::writeJsonFile(const QString&, const QJsonDocument&) { return false; }
+bool Utils::writeJsonFile(const QString& path, const QJsonDocument& doc)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) return false;
+    return file.write(doc.toJson(QJsonDocument::Indented)) >= 0;
+}
 
 // 注入 nullptr 的 WorldInfoService 时不应触达这两个符号。
 WorldInfoService& WorldInfoService::instance()
@@ -68,6 +75,18 @@ WorldInfoService& WorldInfoService::instance()
     return *invalid;
 }
 QString WorldInfoService::importWorldBook(QJsonObject&) { return {}; }
+
+// 角色卡导出会把绑定的世界书塞进 data.character_book；这里给一个可辨认的桩，
+// 用来验证"绑了书才会写 character_book"这条管线。书的真实序列化在
+// WorldInfoServiceTest 里测（那边链接的是真的 WorldInfoService）。
+QJsonObject WorldInfoService::bookToCharacterBookJson(const QString& bookId)
+{
+    if (bookId != QLatin1String("stub-book-id")) return {};
+    QJsonObject book;
+    book["name"] = QStringLiteral("桩世界书");
+    book["entries"] = QJsonArray();
+    return book;
+}
 
 class CharacterServiceTestProvider : public IConnectionProvider
 {
@@ -110,6 +129,7 @@ class CharacterServiceTest : public QObject
 
 private slots:
     void createUpdateDeleteThroughInjectedDao();
+    void exportedCardUsesSillyTavernV2Spec();
 };
 
 void CharacterServiceTest::createUpdateDeleteThroughInjectedDao()
@@ -135,6 +155,61 @@ void CharacterServiceTest::createUpdateDeleteThroughInjectedDao()
     QVERIFY(service.getAllCharacters().isEmpty());
 }
 
-QTEST_GUILESS_MAIN(CharacterServiceTest)
+// 导出的角色卡必须是 ST 认的 V2 规格：spec 写 "chara_card_v2"（以前写成 "v2"，
+// ST 会当成 V1 读，data 里的东西全丢），字段放在 data 下、附带 spec_version。
+void CharacterServiceTest::exportedCardUsesSillyTavernV2Spec()
+{
+    CharacterServiceTestProvider provider;
+    CharacterDao dao;
+    dao.setConnectionProvider(&provider);
+    // 传 nullptr：这次不测世界书入库，只测卡片结构
+    CharacterService service(&dao, static_cast<WorldInfoService*>(nullptr));
 
+    CharacterEntity entity;
+    entity.name = QStringLiteral("测试角色");
+    entity.description = QStringLiteral("描述");
+    entity.firstMessage = QStringLiteral("开场白");
+    entity.alternateGreetings = {QStringLiteral("备选一")};
+    entity.systemPrompt = QStringLiteral("系统提示");
+    entity.postHistoryInstructions = QStringLiteral("历史后指令");
+    entity.scenario = QStringLiteral("场景");
+    entity.personality = QStringLiteral("性格");
+    entity.exampleDialogue = QStringLiteral("示例对话");
+    entity.creator = QStringLiteral("作者");
+    entity.creatorNotes = QStringLiteral("作者备注");
+    entity.tags = {QStringLiteral("tag-a")};
+    entity.characterVersion = QStringLiteral("1.2.3");
+    const QString id = service.createCharacter(entity);
+    QVERIFY(!id.isEmpty());
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("card.json"));
+    QVERIFY(service.exportCharacterToFile(id, path));
+
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QJsonObject card = QJsonDocument::fromJson(file.readAll()).object();
+
+    QCOMPARE(card.value("spec").toString(), QStringLiteral("chara_card_v2"));
+    QCOMPARE(card.value("spec_version").toString(), QStringLiteral("2.0"));
+
+    const QJsonObject data = card.value("data").toObject();
+    QCOMPARE(data.value("name").toString(), QStringLiteral("测试角色"));
+    QCOMPARE(data.value("first_mes").toString(), QStringLiteral("开场白"));
+    QCOMPARE(data.value("system_prompt").toString(), QStringLiteral("系统提示"));
+    // 这一项以前根本没导出，导入侧也读不到
+    QCOMPARE(data.value("post_history_instructions").toString(), QStringLiteral("历史后指令"));
+    QCOMPARE(data.value("alternate_greetings").toArray().size(), 1);
+    QCOMPARE(data.value("tags").toArray().size(), 1);
+    QVERIFY(data.value("create_date").isString());
+    QVERIFY(!data.value("extensions").isUndefined());
+    // 没绑定世界书就不该出现 character_book
+    QVERIFY(!data.contains("character_book"));
+    // V1 兼容别名
+    QCOMPARE(card.value("name").toString(), QStringLiteral("测试角色"));
+    QCOMPARE(card.value("creatorcomment").toString(), QStringLiteral("作者备注"));
+}
+
+QTEST_GUILESS_MAIN(CharacterServiceTest)
 #include "CharacterServiceTest.moc"

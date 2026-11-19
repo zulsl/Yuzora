@@ -51,8 +51,18 @@ QVariantMap Utils::jsonObjectToVariantMap(const QJsonObject& obj)
 {
     return obj.toVariantMap();
 }
-QJsonDocument Utils::readJsonFile(const QString&) { return {}; }
-bool Utils::writeJsonFile(const QString&, const QJsonDocument&) { return false; }
+QJsonDocument Utils::readJsonFile(const QString& path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) return {};
+    return QJsonDocument::fromJson(file.readAll());
+}
+bool Utils::writeJsonFile(const QString& path, const QJsonDocument& doc)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) return false;
+    return file.write(doc.toJson(QJsonDocument::Indented)) >= 0;
+}
 
 class PresetTestProvider : public IConnectionProvider
 {
@@ -109,6 +119,7 @@ private slots:
     void importPreservesExplicitEmptyChatSettings();
     void importFallsBackToStDefaultsWhenKeysMissing();
     void nullColumnsFallBackToStDefaults();
+    void exportedPresetKeepsPromptsAndOrder();
 };
 
 // 最小 ST 预设 JSON：一条 main 提示词
@@ -294,6 +305,105 @@ void CompletionPresetServiceTest::nullColumnsFallBackToStDefaults()
     QCOMPARE(preset.wiFormat, QStringLiteral("{0}"));
     QCOMPARE(preset.scenarioFormat, QStringLiteral("{{scenario}}"));
     QCOMPARE(preset.personalityFormat, QStringLiteral("{{personality}}"));
+}
+
+// 导出的预设必须是 ST 能用的完整预设：键名用 ST 自己的（openai_max_context /
+// openai_max_tokens / stream_openai），并且带上 prompts 与 prompt_order。
+// 以前导出只有一个"空壳"：所有提示词和顺序都没了，ST 打开就是空预设。
+void CompletionPresetServiceTest::exportedPresetKeepsPromptsAndOrder()
+{
+    PresetTestProvider provider;
+    ConnectionProviderRegistry::setProvider(&provider);
+
+    CompletionPresetDao presetDao;
+    PromptDao promptDao;
+    presetDao.setConnectionProvider(&provider);
+    promptDao.setConnectionProvider(&provider);
+    CompletionPresetService service(&presetDao, &promptDao);
+
+    CompletionPresetEntity preset;
+    preset.name = QStringLiteral("导出预设");
+    preset.maxContextToken = 8192;
+    preset.maxResponseToken = 256;
+    preset.streamEnabled = false;
+    preset.temperature = 1.2;
+    preset.newChatPrompt = QStringLiteral("");  // 显式空串（不是 null），不许被"没设置"吃掉
+    preset.wiFormat = QStringLiteral("<World>{0}</World>");
+    const QString presetId = service.createPreset(preset);
+    QVERIFY(!presetId.isEmpty());
+
+    PromptEntity main;
+    main.identifier = QStringLiteral("main");
+    main.name = QStringLiteral("Main");
+    main.content = QStringLiteral("主提示词");
+    main.system_prompt = true;
+    main.role = GlobalConstants::MessageType::System;
+    QVERIFY(service.addPrompt(presetId, main));
+
+    PromptEntity jailbreak;
+    jailbreak.identifier = QStringLiteral("jailbreak");
+    jailbreak.name = QStringLiteral("Jailbreak");
+    jailbreak.content = QStringLiteral("越狱");
+    jailbreak.role = GlobalConstants::MessageType::User;
+    jailbreak.isActive = false;                // 禁用条目也要导出（enabled=false）
+    QVERIFY(service.addPrompt(presetId, jailbreak));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("preset.json"));
+    QVERIFY(service.exportToSillyTavern(presetId, path));
+
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QJsonObject exported = QJsonDocument::fromJson(file.readAll()).object();
+
+    QCOMPARE(exported.value("name").toString(), QStringLiteral("导出预设"));
+    QCOMPARE(exported.value("openai_max_context").toInt(), 8192);
+    QCOMPARE(exported.value("openai_max_tokens").toInt(), 256);
+    QCOMPARE(exported.value("stream_openai").toBool(), false);
+    QCOMPARE(exported.value("temperature").toDouble(), 1.2);
+    QVERIFY(exported.contains("new_chat_prompt"));
+    QCOMPARE(exported.value("new_chat_prompt").toString(), QString());
+    QCOMPARE(exported.value("wi_format").toString(), QStringLiteral("<World>{0}</World>"));
+
+    const QJsonArray prompts = exported.value("prompts").toArray();
+    QCOMPARE(prompts.size(), 2);
+
+    // prompt_order 按 character_id 分组；ST 的 chat completion 用 100001
+    const QJsonArray groups = exported.value("prompt_order").toArray();
+    QJsonArray order;
+    for (const QJsonValue& group : groups) {
+        if (group.toObject().value("character_id").toInt() == 100001)
+            order = group.toObject().value("order").toArray();
+    }
+    QCOMPARE(order.size(), 2);
+    QCOMPARE(order.at(0).toObject().value("identifier").toString(), QStringLiteral("main"));
+    QCOMPARE(order.at(1).toObject().value("identifier").toString(), QStringLiteral("jailbreak"));
+    QVERIFY(order.at(0).toObject().value("enabled").toBool());
+    QVERIFY(!order.at(1).toObject().value("enabled").toBool());
+
+    // 往返：把导出物当成 ST 预设导回来，提示词与启用状态还在
+    QCOMPARE(service.importFromSillyTavernJson(exported, QStringLiteral("往返预设")), 1);
+
+    QString reimportedId;
+    for (const CompletionPresetEntity& p : service.getAllPresets()) {
+        if (p.name == QStringLiteral("往返预设")) reimportedId = p.id;
+    }
+    QVERIFY(!reimportedId.isEmpty());
+
+    const CompletionPresetEntity reimported = service.getPresetById(reimportedId);
+    QCOMPARE(reimported.maxContextToken, 8192);
+    QCOMPARE(reimported.maxResponseToken, 256);
+    QVERIFY(!reimported.streamEnabled);
+    QCOMPARE(reimported.newChatPrompt, QString());
+
+    const QList<PromptEntity> restored = service.getPromptsByPresetId(reimportedId);
+    QCOMPARE(restored.size(), 2);
+    QCOMPARE(restored.at(0).identifier, QStringLiteral("main"));
+    QCOMPARE(restored.at(0).content, QStringLiteral("主提示词"));
+    QVERIFY(restored.at(0).isActive);
+    QCOMPARE(restored.at(1).identifier, QStringLiteral("jailbreak"));
+    QVERIFY(!restored.at(1).isActive);
 }
 
 QTEST_GUILESS_MAIN(CompletionPresetServiceTest)

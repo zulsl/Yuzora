@@ -159,15 +159,15 @@ ColumnLayout {
                 // 暴露给“插入”工具栏按钮，用于定位当前选中项
                 property string promptIdentifier: model.identifier
 
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    height: rowItem.headerHeight
-                    z: -2
-                    radius: Theme.radiusSm
-                    color: promptList.currentIndex === index ? Theme.rowHover : "transparent"
-                }
+                // Rectangle {
+                //     anchors.left: parent.left
+                //     anchors.right: parent.right
+                //     anchors.top: parent.top
+                //     height: rowItem.headerHeight
+                //     z: -2
+                //     radius: Theme.radiusSm
+                //     color: promptList.currentIndex === index ? Theme.rowHover : "transparent"
+                // }
 
                 // 点击行空白处选中；输入框/按钮自己处理点击，另外补选中
                 MouseArea {

@@ -39,20 +39,17 @@ ChatViewModel::ChatViewModel(QObject* parent)
             });
     connect(m_chatService, &ChatService::sessionDeleted,
             this, [this](const QString& sessionId) {
-                if (sessionId == m_chatService->currentSessionId()) {
-                    m_messageModel->clear();
-                    m_currentCharName.clear();
-                    m_currentCharAvatarPath.clear();
-                    m_currentSessionTitle.clear();
-                    m_currentSessionId.clear();
-                    m_oldestMessageTime = QDateTime();
-                    m_oldestMessageId.clear();
-                    m_hasMoreHistory = false;
-                    emit currentCharNameChanged();
-                    emit currentSessionTitleChanged();
-                    emit currentSessionIdChanged();
-                    emit hasMoreHistoryChanged();
-                }
+                if (sessionId == m_chatService->currentSessionId())
+                    clearCurrentChatState();
+            });
+    // 角色被删除：会话与消息由外键级联删除，当前角色/会话指针由 ChatService 清空，
+    // 这里同步把页面上的角色名、标题和消息列表清掉，落回"未选择角色"的空状态。
+    connect(m_chatService, &ChatService::characterClosed,
+            this, [this](const QString&) {
+                m_isGenerating = false;
+                emit isGeneratingChanged();
+                clearCurrentChatState();
+                refreshSessionList();
             });
 
     // 消息变更信号连接
@@ -429,8 +426,36 @@ void ChatViewModel::loadInitialMessages()
     m_messageModel->resetData(items);
 }
 
+void ChatViewModel::clearCurrentChatState()
+{
+    m_messageModel->clear();
+    m_currentCharName.clear();
+    m_currentCharAvatarPath.clear();
+    m_currentSessionTitle.clear();
+    m_currentSessionId.clear();
+    m_oldestMessageTime = QDateTime();
+    m_oldestMessageId.clear();
+    m_hasMoreHistory = false;
+
+    clearGenerationError();
+
+    // 头像也要发通知：之前漏了这一条，清空后 QML 还挂着上一个角色的头像
+    emit currentCharNameChanged();
+    emit currentCharAvatarPathChanged();
+    emit currentSessionTitleChanged();
+    emit currentSessionIdChanged();
+    emit hasMoreHistoryChanged();
+}
+
 void ChatViewModel::refreshSessionList()
 {
+    // 当前角色为空（例如角色被删掉）时不要去查库：
+    // SessionService 会为"当前角色为空"记一条错误日志，而结果必然是空列表。
+    if (m_chatService->currentCharacterId().isEmpty()) {
+        m_sessionModel->loadList({});
+        return;
+    }
+
     // qDebug()<<"刷新会话列表";
     QList<ChatSessionEntity> entities = m_chatService->getSessionListByCurrentCharacter();
     m_sessionModel->loadList(entities);

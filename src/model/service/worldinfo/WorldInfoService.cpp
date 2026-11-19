@@ -645,34 +645,144 @@ QJsonObject WorldInfoService::bookToStJson(
 {
     QJsonObject obj;
     obj["name"] = book.name;
+    // ST 的世界书文件本身没有"整本书启用"字段，这是我们自己的扩展位：
+    // 留着它，"导出 → 导入"才能保住书的启用状态；ST 会忽略这个未知键。
     obj["isEnabled"] = book.isEnabled;
 
-    QJsonArray entriesArr;
-    for (const WorldInfoEntryEntity& entry : entries) {
-        QJsonObject entryObj;
-        entryObj["name"] = entry.name;
-        entryObj["key"] = QJsonArray::fromStringList(entry.keywords);
-        entryObj["keysecondary"] = QJsonArray::fromStringList(entry.secondaryKeywords);
-        entryObj["comment"] = entry.name;
-        entryObj["content"] = entry.content;
-        entryObj["constant"] = entry.constant;
-        entryObj["vectorized"] = entry.vectorized;
-        entryObj["position"] = static_cast<int>(entry.position);
-        entryObj["role"] = static_cast<int>(entry.insertRole);
-        entryObj["order"] = entry.sortOrder;
-        entryObj["depth"] = entry.insertDepth;
-        // 内部格式用 disable（取反）；不写的话导出再导入会丢掉"条目被禁用"这个状态
-        entryObj["disable"] = !entry.isEnabled;
-        entryObj["probability"] = entry.probability;
-        entryObj["selective"] = entry.selective;
-        entryObj["selectiveLogic"] = static_cast<int>(entry.selectiveLogic);
-        entryObj["scanDepth"] = entry.scanDepth;
-        entryObj["useGroupScoring"] = entry.useGroupScoring;
-        entryObj["automationId"] = entry.automationId;
-        entryObj["extensions"] = Utils::variantMapToJsonObject(entry.extensions);
-        entriesArr.append(entryObj);
+    // ST 内部格式的 entries 是 {"<uid>": {...}} 对象，**不是数组**。
+    // 以前导出数组，ST 直接读不出来（它按 Object.entries 遍历）。
+    QJsonObject entriesObj;
+    QSet<int> usedUids;
+    for (int i = 0; i < entries.size(); ++i) {
+        const WorldInfoEntryEntity& entry = entries.at(i);
+
+        // uid 只要求文件内唯一；从 ST 导入的 uid 存在 extensions 里，能用就沿用，
+        // 撞了（或没有）就退回当前下标，避免后写的条目把前面的覆盖掉。
+        int uid = i;
+        const QVariantMap& ext = entry.extensions;
+        const auto carried = ext.constFind(QStringLiteral("uid"));
+        if (carried != ext.constEnd()) {
+            const int candidate = carried.value().toInt();
+            if (candidate >= 0 && !usedUids.contains(candidate))
+                uid = candidate;
+        }
+        while (usedUids.contains(uid))
+            ++uid;
+        usedUids.insert(uid);
+
+        entriesObj.insert(QString::number(uid), entryToStJson(entry, uid));
     }
-    obj["entries"] = entriesArr;
+    obj["entries"] = entriesObj;
+    return obj;
+}
+
+QJsonObject WorldInfoService::entryToStJson(const WorldInfoEntryEntity& entry, int uid) const
+{
+    QJsonObject o;
+    o["uid"] = uid;
+    o["key"] = QJsonArray::fromStringList(entry.keywords);
+    o["keysecondary"] = QJsonArray::fromStringList(entry.secondaryKeywords);
+    o["comment"] = entry.name;
+    o["content"] = entry.content;
+    o["constant"] = entry.constant;
+    o["vectorized"] = entry.vectorized;
+    o["selective"] = entry.selective;
+    o["selectiveLogic"] = static_cast<int>(entry.selectiveLogic);
+    o["addMemo"] = true;
+    o["order"] = entry.sortOrder;
+    o["position"] = static_cast<int>(entry.position);
+    // ST 用 disable（取反）；不写的话导出再导入会丢掉"条目被禁用"这个状态
+    o["disable"] = !entry.isEnabled;
+    o["useProbability"] = entry.useProbability;
+    o["probability"] = entry.probability;
+    // scanDepth < 0 表示"跟随全局"。ST 用"没有这个键 / null"表达同一件事，
+    // 写 -1 反而会被它当成一个真实的扫描深度。
+    if (entry.scanDepth >= 0)
+        o["scanDepth"] = entry.scanDepth;
+    o["depth"] = entry.insertDepth;
+    o["role"] = static_cast<int>(entry.insertRole);
+
+    const QJsonObject ext = Utils::variantMapToJsonObject(entry.extensions);
+
+    // 这些字段没有对应的数据库列，只存在 extensions 里。导出时抬回 ST 的顶层键，
+    // 否则"从 ST 导入 → 导出"会把这些行为悄悄抹平。
+    static const QPair<const char*, const char*> kCarry[] = {
+        {"group", "group"},
+        {"groupOverride", "group_override"},
+        {"groupWeight", "group_weight"},
+        {"useGroupScoring", "use_group_scoring"},
+        {"automationId", "automation_id"},
+        {"excludeRecursion", "exclude_recursion"},
+        {"preventRecursion", "prevent_recursion"},
+        {"delayUntilRecursion", "delay_until_recursion"},
+        {"ignoreBudget", "ignore_budget"},
+        {"caseSensitive", "case_sensitive"},
+        {"matchWholeWords", "match_whole_words"},
+        {"sticky", "sticky"},
+        {"cooldown", "cooldown"},
+        {"delay", "delay"},
+        {"displayIndex", "display_index"},
+    };
+    for (const auto& pair : kCarry) {
+        const QLatin1String extKey(pair.second);
+        if (ext.contains(extKey))
+            o[QLatin1String(pair.first)] = ext.value(extKey);
+    }
+
+    // 扩展原样带回：ST 的 character_book 字段本来就住在这里（position/depth/role…），
+    // 我们不认识的键也一并保留，避免每导出一次掉一层信息。
+    o["extensions"] = ext;
+    return o;
+}
+
+QJsonObject WorldInfoService::entryToCharacterBookEntry(
+    const WorldInfoEntryEntity& entry, int index) const
+{
+    QJsonObject o;
+    o["id"] = index;
+    o["keys"] = QJsonArray::fromStringList(entry.keywords);
+    o["secondary_keys"] = QJsonArray::fromStringList(entry.secondaryKeywords);
+    o["comment"] = entry.name;
+    o["name"] = entry.name;
+    o["content"] = entry.content;
+    o["constant"] = entry.constant;
+    o["selective"] = entry.selective;
+    o["insertion_order"] = entry.sortOrder;
+    o["enabled"] = entry.isEnabled;
+    // V2 规范只认 before_char / after_char；其余位置（AN、@depth、EM、outlet）
+    // 靠 extensions.position 表达——ST 的 convertCharacterBook 也正好是 extensions 优先。
+    o["position"] = (entry.position == WorldInfoEntryEntity::AfterChar)
+        ? QStringLiteral("after_char") : QStringLiteral("before_char");
+
+    QJsonObject ext = Utils::variantMapToJsonObject(entry.extensions);
+    // 让"导出 → 导入"把位置/深度/角色/向量化还原成原本的值，而不是被 V2 的
+    // before_char/after_char 压平。
+    ext["position"] = static_cast<int>(entry.position);
+    ext["depth"] = entry.insertDepth;
+    ext["role"] = static_cast<int>(entry.insertRole);
+    ext["vectorized"] = entry.vectorized;
+    o["extensions"] = ext;
+    return o;
+}
+
+QJsonObject WorldInfoService::bookToCharacterBookJson(const QString& bookId)
+{
+    if (bookId.isEmpty()) return {};
+
+    const WorldInfoBookEntity book = m_BookDao->selectById(bookId);
+    if (book.id.isEmpty()) return {};
+
+    const QList<WorldInfoEntryEntity> entries = m_EntryDao->selectEntriesByBookId(bookId);
+    if (entries.isEmpty()) return {};
+
+    QJsonObject obj;
+    obj["name"] = book.name;
+
+    QJsonArray arr;
+    for (int i = 0; i < entries.size(); ++i)
+        arr.append(entryToCharacterBookEntry(entries.at(i), i));
+    obj["entries"] = arr;
+    obj["extensions"] = QJsonObject();
     return obj;
 }
 
@@ -703,7 +813,37 @@ WorldInfoEntryEntity WorldInfoService::parseJsonToEntry(const QJsonObject& json,
     //                        insertion_order / enabled / extensions.depth ...
     //   world（worlds/*.json）: key / keysecondary / position:0 / order / disable / depth ...
     // ST 的 convertCharacterBook 是「extensions 优先、顶层兜底」，这里照做。
-    const QJsonObject ext = json.value("extensions").toObject();
+    QJsonObject ext = json.value("extensions").toObject();
+
+    // 下面这些字段在我们的库里没有独立列，只靠 extensions 这块 JSON 持久化。
+    // ST 的 world 文件把它们放在顶层，所以这里顺手补进 extensions——
+    // 否则导入一张 ST 世界书、再导出，group / sticky / cooldown 这些会全部消失。
+    {
+        static const QPair<const char*, const char*> kCarryIntoExtensions[] = {
+            {"uid", "uid"},
+            {"group", "group"},
+            {"groupOverride", "group_override"},
+            {"groupWeight", "group_weight"},
+            {"useGroupScoring", "use_group_scoring"},
+            {"automationId", "automation_id"},
+            {"excludeRecursion", "exclude_recursion"},
+            {"preventRecursion", "prevent_recursion"},
+            {"delayUntilRecursion", "delay_until_recursion"},
+            {"ignoreBudget", "ignore_budget"},
+            {"caseSensitive", "case_sensitive"},
+            {"matchWholeWords", "match_whole_words"},
+            {"sticky", "sticky"},
+            {"cooldown", "cooldown"},
+            {"delay", "delay"},
+            {"displayIndex", "display_index"},
+        };
+        for (const auto& pair : kCarryIntoExtensions) {
+            const QLatin1String stKey(pair.first);
+            const QLatin1String extKey(pair.second);
+            if (json.contains(stKey) && !ext.contains(extKey))
+                ext.insert(extKey, json.value(stKey));
+        }
+    }
 
     entry.keywords = jsonStrings(json.contains("key") ? json.value("key") : json.value("keys"));
     entry.secondaryKeywords = jsonStrings(json.contains("keysecondary")

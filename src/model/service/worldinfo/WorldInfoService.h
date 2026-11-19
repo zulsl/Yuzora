@@ -55,6 +55,11 @@ public:
     //写入数据库
     QString importWorldBook(QJsonObject & bookData);
 
+    // 把一本世界书序列化成角色卡里的 character_book（V2 规范格式：
+    // entries 是数组、keys/secondary_keys、position 用 before_char/after_char）。
+    // 角色卡导出时由 CharacterService 调用；书不存在或没有条目时返回空对象。
+    QJsonObject bookToCharacterBookJson(const QString& bookId);
+
 
 signals:
     void bookListChanged();
@@ -69,6 +74,10 @@ signals:
 private:
     explicit WorldInfoService(QObject* parent = nullptr);
     QJsonObject bookToStJson(const WorldInfoBookEntity& book, const QList<WorldInfoEntryEntity>& entries);
+    // 单条条目 → ST world 文件格式（顶层 camelCase 字段 + extensions 原样带回）
+    QJsonObject entryToStJson(const WorldInfoEntryEntity& entry, int uid) const;
+    // 单条条目 → 角色卡 V2 character_book 的条目格式（snake_case，entries 是数组）
+    QJsonObject entryToCharacterBookEntry(const WorldInfoEntryEntity& entry, int index) const;
     WorldInfoBookEntity parseJsonToBook(const QJsonObject& json);
     WorldInfoEntryEntity parseJsonToEntry(const QJsonObject& json, const QString& bookId);
 

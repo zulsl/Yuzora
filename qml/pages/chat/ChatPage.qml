@@ -418,6 +418,20 @@ PageScaffold {
     }
 
     // ========== 历史会话抽屉 ==========
+    // 安卓返回键到 Qt 是 Qt.Key_Back，而 Drawer 的 closePolicy 只认 Esc，所以要自己接。
+    // 注意必须用 ApplicationShortcut 上下文：Drawer 是模态 Popup，打开期间
+    // 窗口级（WindowShortcut）的 Shortcut 不会触发，按键会直接送进 Popup 内部。
+    // 抽屉里的确认/重命名弹窗打开时让位，免得"返回"把底下这层的抽屉关掉。
+    Shortcut {
+        sequence: "Back"
+        context: Qt.ApplicationShortcut
+        enabled: historyDrawer.opened
+                 && !deleteAllDialog.opened
+                 && !renameSessionDialog.opened
+                 && !deleteSessionDialog.opened
+        onActivated: historyDrawer.close()
+    }
+
     Drawer {
         id: historyDrawer
         width: Math.min(320, Math.round(root.width * 0.84))

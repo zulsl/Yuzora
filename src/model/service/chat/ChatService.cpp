@@ -58,6 +58,13 @@ ChatService::ChatService(const ChatServiceDependencies& deps, QObject* parent)
         connect(m_greeting, &GreetingService::stateChanged,
                 this, &ChatService::greetingStateChanged);
     }
+
+    // 角色被删掉时，会话表与其消息已被外键级联删除；
+    // 但"当前角色/会话"是内存里的指针，没人清就会一直指着不存在的角色。
+    if (m_characterService) {
+        connect(m_characterService, &CharacterService::characterDeleted,
+                this, &ChatService::onCharacterDeleted);
+    }
 }
 
 ChatService::~ChatService()
@@ -243,6 +250,27 @@ void ChatService::deleteAllSession()
 QList<ChatSessionEntity> ChatService::getSessionListByCharacter(const QString& characterId)
 {
     return m_sessions->listForCharacter(characterId);
+}
+
+void ChatService::onCharacterDeleted(const QString& characterId)
+{
+    if (characterId.isEmpty() || !m_sessions) return;
+
+    // 删的不是当前角色：它名下的会话与消息已被外键级联删除，内存里没有要清的东西
+    if (characterId != m_sessions->currentCharacterId()) return;
+
+    // 生成中先停流，避免补全回调继续往已经删除的会话里写
+    if (m_isGenerating) cancelGeneration();
+
+    // 开场白状态跟着当前会话走，会话没了就要一起复位，否则切换条还挂在界面上
+    if (m_greeting) m_greeting->refresh(QString(), QString());
+
+    m_sessions->clearCurrent();
+    // 下次启动不要再"还原"到这个已经不存在的角色
+    m_sessions->clearLastActiveCharacter();
+
+    emit characterClosed(characterId);
+    emit sessionListChanged(characterId);
 }
 
 ChatSessionEntity ChatService::currentSession() const

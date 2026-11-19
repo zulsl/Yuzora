@@ -59,7 +59,12 @@ QJsonDocument Utils::readJsonFile(const QString& path)
     if (!file.open(QIODevice::ReadOnly)) return {};
     return QJsonDocument::fromJson(file.readAll());
 }
-bool Utils::writeJsonFile(const QString&, const QJsonDocument&) { return false; }
+bool Utils::writeJsonFile(const QString& path, const QJsonDocument& doc)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) return false;
+    return file.write(doc.toJson(QJsonDocument::Indented)) >= 0;
+}
 
 class WorldInfoTestProvider : public IConnectionProvider
 {
@@ -109,6 +114,8 @@ private slots:
     void importsInternalWorldEntries();
     void importsStWorldFile();
     void reimportSameNameReplacesEntries();
+    void exportUsesSillyTavernWorldFormat();
+    void characterBookJsonUsesV2Shape();
 };
 
 // 角色卡 V2 的 character_book：keys / position:"after_char" / insertion_order /
@@ -347,6 +354,143 @@ void WorldInfoServiceTest::bookAndEntryLifecycle()
 
     QVERIFY(service.deleteBook(bookId));
     QVERIFY(service.getAllBooks().isEmpty());
+}
+
+// 导出的世界书必须是 ST 内部格式：entries 是 {"<uid>": {...}} **对象**而不是数组，
+// 顶层字段用 ST 的 camelCase，禁用写 disable。以前导出的是数组，ST 直接读不出来。
+void WorldInfoServiceTest::exportUsesSillyTavernWorldFormat()
+{
+    WorldInfoTestProvider provider;
+    WorldInfoBookDao bookDao;
+    WorldInfoEntryDao entryDao;
+    bookDao.setConnectionProvider(&provider);
+    entryDao.setConnectionProvider(&provider);
+    WorldInfoService service(&bookDao, &entryDao);
+
+    QJsonObject entry;
+    entry["key"] = QJsonArray{QStringLiteral("k1")};
+    entry["comment"] = QStringLiteral("条目一");
+    entry["content"] = QStringLiteral("内容");
+    entry["position"] = 4;   // @depth
+    entry["depth"] = 2;
+    entry["role"] = 1;
+    entry["order"] = 30;
+    entry["disable"] = true;
+    // group 我们没有对应的数据库列，只在 extensions 里持久化：
+    // 导入时补进去、导出时抬回顶层，这样它不会在一次往返里消失。
+    entry["group"] = QStringLiteral("g1");
+
+    QJsonObject book;
+    book["name"] = QStringLiteral("导出书");
+    book["entries"] = QJsonArray{entry};
+    const QString bookId = service.importWorldBook(book);
+    QVERIFY(!bookId.isEmpty());
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("book.json"));
+    QVERIFY(service.exportBookToSillyTavern(bookId, path));
+
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::ReadOnly));
+    const QJsonObject exported = QJsonDocument::fromJson(file.readAll()).object();
+
+    QCOMPARE(exported.value("name").toString(), QStringLiteral("导出书"));
+
+    const QJsonValue entriesValue = exported.value("entries");
+    QVERIFY2(entriesValue.isObject(),
+             "ST 按 Object.entries 遍历世界书，entries 必须是对象");
+    const QJsonObject entriesObj = entriesValue.toObject();
+    QCOMPARE(entriesObj.size(), 1);
+
+    const QString uidKey = entriesObj.keys().first();
+    QCOMPARE(uidKey, QStringLiteral("0"));
+    const QJsonObject first = entriesObj.value(uidKey).toObject();
+    QCOMPARE(first.value("uid").toInt(), 0);
+    QCOMPARE(first.value("comment").toString(), QStringLiteral("条目一"));
+    QCOMPARE(first.value("content").toString(), QStringLiteral("内容"));
+    QCOMPARE(first.value("key").toArray().size(), 1);
+    QCOMPARE(first.value("position").toInt(), 4);
+    QCOMPARE(first.value("depth").toInt(), 2);
+    QCOMPARE(first.value("order").toInt(), 30);
+    QVERIFY(first.value("disable").toBool());
+    QCOMPARE(first.value("group").toString(), QStringLiteral("g1"));
+
+    // 往返：把导出物再导一遍，条目的位置/深度/顺序/启用状态都要保持
+    QJsonObject roundTrip = exported;
+    const QString reimportedId = service.importWorldBook(roundTrip);
+    QCOMPARE(reimportedId, bookId);   // 同名就地覆盖
+
+    const QList<WorldInfoEntryEntity> reloaded = service.getEntriesByBook(reimportedId);
+    QCOMPARE(reloaded.size(), 1);
+    const WorldInfoEntryEntity& e = reloaded.first();
+    QCOMPARE(static_cast<int>(e.position), 4);
+    QCOMPARE(e.insertDepth, 2);
+    QCOMPARE(e.sortOrder, 30);
+    QVERIFY(!e.isEnabled);
+    // group 没有独立列，靠 extensions 持久化——这正是导出时能抬回顶层的前提
+    QCOMPARE(e.extensions.value(QStringLiteral("group")).toString(), QStringLiteral("g1"));
+}
+
+// 角色卡里的 character_book 是 V2 规范格式，和世界书文件不一样：
+// entries 是**数组**、字段名 snake_case、position 只能是 before_char / after_char。
+// 其它位置（@depth / 作者注释 / 示例消息）靠 extensions.position 表达，
+// 这也是 ST 的 convertCharacterBook 认的写法。
+void WorldInfoServiceTest::characterBookJsonUsesV2Shape()
+{
+    WorldInfoTestProvider provider;
+    WorldInfoBookDao bookDao;
+    WorldInfoEntryDao entryDao;
+    bookDao.setConnectionProvider(&provider);
+    entryDao.setConnectionProvider(&provider);
+    WorldInfoService service(&bookDao, &entryDao);
+
+    QJsonObject inBookEntry;
+    inBookEntry["key"] = QJsonArray{QStringLiteral("k1")};
+    inBookEntry["keysecondary"] = QJsonArray{QStringLiteral("s1")};
+    inBookEntry["comment"] = QStringLiteral("深度条目");
+    inBookEntry["content"] = QStringLiteral("正文");
+    inBookEntry["position"] = 4;      // @depth，V2 只能用 extensions 表达
+    inBookEntry["depth"] = 3;
+    inBookEntry["role"] = 1;
+    inBookEntry["order"] = 55;
+    inBookEntry["disable"] = false;
+
+    QJsonObject book;
+    book["name"] = QStringLiteral("卡片书");
+    book["entries"] = QJsonArray{inBookEntry};
+    const QString bookId = service.importWorldBook(book);
+    QVERIFY(!bookId.isEmpty());
+
+    const QJsonObject cardBook = service.bookToCharacterBookJson(bookId);
+    QVERIFY(!cardBook.isEmpty());
+    QCOMPARE(cardBook.value("name").toString(), QStringLiteral("卡片书"));
+    QVERIFY(cardBook.value("entries").isArray());
+
+    const QJsonArray entries = cardBook.value("entries").toArray();
+    QCOMPARE(entries.size(), 1);
+    const QJsonObject e = entries.first().toObject();
+
+    QCOMPARE(e.value("id").toInt(), 0);
+    QCOMPARE(e.value("keys").toArray().size(), 1);
+    QCOMPARE(e.value("secondary_keys").toArray().size(), 1);
+    QCOMPARE(e.value("comment").toString(), QStringLiteral("深度条目"));
+    QCOMPARE(e.value("content").toString(), QStringLiteral("正文"));
+    QCOMPARE(e.value("insertion_order").toInt(), 55);
+    QVERIFY(e.value("enabled").toBool());
+    // V2 的 position 只有两个合法值，真实的 @depth 放在 extensions 里
+    QCOMPARE(e.value("position").toString(), QStringLiteral("before_char"));
+    const QJsonObject ext = e.value("extensions").toObject();
+    QCOMPARE(ext.value("position").toInt(), 4);
+    QCOMPARE(ext.value("depth").toInt(), 3);
+    QCOMPARE(ext.value("role").toInt(), 1);
+
+    // 空书 / 不存在的书 → 空对象（角色卡那边据此决定不写 character_book）
+    QVERIFY(service.bookToCharacterBookJson(QStringLiteral("不存在")).isEmpty());
+
+    const QString emptyBookId = service.createBook(QStringLiteral("空书"));
+    QVERIFY(!emptyBookId.isEmpty());
+    QVERIFY(service.bookToCharacterBookJson(emptyBookId).isEmpty());
 }
 
 QTEST_GUILESS_MAIN(WorldInfoServiceTest)

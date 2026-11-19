@@ -186,8 +186,12 @@ QJsonObject Utils::extractPngMetadata(const QString& imagePath)
         return QJsonObject();
     }
 
-    //解码base64
+    //解码base64（标准格式）
     QByteArray metaBA = QByteArray::fromBase64(meta64.toUtf8());
+    // 兼容早期版本导出的"裸 JSON"：那段代码漏了 base64 编码，
+    // 解出来不是 JSON 对象时按原文再试一次，至少别把老文件判成坏卡。
+    if (!QJsonDocument::fromJson(metaBA).isObject())
+        metaBA = meta64.toUtf8();
     // 解析 JSON
     QJsonParseError parseError;
     QJsonDocument doc = QJsonDocument::fromJson(metaBA, &parseError);
@@ -220,10 +224,13 @@ bool Utils::injectPngMetadata(const QString& imagePath, const QJsonObject& metad
         }
     }
 
-    // 写入新的 chara 元数据
+    // 写入新的 chara 元数据：ST 的 tEXt 块里存的是 base64(JSON)。
+    // 以前这里写的是裸 JSON，结果 ST 读不出来，本项目的 extractPngMetadata
+    // 按 base64 解码也解不出来——导出再导入等于丢卡。
     QJsonDocument doc(metadata);
-    QString metaStr = QString::fromUtf8(doc.toJson(QJsonDocument::Compact));
-    image.setText(GlobalConstants::CHARACTER_CARD_META_KEY, metaStr);
+    const QByteArray jsonBytes = doc.toJson(QJsonDocument::Compact);
+    const QString meta64 = QString::fromLatin1(jsonBytes.toBase64());
+    image.setText(GlobalConstants::CHARACTER_CARD_META_KEY, meta64);
 
     // 保存图片（PNG 格式，保留原有图像质量）
     if (!image.save(imagePath, "PNG")) {
@@ -336,14 +343,17 @@ QJsonDocument Utils::readJsonFile(const QString& filePath)
 //     return QString::fromUtf8(doc.toJson(QJsonDocument::Compact));;
 // }
 
+// 这两个是 QJsonObject ⇄ QVariantMap 的互转，之前是空实现（恒返回空）。
+// 后果：世界书条目的 extensions 在导入时被整块丢掉、导出时又写成 {}，
+// 角色卡/世界书里 position、depth、sticky 这些住在 extensions 里的字段一来一回全没了。
 QVariantMap Utils::jsonObjectToVariantMap(const QJsonObject &obj)
 {
-    return QVariantMap();
+    return obj.toVariantMap();
 }
 
 QJsonObject Utils::variantMapToJsonObject(const QVariantMap &map)
 {
-    return QJsonObject();
+    return QJsonObject::fromVariantMap(map);
 }
 
 QString Utils::jsonToPrettyString(const QJsonObject& obj)

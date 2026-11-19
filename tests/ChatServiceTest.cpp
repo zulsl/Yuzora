@@ -85,6 +85,7 @@ WorldInfoService& WorldInfoService::instance()
     return *invalid;
 }
 QString WorldInfoService::importWorldBook(QJsonObject&) { return {}; }
+QJsonObject WorldInfoService::bookToCharacterBookJson(const QString&) { return {}; }
 
 // 提示词装配整块替换：本测试不校验提示词内容，返回空列表即可。
 // 正因为 buildPromptContext 已经被抽成自由函数，这里才能这么替换。
@@ -314,6 +315,8 @@ private slots:
     void regenerateFailedPlaceholderKeepsEarlierReply();
     void sessionSwitchPersistsLastActiveCharacterAndSession();
     void autoTitleSkipsRenamedSession();
+    void deletingCurrentCharacterClearsChatState();
+    void deletingOtherCharacterKeepsChatState();
 };
 
 // ======================================
@@ -859,6 +862,56 @@ void ChatServiceTest::autoTitleSkipsRenamedSession()
     f.completion.completeWith(QStringLiteral("这是AI的回复内容"));
 
     QCOMPARE(f.chatService.currentSession().title, QStringLiteral("我的标题"));
+}
+
+// 删掉当前正在聊的角色：界面不能继续停在那个人身上。
+// 会话与消息由外键级联删除（生产库），这里只验证 ChatService 内存里的
+// "当前角色/会话"指针被清空、并且发出了 characterClosed。
+void ChatServiceTest::deletingCurrentCharacterClearsChatState()
+{
+    Fixture f;
+    const CharacterEntity character = f.makeCharacter(QStringLiteral("默认开场白"), {});
+    QVERIFY(f.characterDao.insert(character));
+
+    const QString sessionId = f.chatService.createSession(character.id);
+    QVERIFY(!sessionId.isEmpty());
+    f.chatService.switchSession(sessionId);
+    QCOMPARE(f.chatService.currentCharacterId(), character.id);
+    QCOMPARE(f.chatService.currentSessionId(), sessionId);
+
+    QSignalSpy closedSpy(&f.chatService, &ChatService::characterClosed);
+
+    QVERIFY(f.characterService.deleteCharacter(character.id));
+
+    QCOMPARE(closedSpy.count(), 1);
+    QCOMPARE(closedSpy.first().first().toString(), character.id);
+
+    QVERIFY(f.chatService.currentSessionId().isEmpty());
+    QVERIFY(f.chatService.currentCharacterId().isEmpty());
+    // 下次启动不要还原到这个已删除的角色
+    QVERIFY(f.sessions.lastActiveCharacterId().isEmpty());
+}
+
+// 删的是"别的"角色：当前会话不能被动到
+void ChatServiceTest::deletingOtherCharacterKeepsChatState()
+{
+    Fixture f;
+    const CharacterEntity current = f.makeCharacter(QStringLiteral("默认开场白"), {});
+    CharacterEntity other = f.makeCharacter(QStringLiteral("另一张开场白"), {});
+    other.name = QStringLiteral("另一个角色");
+    QVERIFY(f.characterDao.insert(current));
+    QVERIFY(f.characterDao.insert(other));
+
+    const QString sessionId = f.chatService.createSession(current.id);
+    f.chatService.switchSession(sessionId);
+
+    QSignalSpy closedSpy(&f.chatService, &ChatService::characterClosed);
+
+    QVERIFY(f.characterService.deleteCharacter(other.id));
+
+    QCOMPARE(closedSpy.count(), 0);
+    QCOMPARE(f.chatService.currentSessionId(), sessionId);
+    QCOMPARE(f.chatService.currentCharacterId(), current.id);
 }
 
 QTEST_GUILESS_MAIN(ChatServiceTest)

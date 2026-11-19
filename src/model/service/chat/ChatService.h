@@ -94,6 +94,9 @@ signals:
     void sessionSwitched(const QString& characterId, const QString& sessionId);//会话已切换
     void sessionListChanged(const QString& characterId);//会话列表变更
     void sessionDeleted(const QString& sessionId);
+    // 当前角色被删除，内存里的会话指针已清空（会话与消息由外键级联删除）。
+    // 与 sessionDeleted 分开：这里没有一个"仍然存在的会话"可以指代。
+    void characterClosed(const QString& characterId);
 
     // 消息变更
     void messageAppended(const ChatMessageEntity& message);
@@ -118,6 +121,10 @@ signals:
     void operationError(const QString& errorMsg);//操作错误
 
 private slots:
+    // 角色被删除（CharacterService::characterDeleted）：删的若是当前角色，
+    // 清空内存里的当前会话指针，否则聊天页会停在一个已经不存在的角色上。
+    void onCharacterDeleted(const QString& characterId);
+
     // 补全器（生成请求）的三个回调，语义与旧版网络槽一一对应
     void onCompletionChunk(const QString& chunk);//收到流式文本块
     void onCompletionFinished(const QString& fullText);//请求完成
