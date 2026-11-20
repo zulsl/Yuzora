@@ -313,6 +313,7 @@ bool Utils::writeJsonFile(const QString& filePath, const QJsonDocument& doc)
 
 QString Utils::pathFromUrl(const QUrl& url)
 {
+    qDebug()<<"处理文件url"<<url;
     if (url.isEmpty())
         return {};
 

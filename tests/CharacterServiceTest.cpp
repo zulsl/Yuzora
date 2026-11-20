@@ -2,6 +2,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QSignalSpy>
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include <QTemporaryDir>
@@ -130,6 +131,7 @@ class CharacterServiceTest : public QObject
 private slots:
     void createUpdateDeleteThroughInjectedDao();
     void exportedCardUsesSillyTavernV2Spec();
+    void importDetectsCardKindWithoutFileExtension();
 };
 
 void CharacterServiceTest::createUpdateDeleteThroughInjectedDao()
@@ -209,6 +211,62 @@ void CharacterServiceTest::exportedCardUsesSillyTavernV2Spec()
     // V1 兼容别名
     QCOMPARE(card.value("name").toString(), QStringLiteral("测试角色"));
     QCOMPARE(card.value("creatorcomment").toString(), QStringLiteral("作者备注"));
+}
+
+// 安卓真机的坑：文档选择器（SAF）返回的 content:// URI 末段是
+// image%3A1000000033 这种资源 id，根本没有 .png / .json 后缀，
+// 以前只按 QFileInfo::suffix() 判断类型，整张卡被判成"不支持的文件格式"。
+// 这里用"无扩展名的文件"模拟那种路径，断言类型是按内容嗅探出来的：
+// PNG 走 PNG 分支、JSON 走 JSON 分支（本测试里两个解析函数是桩，
+// 所以分别停在"不含角色卡元数据"和"JSON文件格式错误"）。
+void CharacterServiceTest::importDetectsCardKindWithoutFileExtension()
+{
+    CharacterServiceTestProvider provider;
+    CharacterDao dao;
+    dao.setConnectionProvider(&provider);
+    CharacterService service(&dao, static_cast<WorldInfoService*>(nullptr));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+
+    const auto writeFile = [&dir](const QString& name, const QByteArray& bytes) {
+        const QString path = dir.filePath(name);
+        QFile file(path);
+        if (!file.open(QIODevice::WriteOnly))
+            return QString();
+        file.write(bytes);
+        file.close();
+        return path;
+    };
+
+    // 1) 无扩展名 + PNG 签名 -> 认成 PNG
+    const QString pngPath = writeFile(QStringLiteral("card"),
+                                      QByteArray("\x89PNG\r\n\x1a\n", 8));
+    QVERIFY(!pngPath.isEmpty());
+    QSignalSpy pngSpy(&service, &CharacterService::operationError);
+    QVERIFY(service.importCharacterFromFile(pngPath).isEmpty());
+    QCOMPARE(pngSpy.count(), 1);
+    QCOMPARE(pngSpy.first().at(0).toString(),
+             QStringLiteral("导入失败：PNG文件不含角色卡元数据"));
+
+    // 2) 无扩展名 + JSON -> 认成 JSON（带 BOM 和前导空白也要认出来）
+    const QString jsonPath = writeFile(QStringLiteral("book"),
+                                       QByteArray("\xEF\xBB\xBF  \r\n{\"name\":\"x\"}"));
+    QVERIFY(!jsonPath.isEmpty());
+    QSignalSpy jsonSpy(&service, &CharacterService::operationError);
+    QVERIFY(service.importCharacterFromFile(jsonPath).isEmpty());
+    QCOMPARE(jsonSpy.count(), 1);
+    QCOMPARE(jsonSpy.first().at(0).toString(),
+             QStringLiteral("导入失败：JSON文件格式错误"));
+
+    // 3) 无扩展名 + 认不出的内容 -> 才报"不支持"
+    const QString junkPath = writeFile(QStringLiteral("junk"), QByteArray("hello"));
+    QVERIFY(!junkPath.isEmpty());
+    QSignalSpy junkSpy(&service, &CharacterService::operationError);
+    QVERIFY(service.importCharacterFromFile(junkPath).isEmpty());
+    QCOMPARE(junkSpy.count(), 1);
+    QCOMPARE(junkSpy.first().at(0).toString(),
+             QStringLiteral("导入失败：不支持的文件格式"));
 }
 
 QTEST_GUILESS_MAIN(CharacterServiceTest)

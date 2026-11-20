@@ -19,19 +19,30 @@ qt_add_executable(${PROJECT_NAME}
 # 宏定义,版本号唯一权威来源
 add_definitions(-DAPP_VERSION="${PROJECT_VERSION}")
 
+
 # Windows：把 .ico 编进 exe（资源管理器/任务栏固定项显示的图标）。
-# Qt 的 setWindowIcon 只改运行时的窗口图标，不改 exe 文件本身的图标。
-# OBJECT_DEPENDS 让 .ico 变化时 rc 会重编——否则 CMake 只盯着 app.rc，换了图标 exe 还是旧的。
 if(WIN32)
     target_sources(${PROJECT_NAME} PRIVATE app.rc)
     set_source_files_properties(app.rc PROPERTIES
         OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/res/app/yuzora.ico")
 endif()
 
+
+# 安卓自定义专属构建,自定义应用名|图标|权限|网络|键盘|主题|存储
+# OBJECT_DEPENDS 让 .ico 变化时 rc 会重编——否则 CMake 只盯着 app.rc，换了图标 exe 还是旧的。
 if(ANDROID)
     # 安卓openssl需自己导入
     include("D:/Qt/Android/SDK/android_openssl/android_openssl.cmake")
     add_android_openssl_libraries(${PROJECT_NAME})
+
+    # 版本号跟随 project(VERSION)，其它地方只写 project(VERSION) 一处即可。
+    # 清单里必须保留 "-- %%INSERT_VERSION_CODE%% --" / "-- %%INSERT_VERSION_NAME%% --"
+    # 占位符，androiddeployqt 才会代入；写死数字的话这两个属性会被忽略。
+    # versionCode 只能是整数且要单调递增，按 1.0.1 -> 10001 换算（minor/patch 别超过 99）。
+    math(EXPR YUZORA_VERSION_CODE
+         "${PROJECT_VERSION_MAJOR} * 10000 + ${PROJECT_VERSION_MINOR} * 100 + ${PROJECT_VERSION_PATCH}")
+    set_property(TARGET ${PROJECT_NAME} PROPERTY QT_ANDROID_VERSION_CODE ${YUZORA_VERSION_CODE})
+    set_property(TARGET ${PROJECT_NAME} PROPERTY QT_ANDROID_VERSION_NAME  "${PROJECT_VERSION}")
 
     # 自定义清单：android:windowSoftInputMode="adjustResize"
     # 软键盘弹出时收缩窗口（只让底部让位），而不是默认的 pan（整个界面被平移）。

@@ -12,6 +12,62 @@
 #include <QFileInfo>
 #include <QFile>
 
+namespace {
+
+enum class CardFileKind { Unknown, Png, Json };
+
+// 安卓真机上的坑：文档选择器（SAF）给的是 content:// 文档 URI，末段常常是
+// image%3A1000000033 这种资源 id，没有 .png / .json 后缀。以前只按
+// QFileInfo::suffix() 判断类型，整张卡就被判成"不支持的文件格式"
+// （模拟器上换个入口能过、真机上必挂，就是这个原因）。
+// 这里改成读文件头嗅探内容：PNG 签名或 JSON 的首字符，认不出来再退回后缀。
+// 嗅探对本地路径和 content:// URI 一视同仁——两者都走 QFile 打开。
+CardFileKind sniffCardFileKind(const QString& filePath)
+{
+    static const QByteArray kPngSignature("\x89PNG\r\n\x1a\n", 8);
+
+    QFile file(filePath);
+    if (file.open(QIODevice::ReadOnly)) {
+        const QByteArray head = file.read(64);
+        file.close();
+
+        if (head.startsWith(kPngSignature))
+            return CardFileKind::Png;
+
+        // 跳过 UTF-8 BOM 和前导空白，再看第一个有效字符
+        int i = 0;
+        if (head.startsWith("\xEF\xBB\xBF"))
+            i = 3;
+        while (i < head.size()) {
+            const char c = head.at(i);
+            if (c != ' ' && c != '\t' && c != '\r' && c != '\n')
+                break;
+            ++i;
+        }
+        if (i < head.size() && head.at(i) == '{')
+            return CardFileKind::Json;
+    }
+
+    const QString suffix = QFileInfo(filePath).suffix().toLower();
+    if (suffix == QLatin1String("png"))
+        return CardFileKind::Png;
+    if (suffix == QLatin1String("json"))
+        return CardFileKind::Json;
+    return CardFileKind::Unknown;
+}
+
+QString cardKindName(CardFileKind kind)
+{
+    switch (kind) {
+    case CardFileKind::Png: return QStringLiteral("PNG");
+    case CardFileKind::Json: return QStringLiteral("JSON");
+    default: break;
+    }
+    return QStringLiteral("未知");
+}
+
+} // namespace
+
 CharacterService& CharacterService::instance()
 {
     static CharacterService instance;
@@ -254,24 +310,36 @@ QString CharacterService::duplicateCharacter(const QString& sourceId)
 // ==================== 导入导出 ====================
 QString CharacterService::importCharacterFromFile(const QString& filePath)
 {
+    qDebug()<<"导入文件:"<<filePath;
     if (!QFile::exists(filePath)) {
         qDebug()<<"导入失败："<<filePath<<"文件不存在";
         emit operationError("导入失败：文件不存在");
         return {};
     }
 
-    QFileInfo fileInfo(filePath);
-    QString suffix = fileInfo.suffix().toLower();
+    // 先确认能读（content:// URI 的权限问题在这里暴露，别误报成格式不支持）
+    {
+        QFile probe(filePath);
+        if (!probe.open(QIODevice::ReadOnly)) {
+            qDebug()<<"导入失败：无法读取"<<filePath;
+            emit operationError("导入失败：无法读取文件");
+            return {};
+        }
+    }
+
+    // 按内容嗅探，不依赖后缀——安卓 SAF 的 URI 往往没有扩展名
+    const CardFileKind kind = sniffCardFileKind(filePath);
+    qDebug()<<"识别出的卡片类型:"<<cardKindName(kind);
     QJsonObject cardData;
 
     try {
-        if (suffix == "png") {
+        if (kind == CardFileKind::Png) {
             cardData = Utils::extractPngMetadata(filePath);
             if (cardData.isEmpty()) {
                 emit operationError("导入失败：PNG文件不含角色卡元数据");
                 return {};
             }
-        } else if (suffix == "json") {
+        } else if (kind == CardFileKind::Json) {
             QJsonDocument doc = Utils::readJsonFile(filePath);
             if (doc.isNull() || !doc.isObject()) {
                 emit operationError("导入失败：JSON文件格式错误");
@@ -291,7 +359,7 @@ QString CharacterService::importCharacterFromFile(const QString& filePath)
 
         CharacterEntity entity = parseCardDataToEntity(cardData);
 
-        if (suffix == "png") {
+        if (kind == CardFileKind::Png) {
             //头像路径
             entity.avatarPath = entity.id+".png";
             // PNG 角色卡直接用原图作为头像
