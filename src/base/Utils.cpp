@@ -311,6 +311,23 @@ bool Utils::writeJsonFile(const QString& filePath, const QJsonDocument& doc)
     return true;
 }
 
+QString Utils::pathFromUrl(const QUrl& url)
+{
+    if (url.isEmpty())
+        return {};
+
+    // 安卓的文档选择器（ACTION_OPEN_DOCUMENT / ACTION_CREATE_DOCUMENT）给的是
+    // content:// 文档 URI，不是本地路径。Qt 的 Android content file engine 能让
+    // QFile / QFileInfo / QImage 直接读写它，但 QUrl::toLocalFile() 对非本地 URL
+    // 只返回空串 —— 这就是安卓端"导入失败：文件不存在"的根因。
+    // 这里把 content URL 以完全编码的形式原样交回去（等价于 Android 的 uri.toString()），
+    // 其它情况保持原有行为。
+    if (url.scheme().compare(QStringLiteral("content"), Qt::CaseInsensitive) == 0)
+        return url.toString(QUrl::FullyEncoded);
+
+    return url.toLocalFile();
+}
+
 QJsonDocument Utils::readJsonFile(const QString& filePath)
 {
     QFile file(filePath);

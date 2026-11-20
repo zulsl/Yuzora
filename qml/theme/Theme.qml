@@ -103,11 +103,19 @@ QtObject {
     readonly property color borderColor: borderDefault
 
     // ========== 字体 ==========
-    // Windows 用雅黑；其它平台留空，让 Qt 使用系统默认字体。
+    // Windows 用雅黑。
+    // 安卓必须给一个**真实的字体族名**，不能留空：空 family 在 Qt 6 的 fontconfig
+    // 后端下没有"用系统默认"这种语义，而是拿一个空 pattern 去匹配——会匹配到
+    // Roboto 的**斜体** face，于是英文（API / AI）是斜的、中文靠字形回退反而是正的。
+    // Roboto 是 AOSP 自带字体；中文没有的字形会自动回退到 Noto Sans CJK。
     // 不用 Qt.application.font：它不是稳定的跨平台属性，取不到时反而会抛异常。
-    readonly property string fontFamily: Qt.platform.os === "windows"
-                                         ? "Microsoft YaHei"
-                                         : ""
+    readonly property string fontFamily: {
+        if (Qt.platform.os === "windows")
+            return "Microsoft YaHei"
+        if (Qt.platform.os === "android")
+            return "Roboto"
+        return ""
+    }
     // 正文字号（由 Main.qml 从 SettingsViewModel.baseFontSize 推入）
     property int baseFontSize: 14
 

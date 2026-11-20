@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 
-project(Yuzora VERSION 1.0.0 LANGUAGES CXX)
+project(Yuzora VERSION 1.0.1 LANGUAGES CXX)
 
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -69,7 +69,6 @@ qt_add_qml_module(${PROJECT_NAME}
     RESOURCES res.qrc
 
     SOURCES
-        # src/base
         src/base/AppException.cpp
         src/base/AppException.h
         src/base/ExceptionHandler.cpp
@@ -83,17 +82,14 @@ qt_add_qml_module(${PROJECT_NAME}
         src/base/Utils.cpp
         src/base/Utils.h
 
-        # src/crossplatform
         src/crossplatform/DeviceHelper.cpp
         src/crossplatform/DeviceHelper.h
 
-        # src/model
         src/model/ApplicationBootstrap.cpp
         src/model/ApplicationBootstrap.h
         src/model/DatabaseManager.cpp
         src/model/DatabaseManager.h
 
-        # src/model/dao
         src/model/dao/AbstractDao.cpp
         src/model/dao/AbstractDao.h
         src/model/dao/ApiConfigDao.cpp
@@ -122,7 +118,6 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/dao/WorldInfoEntryDao.cpp
         src/model/dao/WorldInfoEntryDao.h
 
-        # src/model/entity
         src/model/entity/ApiConfigEntity.h
         src/model/entity/CharacterEntity.h
         src/model/entity/ChatMessageEntity.h
@@ -134,7 +129,6 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/entity/WorldInfoBookEntity.h
         src/model/entity/WorldInfoEntryEntity.h
 
-        # src/model/list
         src/model/list/ApiConfigListModel.cpp
         src/model/list/ApiConfigListModel.h
         src/model/list/CharacterItemViewModel.cpp
@@ -154,20 +148,17 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/list/WorldInfoEntryListModel.cpp
         src/model/list/WorldInfoEntryListModel.h
 
-        # src/model/list/preset
         src/model/list/preset/PresetListModel.cpp
         src/model/list/preset/PresetListModel.h
         src/model/list/preset/PresetPromptListModel.cpp
         src/model/list/preset/PresetPromptListModel.h
 
-        # src/model/migration
         src/model/migration/MigrationRunner.cpp
         src/model/migration/MigrationRunner.h
         src/model/migration/SchemaMigration.h
         src/model/migration/SchemaMigrations.cpp
         src/model/migration/SchemaMigrations.h
 
-        # src/model/network
         src/model/network/BaseApiClient.cpp
         src/model/network/BaseApiClient.h
         src/model/network/ChatMessage.cpp
@@ -187,7 +178,6 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/network/OpenAICompatibleApiClient.cpp
         src/model/network/OpenAICompatibleApiClient.h
 
-        # src/model/service/app
         src/model/service/app/ApiConfigService.cpp
         src/model/service/app/ApiConfigService.h
         src/model/service/app/SettingsService.cpp
@@ -195,7 +185,6 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/service/app/StorageService.cpp
         src/model/service/app/StorageService.h
 
-        # src/model/service/character
         src/model/service/character/CharacterCardParser.cpp
         src/model/service/character/CharacterCardParser.h
         src/model/service/character/CharacterService.cpp
@@ -203,7 +192,6 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/service/character/GreetingService.cpp
         src/model/service/character/GreetingService.h
 
-        # src/model/service/chat
         src/model/service/chat/ChatService.cpp
         src/model/service/chat/ChatService.h
         src/model/service/chat/ChatServiceAssembly.cpp
@@ -212,16 +200,13 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/service/chat/SessionService.cpp
         src/model/service/chat/SessionService.h
 
-        # src/model/service/chat/completion
         src/model/service/chat/completion/ApiCompletionRunner.cpp
         src/model/service/chat/completion/ApiCompletionRunner.h
         src/model/service/chat/completion/ChatCompletionRunner.h
 
-        # src/model/service/preset
         src/model/service/preset/CompletionPresetService.cpp
         src/model/service/preset/CompletionPresetService.h
 
-        # src/model/service/prompt
         src/model/service/prompt/ChatCompletion.cpp
         src/model/service/prompt/ChatCompletion.h
         src/model/service/prompt/ChatMessageGroup.h
@@ -232,13 +217,11 @@ qt_add_qml_module(${PROJECT_NAME}
         src/model/service/prompt/PromptBuilder.cpp
         src/model/service/prompt/PromptBuilder.h
 
-        # src/model/service/worldinfo
         src/model/service/worldinfo/WorldInfoMatcher.cpp
         src/model/service/worldinfo/WorldInfoMatcher.h
         src/model/service/worldinfo/WorldInfoService.cpp
         src/model/service/worldinfo/WorldInfoService.h
 
-        # src/viewmodel
         src/viewmodel/AboutViewModel.cpp
         src/viewmodel/AboutViewModel.h
         src/viewmodel/ApiConfigDraft.cpp

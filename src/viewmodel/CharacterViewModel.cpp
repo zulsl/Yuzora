@@ -135,7 +135,7 @@ void CharacterViewModel::updateAvatar(const QUrl& fileUrl)
         return;
     }
 
-    const QString filePath = fileUrl.toLocalFile();
+    const QString filePath = Utils::pathFromUrl(fileUrl);
     if (filePath.isEmpty()) {
         emit operationError("头像路径无效");
         return;
@@ -174,7 +174,7 @@ void CharacterViewModel::duplicateCurrentCharacter()
 
 void CharacterViewModel::importCharacter(const QUrl& fileUrl)
 {
-    const QString filePath = fileUrl.toLocalFile();
+    const QString filePath = Utils::pathFromUrl(fileUrl);
     const QString newId = m_characterService->importCharacterFromFile(filePath);
 
     // 导入后直接选中新角色，避免用户还要手动找。
@@ -185,7 +185,7 @@ void CharacterViewModel::importCharacter(const QUrl& fileUrl)
 
 void CharacterViewModel::exportCurrentCharacter(const QUrl& fileUrl)
 {
-    QString filePath = fileUrl.toLocalFile();
+    QString filePath = Utils::pathFromUrl(fileUrl);
     if (!hasSelection()) return;
     m_characterService->exportCharacterToFile(m_currentCharacter.id, filePath);
 }

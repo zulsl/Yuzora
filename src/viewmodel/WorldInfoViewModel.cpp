@@ -4,6 +4,7 @@
 #include "WorldInfoBookItemModel.h"
 #include "WorldInfoBookEntity.h"
 #include "ExceptionHandler.h"
+#include "Utils.h"
 
 // ======================================
 // 构造与析构
@@ -129,13 +130,13 @@ void WorldInfoViewModel::renameBook(const QString& bookId, const QString& newNam
 // ======================================
 void WorldInfoViewModel::importBook(const QUrl& fileUrl)
 {
-    QString filePath = fileUrl.toLocalFile();
+    QString filePath = Utils::pathFromUrl(fileUrl);
     m_service->importBookFromSillyTavern(filePath);
 }
 
 void WorldInfoViewModel::exportCurrentBook(const QUrl& fileUrl)
 {
-    QString filePath = fileUrl.toLocalFile();
+    QString filePath = Utils::pathFromUrl(fileUrl);
     if (m_currentBookId.isEmpty()) {
         emit operationError(QStringLiteral("请先选择要导出的文集"));
         return;

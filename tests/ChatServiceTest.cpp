@@ -470,7 +470,7 @@ void ChatServiceTest::renameSessionTrimsAndClamps()
     QVERIFY(f.chatService.renameSession(sessionId, QStringLiteral("  新标题  ")));
     QCOMPARE(f.chatService.currentSession().title, QStringLiteral("新标题"));
 
-    const QString longTitle(60, QLatin1Char('长'));
+    const QString longTitle(60, QLatin1Char('a'));
     QVERIFY(f.chatService.renameSession(sessionId, longTitle));
     QCOMPARE(f.chatService.currentSession().title.size(), 40);
 

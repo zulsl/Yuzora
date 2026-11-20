@@ -41,6 +41,30 @@ PageScaffold {
     contentPadding: 0
     onLeftClicked: Ui.requestDrawer()
 
+    // ===== 键盘 / 窗口尺寸变化时的贴底策略 =====
+    // 软键盘弹出/收起会让窗口变矮/变高（manifest 里用的是 adjustResize），ListView 随之重排。
+    // 在重排过程中直接 positionViewAtEnd() 会和布局互相打架，表现为“收起键盘后列表卡住/停在半路”。
+    // 所以改成：尺寸稳定一小段时间后再贴底一次，并且只在用户本来就贴着底部时才贴。
+    property bool stickToBottom: true
+
+    onHeightChanged: {
+        if (!resizeSettleTimer.running)
+            resizeSettleTimer.pinned = root.stickToBottom
+        resizeSettleTimer.restart()
+    }
+
+    Timer {
+        id: resizeSettleTimer
+        property bool pinned: false
+        interval: 140
+        repeat: false
+        // 只有一条消息时是开场白，必须停在顶部，不能被贴底带走
+        onTriggered: {
+            if (pinned && messageListView.count > 1)
+                messageListView.positionViewAtEnd()
+        }
+    }
+
     // 会话里只有一条消息时它就是开场白：定位到顶部，让开场白从头显示；
     // 否则（已经在聊了）定位到最新消息。开场白可能很长，一条就撑满视口，
     // 这种情况下"定位到末尾"会把人直接甩到开场白底部。
@@ -156,6 +180,14 @@ PageScaffold {
 
                 // 滚动条用下面的 ChatScrollBar 自绘：ListView 对不等高 delegate 的
                 // contentHeight 是估算值，长气泡进出时会让原生 ScrollBar 的长度来回跳。
+
+                // 用户主动上滑就取消贴底；滑回底部时恢复
+                onMovementStarted: root.stickToBottom = false
+
+                onAtYEndChanged: {
+                    if (atYEnd)
+                        root.stickToBottom = true
+                }
 
                 // 消息数变化时跟随：只有开场白一条就停在顶部，否则沿用"在底部才跟随"
                 onCountChanged: {

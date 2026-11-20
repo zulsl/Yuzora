@@ -23,6 +23,14 @@
 
 int main(int argc, char *argv[])
 {
+#ifdef Q_OS_ANDROID
+    // 安卓默认用 SurfaceView 承载渲染表面。窗口尺寸变化时（软键盘弹出/收起就是
+    // adjustResize 引起的窗口 resize）它的绘制缓冲会被丢弃，合成器拿不到内容，
+    // 于是闪一帧黑。TextureView 把内容画进 View 树里的纹理，尺寸变化时保留上一帧，
+    // 不会闪黑；代价是多一次纹理拷贝，性能略降。
+    // 把 "1" 改成 "0" 就退回 SurfaceView。
+    qputenv("QT_ANDROID_SURFACE_CONTAINER_TYPE", "1");
+#endif
     QGuiApplication app(argc, argv);
 
 // 必须显式选择非原生样式：

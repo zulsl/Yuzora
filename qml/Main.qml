@@ -54,11 +54,23 @@ ApplicationWindow {
     font: Theme.applicationFont
     color: Theme.bgCanvas
 
+    // PC 点关闭按钮 / Android 结束 Activity 前都会走这里：
+    // 没确认过就先拦住，等用户在确认框里点头
+    onClosing: function(close) {
+        if (mainWindow.exitConfirmed)
+            return
+        close.accepted = false
+        mainWindow.requestQuit()
+    }
+
     // 当前页索引（导航高亮用）
     property int currentPage: 0
     // “关于”是推入式页面，不占侧栏导航项；记住推入前的页面用于返回。
     property int previousPage: 0
     readonly property int aboutPageIndex: 6
+
+    // 退出确认：安卓返回键退到根位置、PC 关窗口时，都先问一句再退
+    property bool exitConfirmed: false
 
     // ========== 窗口根 Item ==========
     // ApplicationWindow 不是 Item：Keys 只能挂在 Item 上，
@@ -138,12 +150,45 @@ ApplicationWindow {
             mainWindow.popAbout()
             return
         }
+        mainWindow.requestQuit()
+    }
+
+    // 请求退出：没确认过就弹框，避免重复叠加
+    function requestQuit() {
+        if (exitDialog.opened)
+            return
+        exitDialog.open()
+    }
+
+    // 用户确认后真正退出：Android 上等价于结束 Activity，PC 上关闭窗口
+    function quitApplication() {
+        mainWindow.exitConfirmed = true
         mainWindow.close()
     }
 
     // ========== 全局提示 ==========
     AppToast {
         id: globalToast
+    }
+
+    // ========== 退出确认 ==========
+    ConfirmDialog {
+        id: exitDialog
+        title: "退出语昼"
+        text: "确定要退出吗？"
+        acceptText: "退出"
+        rejectText: "继续使用"
+        danger: true
+        onConfirmed: mainWindow.quitApplication()
+    }
+
+    // 确认框打开时，安卓返回键 = 取消。
+    // 注意要用 ApplicationShortcut：modal Popup 会让 WindowShortcut 彻底失效。
+    Shortcut {
+        sequence: "Back"
+        context: Qt.ApplicationShortcut
+        enabled: exitDialog.opened
+        onActivated: exitDialog.close()
     }
 
     Connections {

@@ -510,7 +510,7 @@ void CompletionPresetViewModel::flushPendingPromptEdits()
 // ======================================
 void CompletionPresetViewModel::importFromFile(const QUrl& fileUrl)
 {
-    QString filePath = fileUrl.toLocalFile();
+    QString filePath = Utils::pathFromUrl(fileUrl);
     QFileInfo fi(filePath);
     QString fileName = fi.completeBaseName();
 
@@ -526,7 +526,7 @@ void CompletionPresetViewModel::importFromFile(const QUrl& fileUrl)
 
 void CompletionPresetViewModel::exportCurrent(const QString& presetId, const QUrl& savePath)
 {
-    QString filePath = savePath.toLocalFile();
+    QString filePath = Utils::pathFromUrl(savePath);
     m_service->exportToSillyTavern(presetId, filePath);
 }
 

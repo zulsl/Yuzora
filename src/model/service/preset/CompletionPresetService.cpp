@@ -42,10 +42,10 @@ void CompletionPresetService::initBuiltinPresets()
 {
     if (!m_completionPresetDao->selectAll().isEmpty()) return;
 
-    // 内置1：平衡模式（默认）
+    // 内置1：简易模式（默认）
     CompletionPresetEntity balanced;
     balanced.id = Utils::generateUuid();
-    balanced.name = "平衡模式 (默认)";
+    balanced.name = "简易模式 (默认)";
     balanced.isActive = true;
     balanced.maxContextToken = 4096;
     balanced.maxResponseToken = 1024;

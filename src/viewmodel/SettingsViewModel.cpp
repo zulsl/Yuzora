@@ -3,6 +3,7 @@
 #include "StorageService.h"
 #include "GlobalConstants.h"
 #include "ExceptionHandler.h"
+#include "Utils.h"
 #include <QColor>
 
 SettingsViewModel::SettingsViewModel(QObject* parent)
@@ -125,6 +126,8 @@ QString SettingsViewModel::dataPath() const {
 
 void SettingsViewModel::customAppPath(const QUrl & fileUrl)
 {
+    // 这里选的是“数据目录”而不是文件：安卓的 content:// 树 URI 不能当 SQLite 的目录用，
+    // 所以保持 toLocalFile()，安卓上会走“路径不能为空”的分支。
     const QString path = fileUrl.toLocalFile();
     if (path.isEmpty()) {
         emit m_exceptionHandler->errorOccurred("文件路径不能为空");
@@ -180,7 +183,7 @@ void SettingsViewModel::setUserAvatar(const QUrl& fileUrl)
 {
     if (fileUrl.isEmpty()) return;
     try {
-        m_service->saveUserAvatar(fileUrl.toLocalFile());
+        m_service->saveUserAvatar(Utils::pathFromUrl(fileUrl));
         emit userAvatarChanged();
     }
     catch (const AppException& e) { m_exceptionHandler->handleException(e); }

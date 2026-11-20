@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QUuid>
+#include <QUrl>
 
 #include "GlobalConstants.h"
 #include "PromptEntity.h"
@@ -27,6 +28,9 @@ public:
     static QString getAvatarDirPath();
     //获取配置文件路径(弃用)
     static QString getConfigFilePath(const QString& fileName);
+    // 把文件选择器返回的 QUrl 规范化成 Qt 能直接打开的路径：
+    // 本地文件走 toLocalFile()；安卓文档选择器给的 content:// URI 原样返回。
+    static QString pathFromUrl(const QUrl& url);
 
 // ======================================
 // 角色卡专用处理
