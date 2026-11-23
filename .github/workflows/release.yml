@@ -1,0 +1,194 @@
+# 发版流水线：只在打 tag 时跑一次，产出「Windows 压缩包 + 签名 Android APK」并挂到 Release。
+#
+# 为什么和 build.yml / android.yml 分开：
+#   build.yml   = 日常验证（push/PR 就编译 + 跑测试，快）
+#   android.yml = 手动出 APK（想单独拿个包装手机时用）
+#   release.yml = 发版（两个平台的成品包 + 写 Release）
+#
+# 发版流程：改 CMakeLists 的 project(VERSION) → 提交 → 打 tag → 推 tag
+#   git tag -a 1.0.2 -m "1.0.2" && git push github 1.0.2
+name: release
+
+on:
+  push:
+    # 既认你现有的 1.0.x 风格，也认 v1.0.x
+    tags:
+      - '[0-9]*'
+      - 'v[0-9]*'
+
+jobs:
+  windows:
+    name: Windows 打包
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: 取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Qt 6.8.3（MSVC 2022 x64）
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: 进入 MSVC 编译环境
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: 配置（Release，不编译测试，发版要快）
+        run: >
+          cmake -S . -B build-ci -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DBUILD_TESTING=OFF
+
+      - name: 编译
+        run: cmake --build build-ci --parallel
+
+      - name: 安装到 dist
+        run: cmake --install build-ci --prefix dist
+
+      - name: 部署 Qt 运行库（DLL + QML 模块 + MSVC 运行时）
+        run: >
+          windeployqt --release --compiler-runtime --no-translations
+          --qmldir qml dist\bin\Yuzora.exe
+
+      - name: 打成 zip
+        run: >
+          Compress-Archive -Path dist\bin\*
+          -DestinationPath "Yuzora-${{ github.ref_name }}-win64.zip"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: yuzora-win64
+          path: Yuzora-*.zip
+          if-no-files-found: error
+
+  android:
+    name: Android 打包（arm64，已签名）
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_NDK: /usr/local/lib/android/sdk/ndk/26.1.10909125
+      QT_ANDROID: /home/runner/Qt/6.8.3/android_arm64_v8a
+      QT_HOST: /home/runner/Qt/6.8.3/gcc_64
+
+    steps:
+      - name: 取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 缓存 Qt
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/Qt
+          key: qt-6.8.3-android-arm64-linux
+
+      - name: 安装 Qt for Android + 桌面 host Qt
+        run: |
+          pip3 install --quiet aqtinstall
+          aqt install-qt linux desktop 6.8.3 linux_gcc_64 --outputdir /home/runner/Qt
+          aqt install-qt linux android 6.8.3 android_arm64_v8a --outputdir /home/runner/Qt
+
+      - name: 安装 NDK
+        run: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            --install "ndk;26.1.10909125" "build-tools;35.0.0" > /dev/null
+
+      - name: 配置
+        run: |
+          cmake -S . -B build-android -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-28 \
+            -DCMAKE_TOOLCHAIN_FILE="$QT_ANDROID/lib/cmake/Qt6/qt.toolchain.cmake" \
+            -DQT_HOST_PATH="$QT_HOST" \
+            -DANDROID_OPENSSL_DIR=/nonexistent \
+            -DBUILD_TESTING=OFF
+
+      - name: 编译 APK
+        run: cmake --build build-android --target apk --parallel
+
+      - name: 准备签名密钥
+        id: keystore
+        env:
+          KS_B64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KS_B64" ]; then
+            echo "没有配置 KEYSTORE_BASE64：本次只产出未签名 APK（Release 里会缺 android 包）"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: 签名 + 校验
+        if: steps.keystore.outputs.signed == 'true'
+        env:
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          BT=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -n1)
+          UNSIGNED=$(find build-android -name '*-release-unsigned.apk' | head -n1)
+          OUT="Yuzora-${{ github.ref_name }}-arm64.apk"
+          "$BT/apksigner" sign \
+            --ks "$RUNNER_TEMP/release.keystore" \
+            --ks-pass "pass:$KS_PASS" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass "pass:$KEY_PASS" \
+            --out "$OUT" "$UNSIGNED"
+          "$BT/apksigner" verify --print-certs "$OUT"
+          echo "已签名：$OUT"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: yuzora-android
+          path: Yuzora-*.apk
+          if-no-files-found: warn
+
+  publish:
+    name: 写入 Release
+    needs: [windows, android]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 收集前面两个 job 的产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: 看看收到了什么
+        run: ls -lh artifacts
+
+      - name: 创建或更新 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          FILES=$(ls artifacts/*.zip artifacts/*.apk 2>/dev/null || true)
+          if [ -z "$FILES" ]; then
+            echo "没有拿到任何产物，终止"
+            exit 1
+          fi
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" $FILES --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" $FILES \
+              --title "语昼 $(echo "$GITHUB_REF_NAME" | sed 's/^v//')" \
+              --generate-notes
+          fi

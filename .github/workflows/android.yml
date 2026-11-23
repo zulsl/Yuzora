@@ -1,6 +1,5 @@
-# Android arm64 APK：只在「手动点运行」或「打 tag」时跑。
-# 原因：Qt for Android + SDK/NDK 在 runner 上要下 2GB 左右、跑几分钟，
-# 每次 push 都跑太浪费；日常看 build.yml 那个就够了。
+# Android arm64 APK：手动触发，出一份签名包挂在「这次运行」的附件里。
+# 想要正式的发行版（Windows 包 + APK + Release 页面）请打 tag，走 release.yml。
 #
 # 签名：配了仓库 Secrets 就出「可直接安装」的 APK；没配就只出未签名包（不阻断流水线）。
 # 需要的 Secrets：
@@ -8,23 +7,16 @@
 #   KEYSTORE_PASSWORD    密钥库口令
 #   KEY_ALIAS            别名
 #   KEY_PASSWORD         别名口令
-# 打 v* tag 时，已签名的 APK 会自动挂到对应 Release 上。
 name: android
 
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*']
 
 jobs:
   apk:
     name: Android arm64 / Qt 6.8.3
     runs-on: ubuntu-latest
     timeout-minutes: 90
-
-    # 打 tag 时要往 Release 里传文件，默认的只读权限不够
-    permissions:
-      contents: write
 
     env:
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
@@ -125,14 +117,3 @@ jobs:
             yuzora-*.apk
             build-android/**/build/outputs/apk/**/*.apk
           if-no-files-found: warn
-
-      - name: 挂到 Release（仅打 tag 且已签名）
-        if: startsWith(github.ref, 'refs/tags/') && steps.keystore.outputs.signed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" yuzora-*.apk --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" yuzora-*.apk --generate-notes
-          fi
