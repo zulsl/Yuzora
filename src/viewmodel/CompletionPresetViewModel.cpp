@@ -370,6 +370,28 @@ void CompletionPresetViewModel::refreshPromptList()
         }
     }
 
+    // 自愈：有条目、但不在 promptOrder 里的提示词，既不会出现在列表里、也不会参与拼装
+    // （PromptBuilder 只按顺序表遍历）。顺手把它们补到顺序表末尾并落库一次。
+    // 这也是拖动的前提：拖动提交时要求顺序表覆盖所有可见行。
+    QStringList orphans;
+    for (auto it = promptLookup.cbegin(); it != promptLookup.cend(); ++it) {
+        if (!promptOrder.contains(it.key()))
+            orphans.append(it.key());
+    }
+    if (!orphans.isEmpty()) {
+        QStringList healed = promptOrder;
+        healed.append(orphans);
+        if (m_service->reorderPrompts(m_currentPreset.id, healed)) {
+            const CompletionPresetEntity fresh = m_service->getPresetById(m_currentPreset.id);
+            if (!fresh.id.isEmpty())
+                m_currentPreset.promptOrder = fresh.promptOrder;
+            for (const QString& identifier : orphans)
+                items.append(promptLookup.value(identifier));
+        } else {
+            qWarning() << "[CompletionPresetViewModel::refreshPromptList]补全 promptOrder 失败";
+        }
+    }
+
     m_presetPromptListModel->loadList(items);
 }
 
@@ -440,6 +462,40 @@ void CompletionPresetViewModel::deletePrompt(const QString& promptId)
     flushPendingPromptEdits();
     if (m_service->deletePrompt(m_currentPreset.id, promptId))
         reloadCurrentPresetAndPrompts();
+}
+
+void CompletionPresetViewModel::movePrompt(int from, int to)
+{
+    if (m_currentPreset.id.isEmpty()) return;
+
+    // 拖动过程中会连着调很多次：这里刻意不落库、不刷新列表，
+    // 只改模型让界面立刻让位；松手时 commitPromptOrder() 一次写回。
+    m_presetPromptListModel->moveRow(from, to);
+}
+
+void CompletionPresetViewModel::commitPromptOrder()
+{
+    if (m_currentPreset.id.isEmpty()) return;
+
+    flushPendingPromptEdits();
+
+    const QStringList visibleOrder = m_presetPromptListModel->identifiers();
+    if (visibleOrder.isEmpty()) return;
+
+    if (!m_service->reorderPrompts(m_currentPreset.id, visibleOrder)) {
+        // 写库失败：把列表拉回库里的顺序，别让界面和数据库长期不一致
+        refreshPromptList();
+        return;
+    }
+
+    // 关键：把 m_currentPreset.promptOrder 拉成最新。
+    // savePresetDraft() 是整行 UPDATE（草稿里没有 promptOrder），
+    // 内存里留着旧顺序的话，用户接下来改个预设名就会把顺序静默回滚。
+    const CompletionPresetEntity fresh = m_service->getPresetById(m_currentPreset.id);
+    if (!fresh.id.isEmpty() && fresh.promptOrder != m_currentPreset.promptOrder) {
+        m_currentPreset.promptOrder = fresh.promptOrder;
+        emit currentPresetChanged();
+    }
 }
 
 int CompletionPresetViewModel::roleForPromptField(const QString& field) const

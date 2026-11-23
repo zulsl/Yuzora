@@ -98,6 +98,11 @@ public:
     Q_INVOKABLE void setPromptField(const QString& promptId, const QString& field,
                                     const QVariant& value);
     Q_INVOKABLE void flushPendingPromptEdits();
+    // 拖动换位置：只在模型里挪行（界面立刻让位），落库要等松手调 commitPromptOrder()。
+    // 菜单里的上移/下移/置顶/置底也是先 movePrompt 再立刻 commitPromptOrder。
+    Q_INVOKABLE void movePrompt(int from, int to);
+    // 把当前列表顺序写回 preset.promptOrder，并同步内存里的 m_currentPreset。
+    Q_INVOKABLE void commitPromptOrder();
 
 
     // 导入导出

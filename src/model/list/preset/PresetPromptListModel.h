@@ -3,6 +3,7 @@
 
 #include <QAbstractListModel>
 #include <QList>
+#include <QStringList>
 #include "PromptEntity.h"
 
 class PresetPromptListModel : public QAbstractListModel {
@@ -41,6 +42,14 @@ public:
     PromptEntity entryById(const QString& id) const;
     // ViewModel 专用：更新业务字段，不触发持久化
     bool updateField(const QString& id, int role, const QVariant& value);
+
+    // 拖动换位置：只在内存里挪行（带 beginMoveRows/endMoveRows），落库由 ViewModel 负责。
+    // from/to 都是当前行号；to 越界时返回 false。不传 QML，只给 C++ 调用。
+    bool moveRow(int from, int to);
+    // 当前列表顺序（identifier 数组），提交时按它重写 promptOrder
+    QStringList identifiers() const;
+    // 起拖时把所有展开的行收起来：收起后每行等高，让位动画和落点计算才稳定。
+    Q_INVOKABLE void collapseAll();
 
 private:
     QSet<QString> m_expandedIds;

@@ -31,9 +31,15 @@ endif()
 # 安卓自定义专属构建,自定义应用名|图标|权限|网络|键盘|主题|存储
 # OBJECT_DEPENDS 让 .ico 变化时 rc 会重编——否则 CMake 只盯着 app.rc，换了图标 exe 还是旧的。
 if(ANDROID)
-    # 安卓openssl需自己导入
-    include("D:/Qt/Android/SDK/android_openssl/android_openssl.cmake")
-    add_android_openssl_libraries(${PROJECT_NAME})
+    # 安卓的 OpenSSL 要自己导入。路径允许用 -DANDROID_OPENSSL_DIR=... 覆盖；
+    # 找不到就只出一行警告继续编译（CI 或只验证编译时不带 OpenSSL 也能过）。
+    set(ANDROID_OPENSSL_DIR "D:/Qt/Android/SDK/android_openssl" CACHE PATH "Qt for Android 的 OpenSSL 目录")
+    if(EXISTS "${ANDROID_OPENSSL_DIR}/android_openssl.cmake")
+        include("${ANDROID_OPENSSL_DIR}/android_openssl.cmake")
+        add_android_openssl_libraries(${PROJECT_NAME})
+    else()
+        message(WARNING "未找到 ${ANDROID_OPENSSL_DIR}/android_openssl.cmake，本次构建不带 OpenSSL（HTTPS 可能不可用）")
+    endif()
 
     # 版本号跟随 project(VERSION)，其它地方只写 project(VERSION) 一处即可。
     # 清单里必须保留 "-- %%INSERT_VERSION_CODE%% --" / "-- %%INSERT_VERSION_NAME%% --"

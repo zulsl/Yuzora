@@ -534,6 +534,59 @@ bool CompletionPresetService::deletePrompt(const QString& presetId, const QStrin
     return writePromptChange(preset, prompt, order, false, promptId);
 }
 
+bool CompletionPresetService::reorderPrompts(const QString& presetId,
+                                             const QStringList& visibleOrder)
+{
+    CompletionPresetEntity preset = m_completionPresetDao->selectById(presetId);
+    if (preset.id.isEmpty()) {
+        emit operationError("预设不存在");
+        return false;
+    }
+
+    // 哪些 identifier 在界面上真的有一行（有实体）。
+    // 没有实体的 identifier 不参与重排，否则导入预设里的锚点会被抹掉。
+    QSet<QString> visibleIds;
+    for (const PromptEntity& prompt : m_promptDao->selectPromptsByPresetId(presetId)) {
+        if (!prompt.identifier.isEmpty())
+            visibleIds.insert(prompt.identifier);
+    }
+
+    QStringList queue;
+    QSet<QString> queued;
+    for (const QString& identifier : visibleOrder) {
+        if (identifier.isEmpty() || !visibleIds.contains(identifier) || queued.contains(identifier))
+            continue;
+        queued.insert(identifier);
+        queue.append(identifier);
+    }
+
+    // 按旧顺序走一遍：可见行的槽位依次填新顺序，不可见的 identifier 原样留在原位。
+    QStringList newOrder;
+    int next = 0;
+    for (const QString& identifier : preset.promptOrder) {
+        if (!visibleIds.contains(identifier)) {
+            newOrder.append(identifier);
+        } else if (next < queue.size()) {
+            newOrder.append(queue.at(next++));
+        }
+    }
+    // 可见行原本不在 promptOrder 里（自愈前的脏数据），按新顺序补到末尾
+    while (next < queue.size())
+        newOrder.append(queue.at(next++));
+
+    newOrder = normalizePromptOrder(newOrder);
+    if (newOrder.isEmpty() || newOrder == preset.promptOrder)
+        return true;    // 没变化就不写库，避免 BaseDao 因 0 行受影响误判失败
+
+    CompletionPresetEntity updated = preset;
+    updated.promptOrder = newOrder;
+    if (!m_completionPresetDao->update(updated)) {
+        emit operationError("保存提示词顺序失败");
+        return false;
+    }
+    return true;
+}
+
 CompletionPresetEntity CompletionPresetService::parsePresetDataToEntity(const QJsonObject& stJson,const QString& fileName,QList<PromptEntity>& promptList)
 {
     CompletionPresetEntity preset;

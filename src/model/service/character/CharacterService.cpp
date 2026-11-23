@@ -318,20 +318,18 @@ QString CharacterService::importCharacterFromFile(const QString& filePath)
     }
 
     // 先确认能读（content:// URI 的权限问题在这里暴露，别误报成格式不支持）
-    {
-        QFile probe(filePath);
-        if (!probe.open(QIODevice::ReadOnly)) {
-            qDebug()<<"导入失败：无法读取"<<filePath;
-            emit operationError("导入失败：无法读取文件");
-            return {};
-        }
+    QFile probe(filePath);
+    if (!probe.open(QIODevice::ReadOnly)) {
+        qDebug()<<"导入失败：无法读取"<<filePath;
+        emit operationError("导入失败：无法读取文件");
+        return {};
     }
 
     // 按内容嗅探，不依赖后缀——安卓 SAF 的 URI 往往没有扩展名
     const CardFileKind kind = sniffCardFileKind(filePath);
     qDebug()<<"识别出的卡片类型:"<<cardKindName(kind);
-    QJsonObject cardData;
 
+    QJsonObject cardData;
     try {
         if (kind == CardFileKind::Png) {
             cardData = Utils::extractPngMetadata(filePath);

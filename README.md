@@ -4,7 +4,8 @@
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 ![Qt](https://img.shields.io/badge/Qt-6.8-41CD52)
-![Platform](https://img.shields.io/badge/platform-Windows-lightgrey)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android-lightgrey)
+[![build](https://github.com/zulsl/Yuzora/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/zulsl/Yuzora/actions/workflows/build.yml)
 
 语昼（Yuzora）是一个用 Qt 6 / QML 编写的桌面 AI 角色扮演聊天客户端。角色卡、开场白、世界书、对话预设和流式生成都在同一个原生应用里完成；所有数据存在本机 SQLite，请求只发给你自己配置的 API。
 

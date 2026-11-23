@@ -1,0 +1,74 @@
+# Android arm64 APK：只在「手动点运行」或「打 tag」时跑。
+# 原因：Qt for Android + SDK/NDK 在 runner 上要下 ~2.5GB、跑十几分钟，
+# 每次 push 都跑太浪费；日常看 build.yml 那个就够了。
+#
+# 注意：这条流水线第一次跑很可能要调 1~2 处（Qt/SDK 的路径随镜像变动），
+# 本地能出包不代表 runner 上一定行，报错就贴给我，按日志改。
+name: android
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  apk:
+    name: Android arm64 / Qt 6.8.3
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    env:
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_NDK: /usr/local/lib/android/sdk/ndk/26.1.10909125
+      QT_ANDROID: /home/runner/Qt/6.8.3/android_arm64_v8a
+      QT_HOST: /home/runner/Qt/6.8.3/gcc_64
+
+    steps:
+      - name: 取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 缓存 Qt（第二次起省 2GB 下载）
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/Qt
+          key: qt-6.8.3-android-arm64-linux
+
+      - name: 安装 Qt for Android + 桌面 host Qt
+        run: |
+          pip3 install --quiet aqtinstall
+          # 交叉编译 Android 时，宿主端要有同版本的桌面 Qt 来跑 qmlcachegen / rcc 等工具
+          aqt install-qt linux desktop 6.8.3 linux_gcc_64 --outputdir /home/runner/Qt
+          aqt install-qt linux android 6.8.3 android_arm64_v8a --outputdir /home/runner/Qt
+
+      - name: 安装 NDK（Qt 6.8.3 对应 r26b）
+        run: |
+          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+            --install "ndk;26.1.10909125" "build-tools;35.0.0" > /dev/null
+
+      - name: 配置
+        run: |
+          cmake -S . -B build-android -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-28 \
+            -DCMAKE_TOOLCHAIN_FILE="$QT_ANDROID/lib/cmake/Qt6/qt.toolchain.cmake" \
+            -DQT_HOST_PATH="$QT_HOST" \
+            -DANDROID_OPENSSL_DIR=/nonexistent \
+            -DBUILD_TESTING=OFF
+
+      - name: 编译 APK
+        run: cmake --build build-android --target apk --parallel
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: yuzora-apk
+          path: build-android/**/build/outputs/apk/**/*.apk
+          if-no-files-found: warn

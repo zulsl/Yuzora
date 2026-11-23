@@ -1,9 +1,11 @@
 #include <QtTest>
+#include <QFile>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSqlDatabase>
 #include <QSqlQuery>
+#include <QTemporaryDir>
 
 #include "CompletionPresetDao.h"
 #include "CompletionPresetService.h"
@@ -120,6 +122,8 @@ private slots:
     void importFallsBackToStDefaultsWhenKeysMissing();
     void nullColumnsFallBackToStDefaults();
     void exportedPresetKeepsPromptsAndOrder();
+    void reorderPromptsPersistsOrder();
+    void reorderPromptsKeepsIdentifiersWithoutEntities();
 };
 
 // 最小 ST 预设 JSON：一条 main 提示词
@@ -404,6 +408,113 @@ void CompletionPresetServiceTest::exportedPresetKeepsPromptsAndOrder()
     QVERIFY(restored.at(0).isActive);
     QCOMPARE(restored.at(1).identifier, QStringLiteral("jailbreak"));
     QVERIFY(!restored.at(1).isActive);
+}
+
+// 拖动换位置：顺序表落库，并且导出到 ST 时用的是同一份顺序
+void CompletionPresetServiceTest::reorderPromptsPersistsOrder()
+{
+    PresetTestProvider provider;
+    ConnectionProviderRegistry::setProvider(&provider);
+
+    CompletionPresetDao presetDao;
+    PromptDao promptDao;
+    presetDao.setConnectionProvider(&provider);
+    promptDao.setConnectionProvider(&provider);
+
+    CompletionPresetService service(&presetDao, &promptDao);
+
+    CompletionPresetEntity preset;
+    preset.name = QStringLiteral("拖拽预设");
+    const QString presetId = service.createPreset(preset);
+    QVERIFY(!presetId.isEmpty());
+
+    const auto addPrompt = [&](const QString& identifier) {
+        PromptEntity prompt;
+        prompt.identifier = identifier;
+        prompt.name = identifier;
+        prompt.content = identifier;
+        prompt.presetId = presetId;
+        return service.addPrompt(presetId, prompt);
+    };
+    QVERIFY(addPrompt(QStringLiteral("a")));
+    QVERIFY(addPrompt(QStringLiteral("b")));
+    QVERIFY(addPrompt(QStringLiteral("c")));
+    QCOMPARE(service.getPresetById(presetId).promptOrder,
+             (QStringList{QStringLiteral("a"), QStringLiteral("b"), QStringLiteral("c")}));
+
+    // 把 c 拖到最前面
+    QVERIFY(service.reorderPrompts(presetId,
+                                   {QStringLiteral("c"), QStringLiteral("a"), QStringLiteral("b")}));
+    QCOMPARE(service.getPresetById(presetId).promptOrder,
+             (QStringList{QStringLiteral("c"), QStringLiteral("a"), QStringLiteral("b")}));
+
+    // 导出到 ST：prompt_order 里 100001 那组必须也是 c,a,b
+    QJsonObject exported;
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("preset.json"));
+    QVERIFY(service.exportToSillyTavern(presetId, path));
+    {
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::ReadOnly));
+        exported = QJsonDocument::fromJson(file.readAll()).object();
+    }
+
+    QStringList exportedOrder;
+    for (const QJsonValue& group : exported.value("prompt_order").toArray()) {
+        const QJsonObject obj = group.toObject();
+        if (obj.value("character_id").toInt() != 100001) continue;
+        for (const QJsonValue& item : obj.value("order").toArray())
+            exportedOrder.append(item.toObject().value("identifier").toString());
+    }
+    QCOMPARE(exportedOrder, (QStringList{QStringLiteral("c"), QStringLiteral("a"),
+                                         QStringLiteral("b")}));
+}
+
+// 导入的 ST 预设里，promptOrder 可能含没有实体的标识符（锚点）。
+// 拖动只能重排"看得见的行"，那些标识符必须原地留在原来的槽位上，不能被抹掉。
+void CompletionPresetServiceTest::reorderPromptsKeepsIdentifiersWithoutEntities()
+{
+    PresetTestProvider provider;
+    ConnectionProviderRegistry::setProvider(&provider);
+
+    CompletionPresetDao presetDao;
+    PromptDao promptDao;
+    presetDao.setConnectionProvider(&provider);
+    promptDao.setConnectionProvider(&provider);
+
+    CompletionPresetService service(&presetDao, &promptDao);
+
+    CompletionPresetEntity preset;
+    preset.name = QStringLiteral("带锚点预设");
+    const QString presetId = service.createPreset(preset);
+    QVERIFY(!presetId.isEmpty());
+
+    const auto addPrompt = [&](const QString& identifier) {
+        PromptEntity prompt;
+        prompt.identifier = identifier;
+        prompt.name = identifier;
+        prompt.content = identifier;
+        prompt.presetId = presetId;
+        return service.addPrompt(presetId, prompt);
+    };
+    QVERIFY(addPrompt(QStringLiteral("a")));
+    QVERIFY(addPrompt(QStringLiteral("b")));
+    QVERIFY(addPrompt(QStringLiteral("c")));
+
+    // 造一个"没有实体"的锚点：只有顺序表里有它
+    CompletionPresetEntity withGhost = service.getPresetById(presetId);
+    withGhost.promptOrder = {QStringLiteral("a"), QStringLiteral("ghost"),
+                             QStringLiteral("b"), QStringLiteral("c")};
+    QVERIFY(service.updatePreset(withGhost));
+
+    // 可见行拖成 c,a,b；ghost 必须留在第 2 个槽位
+    QVERIFY(service.reorderPrompts(presetId,
+                                   {QStringLiteral("c"), QStringLiteral("a"), QStringLiteral("b")}));
+    QCOMPARE(service.getPresetById(presetId).promptOrder,
+             (QStringList{QStringLiteral("c"), QStringLiteral("ghost"),
+                          QStringLiteral("a"), QStringLiteral("b")}));
+    QCOMPARE(service.getPromptsByPresetId(presetId).size(), 3);
 }
 
 QTEST_GUILESS_MAIN(CompletionPresetServiceTest)

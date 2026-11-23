@@ -1,0 +1,58 @@
+# Windows 桌面端：编译 + 跑全部单元测试
+# 触发：push 到 main、PR、以及网页上手动点 "Run workflow"
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# 同一个分支连着推两次时，取消上一次还没跑完的，省时间也省额度
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    name: Windows / MSVC 2022 / Qt 6.8.3
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: 取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Qt 6.8.3（MSVC 2022 x64）
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          cache: true
+
+      - name: 进入 MSVC 编译环境
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: 配置（Ninja + Release）
+        run: >
+          cmake -S . -B build-ci -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          -DBUILD_TESTING=ON
+
+      - name: 编译（应用 + 20 个测试目标）
+        run: cmake --build build-ci --parallel
+
+      - name: 跑单元测试
+        run: ctest --test-dir build-ci --output-on-failure
+
+      # 失败时把测试日志留下，方便在网页上直接看是哪一条挂了
+      - name: 保存测试日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-logs
+          path: build-ci/Testing/**/*.log
+          if-no-files-found: ignore

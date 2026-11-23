@@ -53,6 +53,39 @@ private slots:
                                   QStringLiteral("新")));
         QCOMPARE(model.entryById(QStringLiteral("custom")).content, QStringLiteral("新"));
     }
+
+    // 拖动换位置：moveRow 只挪内部顺序，并发出 rowsMoved（QML 靠它做让位动画）
+    void moveRowReordersItemsAndEmitsRowsMoved()
+    {
+        PresetPromptListModel model;
+        model.loadList({
+            makePrompt(QStringLiteral("a"), false, QString()),
+            makePrompt(QStringLiteral("b"), false, QString()),
+            makePrompt(QStringLiteral("c"), false, QString()),
+        });
+
+        QSignalSpy spy(&model, &QAbstractItemModel::rowsMoved);
+
+        // 把第 0 行拖到第 2 行
+        QVERIFY(model.moveRow(0, 2));
+        QCOMPARE(model.identifiers(), (QStringList{QStringLiteral("b"),
+                                                   QStringLiteral("c"),
+                                                   QStringLiteral("a")}));
+        QCOMPARE(spy.count(), 1);
+
+        // 再拖回去
+        QVERIFY(model.moveRow(2, 0));
+        QCOMPARE(model.identifiers(), (QStringList{QStringLiteral("a"),
+                                                   QStringLiteral("b"),
+                                                   QStringLiteral("c")}));
+
+        // 原地不动 / 越界都不该发信号
+        const int before = spy.count();
+        QVERIFY(!model.moveRow(1, 1));
+        QVERIFY(!model.moveRow(-1, 0));
+        QVERIFY(!model.moveRow(0, 5));
+        QCOMPARE(spy.count(), before);
+    }
 };
 
 QTEST_GUILESS_MAIN(PresetPromptListModelTest)

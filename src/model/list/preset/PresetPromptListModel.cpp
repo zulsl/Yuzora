@@ -217,3 +217,41 @@ int PresetPromptListModel::indexOfId(const QString& id) const
     }
     return -1;
 }
+
+bool PresetPromptListModel::moveRow(int from, int to)
+{
+    if (from == to)
+        return false;
+    if (from < 0 || from >= m_items.size())
+        return false;
+    if (to < 0 || to >= m_items.size())
+        return false;
+
+    // beginMoveRows 的 destinationChild 是"插到哪一行之前"，所以向下移动要 +1，
+    // 否则 QAbstractItemModel 会直接拒绝这次移动。
+    const int destinationChild = to > from ? to + 1 : to;
+    if (!beginMoveRows(QModelIndex(), from, from, QModelIndex(), destinationChild))
+        return false;
+
+    m_items.move(from, to);
+    endMoveRows();
+    return true;
+}
+
+QStringList PresetPromptListModel::identifiers() const
+{
+    QStringList ids;
+    ids.reserve(m_items.size());
+    for (const PromptEntity& item : m_items)
+        ids.append(item.identifier);
+    return ids;
+}
+
+void PresetPromptListModel::collapseAll()
+{
+    if (m_expandedIds.isEmpty() || m_items.isEmpty())
+        return;
+
+    m_expandedIds.clear();
+    emit dataChanged(index(0), index(m_items.size() - 1), { ExpandedStateRole });
+}

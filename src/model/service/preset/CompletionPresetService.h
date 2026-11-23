@@ -50,6 +50,10 @@ public:
     bool insertPromptBefore(const QString& presetId, const QString& beforeIdentifier,
                             const PromptEntity& prompt);
     bool deletePrompt(const QString& presetId, const QString& promptId);
+    // 拖动换位置：visibleOrder 是编辑界面里"可见行"的新顺序（identifier 序列）。
+    // promptOrder 里可能还留着没有实体的 identifier（导入的 ST 预设里常见），
+    // 那些条目原地不动，只重填可见行占的槽位。顺序没变化时不写库。
+    bool reorderPrompts(const QString& presetId, const QStringList& visibleOrder);
 
     void CreateDefaultPromptEntries(const QString& presetId,QStringList & promptOrderList);//创建默认提示词条目
 
