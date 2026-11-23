@@ -1,5 +1,13 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Sql Test)
 
+# 测试进程要能找到 Qt 的 DLL：ctest 不会继承构建环境的 PATH。
+# 以前每条 add_test 都写死 D:/Qt/6.8.3/msvc2022_64/bin —— 换台机器（以及 CI）就找不到。
+# 现在从 Qt6_DIR 反推安装前缀：<prefix>/lib/cmake/Qt6 → <prefix>/bin
+get_filename_component(YZ_QT_BIN_DIR "${Qt6_DIR}/../../../bin" ABSOLUTE)
+if(NOT IS_DIRECTORY "${YZ_QT_BIN_DIR}")
+    message(WARNING "推导出的 Qt bin 目录不存在：${YZ_QT_BIN_DIR}，测试可能找不到 Qt DLL")
+endif()
+
 # service 层按领域分子目录后，扁平 include 需要把每个子目录都加进搜索路径。
 set(SERVICE_INCLUDE_DIRS
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/model/service/app
@@ -33,7 +41,7 @@ set_target_properties(YuzoraTests PROPERTIES WIN32_EXECUTABLE FALSE)
 
 add_test(NAME YuzoraTests COMMAND YuzoraTests)
 set_tests_properties(YuzoraTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraBaseDaoTests
@@ -56,7 +64,7 @@ set_target_properties(YuzoraBaseDaoTests PROPERTIES WIN32_EXECUTABLE FALSE)
 
 add_test(NAME YuzoraBaseDaoTests COMMAND YuzoraBaseDaoTests)
 set_tests_properties(YuzoraBaseDaoTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraSettingsServiceTests
@@ -91,7 +99,7 @@ set_target_properties(YuzoraSettingsServiceTests PROPERTIES WIN32_EXECUTABLE FAL
 
 add_test(NAME YuzoraSettingsServiceTests COMMAND YuzoraSettingsServiceTests)
 set_tests_properties(YuzoraSettingsServiceTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraCharacterDaoTests
@@ -121,7 +129,7 @@ set_target_properties(YuzoraCharacterDaoTests PROPERTIES WIN32_EXECUTABLE FALSE)
 
 add_test(NAME YuzoraCharacterDaoTests COMMAND YuzoraCharacterDaoTests)
 set_tests_properties(YuzoraCharacterDaoTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraCharacterServiceTests
@@ -155,7 +163,7 @@ set_target_properties(YuzoraCharacterServiceTests PROPERTIES WIN32_EXECUTABLE FA
 
 add_test(NAME YuzoraCharacterServiceTests COMMAND YuzoraCharacterServiceTests)
 set_tests_properties(YuzoraCharacterServiceTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraWorldInfoServiceTests
@@ -193,7 +201,7 @@ set_target_properties(YuzoraWorldInfoServiceTests PROPERTIES WIN32_EXECUTABLE FA
 
 add_test(NAME YuzoraWorldInfoServiceTests COMMAND YuzoraWorldInfoServiceTests)
 set_tests_properties(YuzoraWorldInfoServiceTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraCompletionPresetServiceTests
@@ -231,7 +239,7 @@ set_target_properties(YuzoraCompletionPresetServiceTests PROPERTIES WIN32_EXECUT
 
 add_test(NAME YuzoraCompletionPresetServiceTests COMMAND YuzoraCompletionPresetServiceTests)
 set_tests_properties(YuzoraCompletionPresetServiceTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraCharacterDraftTests
@@ -254,7 +262,7 @@ set_target_properties(YuzoraCharacterDraftTests PROPERTIES WIN32_EXECUTABLE FALS
 
 add_test(NAME YuzoraCharacterDraftTests COMMAND YuzoraCharacterDraftTests)
 set_tests_properties(YuzoraCharacterDraftTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraCompletionPresetDraftTests
@@ -280,7 +288,7 @@ set_target_properties(YuzoraCompletionPresetDraftTests PROPERTIES WIN32_EXECUTAB
 
 add_test(NAME YuzoraCompletionPresetDraftTests COMMAND YuzoraCompletionPresetDraftTests)
 set_tests_properties(YuzoraCompletionPresetDraftTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraChatServiceTests
@@ -338,7 +346,7 @@ set_target_properties(YuzoraChatServiceTests PROPERTIES WIN32_EXECUTABLE FALSE)
 
 add_test(NAME YuzoraChatServiceTests COMMAND YuzoraChatServiceTests)
 set_tests_properties(YuzoraChatServiceTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraApiConfigViewModelTests
@@ -388,7 +396,7 @@ set_target_properties(YuzoraApiConfigViewModelTests PROPERTIES WIN32_EXECUTABLE 
 
 add_test(NAME YuzoraApiConfigViewModelTests COMMAND YuzoraApiConfigViewModelTests)
 set_tests_properties(YuzoraApiConfigViewModelTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraPromptBuilderTests
@@ -428,7 +436,7 @@ set_target_properties(YuzoraPromptBuilderTests PROPERTIES WIN32_EXECUTABLE FALSE
 
 add_test(NAME YuzoraPromptBuilderTests COMMAND YuzoraPromptBuilderTests)
 set_tests_properties(YuzoraPromptBuilderTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraWorldInfoMatcherTests
@@ -457,7 +465,7 @@ set_target_properties(YuzoraWorldInfoMatcherTests PROPERTIES WIN32_EXECUTABLE FA
 
 add_test(NAME YuzoraWorldInfoMatcherTests COMMAND YuzoraWorldInfoMatcherTests)
 set_tests_properties(YuzoraWorldInfoMatcherTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 # 聊天消息显示投影：身份宏只改显示，不改原始记录
@@ -476,7 +484,7 @@ set_target_properties(YuzoraMessageTextRendererTests PROPERTIES WIN32_EXECUTABLE
 
 add_test(NAME YuzoraMessageTextRendererTests COMMAND YuzoraMessageTextRendererTests)
 set_tests_properties(YuzoraMessageTextRendererTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 # 宏引擎：语料取自 SillyTavern 自己的 e2e 用例（tests/frontend/MacroEngine.e2e.js）
@@ -499,7 +507,7 @@ set_target_properties(YuzoraMacroEngineTests PROPERTIES WIN32_EXECUTABLE FALSE)
 
 add_test(NAME YuzoraMacroEngineTests COMMAND YuzoraMacroEngineTests)
 set_tests_properties(YuzoraMacroEngineTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 # 网络错误分类：纯函数，不依赖真实网络
@@ -518,7 +526,7 @@ set_target_properties(YuzoraNetworkErrorTests PROPERTIES WIN32_EXECUTABLE FALSE)
 
 add_test(NAME YuzoraNetworkErrorTests COMMAND YuzoraNetworkErrorTests)
 set_tests_properties(YuzoraNetworkErrorTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 qt_add_executable(YuzoraPresetPromptListModelTests
@@ -543,7 +551,7 @@ set_target_properties(YuzoraPresetPromptListModelTests PROPERTIES WIN32_EXECUTAB
 
 add_test(NAME YuzoraPresetPromptListModelTests COMMAND YuzoraPresetPromptListModelTests)
 set_tests_properties(YuzoraPresetPromptListModelTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 # 数据库迁移：新库、旧库引导、失败回滚、版本保护
@@ -565,7 +573,7 @@ set_target_properties(YuzoraMigrationTests PROPERTIES WIN32_EXECUTABLE FALSE)
 
 add_test(NAME YuzoraMigrationTests COMMAND YuzoraMigrationTests)
 set_tests_properties(YuzoraMigrationTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 # 关于页的版本比较：纯函数，不发起真实网络请求
@@ -586,7 +594,7 @@ set_target_properties(YuzoraAboutViewModelTests PROPERTIES WIN32_EXECUTABLE FALS
 
 add_test(NAME YuzoraAboutViewModelTests COMMAND YuzoraAboutViewModelTests)
 set_tests_properties(YuzoraAboutViewModelTests PROPERTIES
-    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:D:/Qt/6.8.3/msvc2022_64/bin"
+    ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${YZ_QT_BIN_DIR}"
 )
 
 # 对账工具自身的回归（不依赖用户数据）：
