@@ -9,9 +9,14 @@
 #   git tag -a 1.0.2 -m "1.0.2" && git push github 1.0.2
 name: release
 
+# publish job 要用 gh release create/upload 写 Release，
+# GITHUB_TOKEN 默认只有只读权限，不显式声明就会 403 Resource not accessible by integration。
+permissions:
+  contents: write
+
 on:
   push:
-    # 既认你现有的 1.0.x 风格，也认 v1.0.x
+    # 既认现有的 1.0.x 风格，也认 v1.0.x
     tags:
       - '[0-9]*'
       - 'v[0-9]*'
